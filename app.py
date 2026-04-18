@@ -1,29 +1,12 @@
 import streamlit as st
 import ephem
 import math
-import json
-import os
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
-
-CONFIG_FILE = "user_config.json"
-
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_config(config):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f)
 
 LUNATICK_CSS = """
 <style>
@@ -162,7 +145,7 @@ LUNATICK_CSS = """
 st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Logic – Same high-precision Ephem engine
+# Logic
 # ---------------------------------------------------------------------------
 
 ZODIAC_SIGNS = [
@@ -199,30 +182,21 @@ def get_celestial_data(date_utc: datetime):
     obs = ephem.Observer()
     obs.lat, obs.lon = "0", "0"
     obs.date = ephem.Date(date_utc)
-    
     moon = ephem.Moon(obs)
     sun = ephem.Sun(obs)
-    
-    # Moon Calculations
     illum = moon.phase / 100.0
     elong = float(moon.elong)
     if elong < 0: elong += 2 * math.pi
     phase_frac = elong / (2 * math.pi)
     phase_name, phase_emoji = get_moon_phase_name(phase_frac)
-    
     moon_ecl = ephem.Ecliptic(moon)
     moon_lon = math.degrees(float(moon_ecl.lon)) % 360
     moon_sign, moon_symbol, moon_vibe = get_zodiac_sign(moon_lon)
-    
-    # Sun Calculations
     sun_ecl = ephem.Ecliptic(sun)
     sun_lon = math.degrees(float(sun_ecl.lon)) % 360
     sun_sign, sun_symbol, _ = get_zodiac_sign(sun_lon)
-    
-    # Next Full Moon
     nfm = ephem.next_full_moon(obs.date)
     nfm_dt = ephem.Date(nfm).datetime().replace(tzinfo=timezone.utc)
-    
     return {
         "moon_sign": moon_sign, "moon_symbol": moon_symbol, "moon_vibe": moon_vibe, "moon_lon": moon_lon,
         "sun_sign": sun_sign, "sun_symbol": sun_symbol,
@@ -237,20 +211,29 @@ def get_celestial_data(date_utc: datetime):
 now_utc = datetime.now(timezone.utc)
 current = get_celestial_data(now_utc)
 
-# Persistence
-config = load_config()
-persisted_birthdate = config.get("birthdate")
+# PRIVACY PATCH: Use session state and URL params for per-user safety
+query_params = st.query_params
+initial_date = datetime(1990, 1, 1)
+if "dob" in query_params:
+    try:
+        initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
+    except:
+        pass
+
+if 'birth_date' not in st.session_state:
+    st.session_state.birth_date = initial_date
 
 with st.sidebar:
     st.markdown("### 🧬 Personal Cosmic Profile")
-    default_date = datetime.fromisoformat(persisted_birthdate) if persisted_birthdate else datetime(1990, 1, 1)
-    birth_date_input = st.date_input("Enter your birthdate once:", value=default_date, min_value=datetime(1920, 1, 1), max_value=now_utc)
+    birth_date_input = st.date_input("When were you born?", value=st.session_state.birth_date, min_value=datetime(1920, 1, 1), max_value=now_utc)
     
-    if not persisted_birthdate or birth_date_input.isoformat() != persisted_birthdate:
-        save_config({"birthdate": birth_date_input.isoformat()})
-        st.success("Cosmic profile locked! 🔒")
+    if birth_date_input != st.session_state.birth_date:
+        st.session_state.birth_date = birth_date_input
+        st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
         st.rerun()
     
+    st.success("🔒 Private: Insights are only visible to you.")
+    st.info("Tip: Bookmark your personalized URL to keep your profile loaded!")
     st.markdown("---")
     st.markdown("#### About Lunatick")
     st.info("Lunatick uses the PyEphem engine for high-precision celestial calculations.")
@@ -266,9 +249,9 @@ st.markdown(f"""
         <h1 style="color:#bc8cff; margin-bottom:0.5rem;">🌙 LUNATICK</h1>
         <p style="color:#8b949e; font-size:0.9rem; margin-bottom:1rem;">Next Full Moon Countdown</p>
         <div class="countdown-display">
-            <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
-            <div class="unit-box"><div class="num">{h}</div><div class="label">Hours</div></div>
-            <div class="unit-box"><div class="num">{m}</div><div class="label">Minutes</div></div>
+            <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div>
+            </div><div class="unit-box"><div class="num">{h}</div><div class="label">Hours</div>
+            </div><div class="unit-box"><div class="num">{m}</div><div class="label">Minutes</div></div>
         </div>
         <p style="color:#58a6ff; font-weight:600; margin-top:1.5rem; font-size: 0.9rem;">
             {current['next_full_dt'].strftime('%B %d, %Y at %H:%M UTC')}
@@ -276,8 +259,8 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# 2. PERSONAL INSIGHTS (MOVED UP)
-birth_utc = datetime.combine(birth_date_input, datetime.min.time()).replace(tzinfo=timezone.utc)
+# 2. PERSONAL INSIGHTS (VISIBLE IF NOT DEFAULT)
+birth_utc = datetime.combine(st.session_state.birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
 natal = get_celestial_data(birth_utc)
 total_moons = (now_utc - birth_utc).days / 29.53
 
