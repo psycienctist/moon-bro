@@ -58,7 +58,7 @@ LUNATICK_CSS = """
         align-items: center;
         gap: 1rem;
         margin: 1.5rem 0;
-        flex-wrap: nowrap; /* Prevent stacking */
+        flex-wrap: nowrap;
     }
     .unit-box {
         background: rgba(255, 255, 255, 0.05);
@@ -267,7 +267,6 @@ with st.sidebar:
         max_value=now_utc
     )
     
-    # Save if changed
     if not persisted_birthdate or birth_date_input.isoformat() != persisted_birthdate:
         save_config({"birthdate": birth_date_input.isoformat()})
         st.success("Cosmic profile locked! 🔒")
@@ -275,9 +274,9 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("#### About Lunatick")
-    st.info("Lunatick uses the PyEphem high-precision engine to calculate real-time lunar positions and astrological transits.")
+    st.info("Lunatick uses the PyEphem engine for high-precision celestial calculations.")
 
-# 1. TOP & CENTER: COUNTDOWN (Horizontal Row)
+# 1. TOP & CENTER: COUNTDOWN
 delta = data["next_full_dt"] - now_utc
 total_sec = int(delta.total_seconds())
 d, remainder = divmod(total_sec, 86400)
@@ -326,12 +325,8 @@ with c3:
 # 3. PERSONAL INSIGHTS
 birth_utc = datetime.combine(birth_date_input, datetime.min.time()).replace(tzinfo=timezone.utc)
 natal_data = get_moon_data(birth_utc)
-
-# Calculate Lunations since birth
 days_since_birth = (now_utc - birth_utc).days
 total_moons = days_since_birth / 29.53059
-
-# Check alignment
 phase_alignment = "harmonious" if abs(data['phase_frac'] - natal_data['phase_frac']) < 0.1 else "different"
 alignment_text = "The cosmic tide today matches your birth rhythm! You may feel more 'at home' or intuitive right now." if phase_alignment == "harmonious" else "The current moon phase is a different frequency than your birth moon. A time for growth and adaptation."
 
@@ -356,13 +351,12 @@ st.markdown(f"""
         <b>Personal Alignment:</b> {alignment_text}
     </div>
 </div>
-", unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 st.write("")
 
 # 4. MOON VIBES & EVENTS
 vcol, ecol = st.columns([1, 1])
-
 with vcol:
     st.markdown(f"""
     <div class="vibe-card">
@@ -390,5 +384,4 @@ with ecol:
         """, unsafe_allow_html=True)
 
 st.markdown("---")
-
 st.markdown("<p style='text-align:center; color:#484f58; font-size:0.8rem;'>🌒 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
