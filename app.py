@@ -118,7 +118,7 @@ LUNATICK_CSS = """
         border: 1px solid #1f6feb;
         border-radius: 20px;
         padding: 1.5rem;
-        margin-top: 2rem;
+        margin-bottom: 2rem;
         box-shadow: 0 10px 40px rgba(31, 111, 235, 0.15);
     }
 
@@ -219,7 +219,7 @@ def get_celestial_data(date_utc: datetime):
     sun_lon = math.degrees(float(sun_ecl.lon)) % 360
     sun_sign, sun_symbol, _ = get_zodiac_sign(sun_lon)
     
-    # Next Full Moon (only relevant for current date)
+    # Next Full Moon
     nfm = ephem.next_full_moon(obs.date)
     nfm_dt = ephem.Date(nfm).datetime().replace(tzinfo=timezone.utc)
     
@@ -255,7 +255,7 @@ with st.sidebar:
     st.markdown("#### About Lunatick")
     st.info("Lunatick uses the PyEphem engine for high-precision celestial calculations.")
 
-# 1. COUNTDOWN
+# 1. TOP: COUNTDOWN
 delta = current["next_full_dt"] - now_utc
 d, rem = divmod(int(delta.total_seconds()), 86400)
 h, m_total = divmod(rem, 3600)
@@ -276,37 +276,22 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# 2. CURRENT STATS
-c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f'<div class="stat-card"><div class="stat-label">Phase</div><div class="stat-val">{current["phase_emoji"]} {current["phase_name"]}</div><div class="stat-label" style="font-size:0.7rem;">{current["phase_frac"]:.1%} Completion</div></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Illumination</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.7rem;">Current Glow</div></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="stat-card"><div class="stat-label">Moon Age</div><div class="stat-val">{current["age_days"]:.1f} Days</div><div class="stat-label" style="font-size:0.7rem;">In current cycle</div></div>', unsafe_allow_html=True)
-
-# 3. PERSONAL INSIGHTS (ENHANCED)
+# 2. PERSONAL INSIGHTS (MOVED UP)
 birth_utc = datetime.combine(birth_date_input, datetime.min.time()).replace(tzinfo=timezone.utc)
 natal = get_celestial_data(birth_utc)
 total_moons = (now_utc - birth_utc).days / 29.53
 
-# Personal Guidance Logic
-aspect = ""
-guidance = ""
 diff = (current["moon_lon"] - natal["moon_lon"]) % 360
-
 if diff < 10 or diff > 350:
-    aspect = "Your Lunar Return"
-    guidance = "The moon is in the exact spot it was when you were born. This is an emotional 'New Year' for you. High intuition, high sensitivity."
+    aspect, guidance = "Your Lunar Return", "The moon is in the exact spot it was when you were born. High intuition, high sensitivity."
 elif 170 < diff < 190:
-    aspect = "Lunar Opposition"
-    guidance = "The moon is opposite your natal position. Emotions might feel like a tug-of-war. Balance your needs with those around you."
+    aspect, guidance = "Lunar Opposition", "Emotions might feel like a tug-of-war. Balance your needs with those around you."
 elif 80 < diff < 100 or 260 < diff < 280:
-    aspect = "Square Aspect"
-    guidance = "Tension in the air today. The universe is pushing you to resolve a lingering emotional hurdle. Don't hide from it."
+    aspect, guidance = "Square Aspect", "Tension in the air today. The universe is pushing you to resolve a hurdle."
 elif 110 < diff < 130 or 230 < diff < 250:
-    aspect = "Trine Aspect"
-    guidance = "Harmony! Today's cosmic tide flows perfectly with your internal rhythm. A great day for creativity and manifesting."
+    aspect, guidance = "Trine Aspect", "Harmony! Today's cosmic tide flows perfectly with your internal rhythm."
 else:
-    aspect = "Developing Cycle"
-    guidance = "A steady day for emotional growth. Use the current moon vibes to build on the intentions you set during the New Moon."
+    aspect, guidance = "Developing Cycle", "A steady day for growth. Build on the intentions you set during the New Moon."
 
 st.markdown(f"""
 <div class="personal-card">
@@ -323,6 +308,12 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+# 3. CURRENT STATS
+c1, c2, c3 = st.columns(3)
+with c1: st.markdown(f'<div class="stat-card"><div class="stat-label">Phase</div><div class="stat-val">{current["phase_emoji"]} {current["phase_name"]}</div><div class="stat-label" style="font-size:0.7rem;">{current["phase_frac"]:.1%} Completion</div></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Illumination</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.7rem;">Current Glow</div></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="stat-card"><div class="stat-label">Moon Age</div><div class="stat-val">{current["age_days"]:.1f} Days</div><div class="stat-label" style="font-size:0.7rem;">In current cycle</div></div>', unsafe_allow_html=True)
 
 st.write("")
 
