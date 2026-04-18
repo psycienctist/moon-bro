@@ -4,74 +4,141 @@ import math
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
-# Page config & dark theme
+# Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="🌙 Moon Management", page_icon="🌙", layout="wide")
+st.set_page_config(page_title="🌑 Lunatick", page_icon="🌑", layout="wide")
 
-DARK_CSS = """
+LUNATICK_CSS = """
 <style>
-    /* Dark background overrides */
-    .stApp { background-color: #0e1117; color: #c9d1d9; }
-    section[data-testid="stSidebar"] { background-color: #161b22; }
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
-    /* Metric cards */
-    .moon-card {
-        background: linear-gradient(135deg, #1a1f36 0%, #0d1224 100%);
-        border: 1px solid #30363d;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        text-align: center;
+    .stApp {
+        background-color: #05070a;
+        color: #e6edf3;
+        font-family: 'Inter', sans-serif;
     }
-    .moon-card h3 { color: #e6edf3; margin-bottom: 0.3rem; }
-    .moon-card .big { font-size: 2.4rem; }
-    .moon-card .sub { color: #8b949e; font-size: 0.9rem; }
 
-    /* Event list */
-    .event-row {
-        background: #161b22;
-        border-left: 4px solid #6e40c9;
-        border-radius: 8px;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.6rem;
+    /* Titles */
+    h1, h2, h3, h4 {
+        font-family: 'Orbitron', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 2px;
     }
-    .event-row .date { color: #8b949e; font-size: 0.85rem; }
-    .event-row .title { color: #e6edf3; font-weight: 600; }
 
-    /* Vibes section */
-    .vibes-box {
-        background: linear-gradient(135deg, #1b1040 0%, #0e1117 100%);
+    /* Main Glow Card */
+    .glow-container {
+        background: radial-gradient(circle at top right, #1b1040 0%, #05070a 100%);
         border: 1px solid #6e40c9;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-    }
-    .vibes-box h4 { color: #d2a8ff; }
-
-    /* Countdown */
-    .countdown-box {
-        background: linear-gradient(135deg, #0d1f3c 0%, #0e1117 100%);
-        border: 1px solid #1f6feb;
-        border-radius: 16px;
-        padding: 1.5rem;
+        border-radius: 24px;
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 0 40px rgba(110, 64, 201, 0.2);
         text-align: center;
     }
-    .countdown-box .number { font-size: 3rem; color: #58a6ff; font-weight: 700; }
-    .countdown-box .label  { color: #8b949e; font-size: 0.85rem; }
 
-    /* Full-moon table */
-    .fm-table { width: 100%; border-collapse: collapse; }
-    .fm-table th { color: #8b949e; text-align: left; padding: 0.4rem 0.6rem;
-                   border-bottom: 1px solid #30363d; font-weight: 600; }
-    .fm-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #21262d; color: #c9d1d9; }
-    .fm-table tr.past td { color: #484f58; }
-    .fm-table tr.next td { color: #58a6ff; font-weight: 600; }
+    /* Countdown Styling */
+    .countdown-display {
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    .unit-box {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 1rem;
+        min-width: 100px;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+    .unit-box .num {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 3.5rem;
+        font-weight: 700;
+        background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1;
+    }
+    .unit-box .label {
+        font-size: 0.75rem;
+        color: #8b949e;
+        margin-top: 0.5rem;
+        font-weight: 600;
+    }
+
+    /* Stats Cards */
+    .stat-card {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 20px;
+        padding: 1.5rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        text-align: center;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(88, 166, 255, 0.1);
+        border-color: #58a6ff;
+    }
+    .stat-val {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+        color: #f0f6fc;
+    }
+    .stat-label {
+        color: #8b949e;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Vibe Box */
+    .vibe-card {
+        background: linear-gradient(135deg, #2d1b69 0%, #1a1f36 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        border: 1px solid #bc8cff;
+        box-shadow: 0 10px 40px rgba(188, 140, 255, 0.15);
+    }
+    .vibe-tag {
+        background: rgba(210, 168, 255, 0.2);
+        color: #d2a8ff;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 1rem;
+    }
+
+    /* Events List */
+    .event-item {
+        background: #161b22;
+        border-radius: 12px;
+        padding: 1.2rem;
+        margin-bottom: 1rem;
+        border-left: 5px solid #ff7b72;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .event-info .etitle { font-weight: 600; color: #f0f6fc; }
+    .event-info .edesc { color: #8b949e; font-size: 0.9rem; margin-top: 0.3rem; }
+    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.8rem; }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #05070a; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 </style>
 """
-st.markdown(DARK_CSS, unsafe_allow_html=True)
+st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Helpers – ephem-based calculations
+# Logic – Same high-precision Ephem engine
 # ---------------------------------------------------------------------------
 
 ZODIAC_SIGNS = [
@@ -101,85 +168,41 @@ PHASE_NAMES = [
     (1.00, "New Moon", "🌑"),
 ]
 
-FULL_MOONS_2026 = [
-    ("Jan 3", "Wolf Moon", "5:03 AM EST"),
-    ("Feb 1", "Snow Moon", "5:09 PM EST"),
-    ("Mar 3", "Worm Moon ★ Total Lunar Eclipse", "6:38 AM EST"),
-    ("Apr 1", "Pink Moon", "10:12 PM EDT"),
-    ("May 1", "Flower Moon", "1:23 PM EDT"),
-    ("May 31", "Blue Moon", "4:45 AM EDT"),
-    ("Jun 29", "Strawberry Moon", "7:57 PM EDT"),
-    ("Jul 29", "Buck Moon", "10:36 AM EDT"),
-    ("Aug 28", "Sturgeon Moon ★ Partial Lunar Eclipse", "12:18 AM EDT"),
-    ("Sep 26", "Corn Moon", "12:49 PM EDT"),
-    ("Oct 25", "Hunter's Moon", "11:12 PM EDT"),
-    ("Nov 24", "Beaver Moon", "9:53 AM EST"),
-    ("Dec 23", "Cold Moon", "8:28 PM EST"),
-]
-
 KEY_EVENTS_2026 = [
-    ("March 3, 2026", "Total Lunar Eclipse",
-     "Visible across the Americas, Europe, and Africa. The Worm Moon enters Earth's full shadow."),
-    ("March 14, 2026", "Annular Solar Eclipse",
-     "The 'ring of fire' eclipse visible across parts of Africa and southeastern Europe."),
-    ("August 28, 2026", "Partial Lunar Eclipse",
-     "The Sturgeon Moon dips partially into Earth's shadow. Visible from the Pacific region."),
-    ("February 1, 2026", "Snow Moon (Micro Moon)",
-     "Near apogee – the farthest and smallest-looking full moon of 2026."),
-    ("May 31, 2026", "Blue Moon",
-     "Second full moon in May – a rare Blue Moon. Next one isn't until 2029."),
-    ("September 26, 2026", "Corn Moon (Supermoon)",
-     "Closest full moon of the year – appears larger and brighter than usual."),
+    ("March 3, 2026", "Total Lunar Eclipse", "Visible across the Americas, Europe, and Africa."),
+    ("March 14, 2026", "Annular Solar Eclipse", "The 'ring of fire' eclipse visible in Africa."),
+    ("August 12, 2026", "Total Solar Eclipse", "Major eclipse visible in Europe & Greenland."),
+    ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
+    ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
 ]
-
 
 def get_moon_phase_name(phase_frac: float) -> tuple[str, str]:
-    """Return (name, emoji) for a 0-1 phase fraction."""
     for i in range(len(PHASE_NAMES) - 1):
-        lo = PHASE_NAMES[i][0]
-        hi = PHASE_NAMES[i + 1][0]
-        if lo <= phase_frac < hi:
+        if PHASE_NAMES[i][0] <= phase_frac < PHASE_NAMES[i + 1][0]:
             return PHASE_NAMES[i][1], PHASE_NAMES[i][2]
     return "New Moon", "🌑"
 
-
 def get_moon_data(now_utc: datetime) -> dict:
-    """Compute current moon info using ephem."""
     obs = ephem.Observer()
-    obs.lat = "0"
-    obs.lon = "0"
+    obs.lat, obs.lon = "0", "0"
     obs.date = ephem.Date(now_utc)
-
     moon = ephem.Moon(obs)
-    sun = ephem.Sun(obs)
-
-    # Phase fraction: 0 = new, 0.5 = full, 1 = new
-    # ephem.moon_phase returns illumination (0-1), not cycle position
-    illumination = moon.phase / 100.0  # 0-1
-
-    # Compute lunation fraction from elongation
-    elong = float(moon.elong)  # radians, negative before new moon
-    if elong < 0:
-        elong += 2 * math.pi
+    
+    illumination = moon.phase / 100.0
+    elong = float(moon.elong)
+    if elong < 0: elong += 2 * math.pi
     phase_frac = elong / (2 * math.pi)
-
+    
     phase_name, phase_emoji = get_moon_phase_name(phase_frac)
-
-    # Moon zodiac sign from ecliptic longitude
+    
     ecl = ephem.Ecliptic(moon)
     lon_deg = math.degrees(float(ecl.lon)) % 360
-    sign_index = int(lon_deg / 30)
-    sign_name, sign_symbol, sign_vibe = ZODIAC_SIGNS[sign_index]
-    sign_degree = lon_deg % 30
-
-    # Next full moon
+    sign_idx = int(lon_deg / 30)
+    sign_name, sign_symbol, sign_vibe = ZODIAC_SIGNS[sign_idx]
+    
     next_full = ephem.next_full_moon(obs.date)
     next_full_dt = ephem.Date(next_full).datetime().replace(tzinfo=timezone.utc)
-
-    # Next new moon
-    next_new = ephem.next_new_moon(obs.date)
-    next_new_dt = ephem.Date(next_new).datetime().replace(tzinfo=timezone.utc)
-
+    
     return {
         "illumination": illumination,
         "phase_frac": phase_frac,
@@ -188,177 +211,95 @@ def get_moon_data(now_utc: datetime) -> dict:
         "sign_name": sign_name,
         "sign_symbol": sign_symbol,
         "sign_vibe": sign_vibe,
-        "sign_degree": sign_degree,
         "next_full_dt": next_full_dt,
-        "next_new_dt": next_new_dt,
         "moon_age_days": phase_frac * 29.53059,
     }
 
-
 # ---------------------------------------------------------------------------
-# Main UI
+# UI Rendering
 # ---------------------------------------------------------------------------
 
 now_utc = datetime.now(timezone.utc)
 data = get_moon_data(now_utc)
 
-# Header
+# 1. TOP & CENTER: COUNTDOWN
+delta = data["next_full_dt"] - now_utc
+total_sec = int(delta.total_seconds())
+d, remainder = divmod(total_sec, 86400)
+h, remainder = divmod(remainder, 3600)
+m, s = divmod(remainder, 60)
+
 st.markdown(
     f"""
-    <div style="text-align:center; padding: 1rem 0 0.5rem 0;">
-        <span style="font-size:4rem;">{data['phase_emoji']}</span>
-        <h1 style="margin:0; color:#e6edf3;">Moon Management</h1>
-        <p style="color:#8b949e; margin-top:0.2rem;">
-            {now_utc.strftime('%A, %B %d, %Y')} &mdash; {now_utc.strftime('%H:%M')} UTC
+    <div class="glow-container">
+        <h1 style="color:#bc8cff; margin-bottom:0.5rem;">LUNATICK</h1>
+        <p style="color:#8b949e; font-size:0.9rem; margin-bottom:2rem;">Next Full Moon Countdown</p>
+        <div class="countdown-display">
+            <div class="unit-box"><div class="num">{d}</div><div class="label">DAYS</div></div>
+            <div class="unit-box"><div class="num">{h}</div><div class="label">HOURS</div></div>
+            <div class="unit-box"><div class="num">{m}</div><div class="label">MINS</div></div>
+            <div class="unit-box"><div class="num">{s}</div><div class="label">SECS</div></div>
+        </div>
+        <p style="color:#58a6ff; font-weight:600; margin-top:1.5rem;">
+            {data['next_full_dt'].strftime('%B %d, %Y at %H:%M UTC')}
         </p>
     </div>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
-# --- Row 1: Phase / Illumination / Moon Age ---
-col1, col2, col3 = st.columns(3)
+# 2. CURRENT STATS
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.markdown(f"""<div class="stat-card">
+        <div class="stat-label">Phase</div>
+        <div class="stat-val">{data['phase_emoji']} {data['phase_name']}</div>
+        <div class="stat-label" style="font-size:0.7rem;">{data['phase_frac']:.1%} Completion</div>
+    </div>""", unsafe_allow_html=True)
+with c2:
+    st.markdown(f"""<div class="stat-card">
+        <div class="stat-label">Illumination</div>
+        <div class="stat-val">{data['illumination']*100:.1f}%</div>
+        <div class="stat-label" style="font-size:0.7rem;">Current Surface Glow</div>
+    </div>""", unsafe_allow_html=True)
+with c3:
+    st.markdown(f"""<div class="stat-card">
+        <div class="stat-label">Moon Age</div>
+        <div class="stat-val">{data['moon_age_days']:.1f} Days</div>
+        <div class="stat-label" style="font-size:0.7rem;">In current cycle</div>
+    </div>""", unsafe_allow_html=True)
 
-with col1:
-    st.markdown(
-        f"""<div class="moon-card">
-            <h3>Current Phase</h3>
-            <div class="big">{data['phase_emoji']} {data['phase_name']}</div>
-            <div class="sub">Cycle position {data['phase_frac']:.1%}</div>
-        </div>""",
-        unsafe_allow_html=True,
-    )
+st.write("")
 
-with col2:
-    pct = data["illumination"] * 100
-    st.markdown(
-        f"""<div class="moon-card">
-            <h3>Illumination</h3>
-            <div class="big">{pct:.1f}%</div>
-            <div class="sub">Surface lit by the Sun</div>
-        </div>""",
-        unsafe_allow_html=True,
-    )
+# 3. MOON VIBES & EVENTS
+vcol, ecol = st.columns([1, 1])
 
-with col3:
-    age = data["moon_age_days"]
-    st.markdown(
-        f"""<div class="moon-card">
-            <h3>Moon Age</h3>
-            <div class="big">{age:.1f} days</div>
-            <div class="sub">Since last New Moon (cycle ≈ 29.5 d)</div>
-        </div>""",
-        unsafe_allow_html=True,
-    )
+with vcol:
+    st.markdown(f"""
+    <div class="vibe-card">
+        <div class="vibe-tag">COSMIC ENERGY</div>
+        <h2 style="color:#fff; margin-bottom:1rem;">{data['sign_symbol']} Moon in {data['sign_name']}</h2>
+        <p style="font-size:1.1rem; line-height:1.6; color:#c9d1d9;">{data['sign_vibe']}</p>
+        <div style="margin-top:1.5rem; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border-left:3px solid #58a6ff;">
+            <span style="color:#58a6ff; font-weight:600;">Brobot Tip:</span> 
+            Focus on {data['sign_name'].lower()}-themed activities for maximum alignment today.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("---")
-
-# --- Row 2: Countdown + Moon Vibes ---
-col_left, col_right = st.columns([1, 1])
-
-with col_left:
-    st.subheader("⏳ Countdown to Next Full Moon")
-    delta = data["next_full_dt"] - now_utc
-    total_seconds = int(delta.total_seconds())
-    days = total_seconds // 86400
-    hours = (total_seconds % 86400) // 3600
-    minutes = (total_seconds % 3600) // 60
-    seconds = total_seconds % 60
-
-    c1, c2, c3, c4 = st.columns(4)
-    for col, val, lbl in [
-        (c1, days, "DAYS"),
-        (c2, hours, "HOURS"),
-        (c3, minutes, "MINS"),
-        (c4, seconds, "SECS"),
-    ]:
-        with col:
-            st.markdown(
-                f"""<div class="countdown-box">
-                    <div class="number">{val}</div>
-                    <div class="label">{lbl}</div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
-
-    st.markdown(
-        f"<p style='color:#8b949e; text-align:center; margin-top:0.5rem;'>"
-        f"Next Full Moon: <b style='color:#58a6ff'>{data['next_full_dt'].strftime('%B %d, %Y at %H:%M UTC')}</b></p>",
-        unsafe_allow_html=True,
-    )
-
-with col_right:
-    st.subheader("✨ Moon Vibes – Astrological Insight")
-    st.markdown(
-        f"""<div class="vibes-box">
-            <h4>{data['sign_symbol']} Moon in {data['sign_name']} ({data['sign_degree']:.1f}°)</h4>
-            <p style="color:#c9d1d9; font-size:1.05rem;">{data['sign_vibe']}</p>
-        </div>""",
-        unsafe_allow_html=True,
-    )
-    # Quick tips based on element
-    element_tips = {
-        "Fire": "🔥 **Energy is high.** Channel it into action – start things, exercise, be bold.",
-        "Earth": "🌿 **Steady and practical.** Good for finances, cooking, gardening, and self-care.",
-        "Air": "💬 **Mind is active.** Write, talk, brainstorm, network. Avoid overthinking before bed.",
-        "Water": "🌊 **Feelings run deep.** Journal, meditate, connect emotionally. Protect your energy.",
-    }
-    element = data["sign_vibe"].split("sign")[0].split()[-1]
-    tip = element_tips.get(element, "")
-    if tip:
-        st.markdown(tip)
+with ecol:
+    st.subheader("🔭 2026 Cosmic Calendar")
+    for d_str, title, desc in KEY_EVENTS_2026:
+        st.markdown(f"""
+        <div class="event-item">
+            <div class="event-info">
+                <div class="etitle">{title}</div>
+                <div class="edesc">{desc}</div>
+            </div>
+            <div class="event-date">{d_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# --- Row 3: 2026 Highlights ---
-st.subheader("🗓️ 2026 Highlights")
-
-tab_events, tab_full_moons = st.tabs(["Key Events", "Full Moon Calendar"])
-
-with tab_events:
-    # Sort by date
-    sorted_events = sorted(KEY_EVENTS_2026, key=lambda e: datetime.strptime(e[0], "%B %d, %Y"))
-    for date_str, title, desc in sorted_events:
-        ev_date = datetime.strptime(date_str, "%B %d, %Y").replace(year=2026)
-        past = ev_date.date() < now_utc.date()
-        opacity = "0.5" if past else "1.0"
-        st.markdown(
-            f"""<div class="event-row" style="opacity:{opacity}">
-                <span class="date">{date_str}</span><br/>
-                <span class="title">{title}</span>
-                <p style="color:#8b949e; margin:0.2rem 0 0 0; font-size:0.9rem;">{desc}</p>
-            </div>""",
-            unsafe_allow_html=True,
-        )
-
-with tab_full_moons:
-    rows_html = ""
-    for date_str, name, time_str in FULL_MOONS_2026:
-        # Determine if past or next
-        try:
-            fm_date = datetime.strptime(f"{date_str} 2026", "%b %d %Y")
-        except ValueError:
-            fm_date = datetime(2026, 1, 1)
-        css_class = ""
-        if fm_date.date() < now_utc.date():
-            css_class = "past"
-        elif fm_date.date() <= (now_utc + timedelta(days=30)).date() and fm_date.date() >= now_utc.date():
-            css_class = "next"
-        star = " ⭐" if "★" in name else ""
-        rows_html += f'<tr class="{css_class}"><td>{date_str}</td><td>{name}</td><td>{time_str}</td></tr>\n'
-
-    st.markdown(
-        f"""<table class="fm-table">
-            <tr><th>Date</th><th>Name</th><th>Time</th></tr>
-            {rows_html}
-        </table>""",
-        unsafe_allow_html=True,
-    )
-
-# --- Footer ---
-st.markdown("---")
-st.markdown(
-    "<p style='text-align:center; color:#484f58; font-size:0.8rem;'>"
-    "🌙 Moon Management • Powered by PyEphem • Data accurate to ±1 minute</p>",
-    unsafe_allow_html=True,
-)
+st.markdown("<p style='text-align:center; color:#484f58;'>🌒 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
