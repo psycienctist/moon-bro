@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="🌑 Lunatick", page_icon="🌑", layout="wide")
+st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
 
 CONFIG_FILE = "user_config.json"
 
@@ -263,7 +263,7 @@ m, _ = divmod(m_total, 60)
 
 st.markdown(f"""
     <div class="glow-container">
-        <h1 style="color:#bc8cff; margin-bottom:0.5rem;">LUNATICK</h1>
+        <h1 style="color:#bc8cff; margin-bottom:0.5rem;">🌙 LUNATICK</h1>
         <p style="color:#8b949e; font-size:0.9rem; margin-bottom:1rem;">Next Full Moon Countdown</p>
         <div class="countdown-display">
             <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
@@ -343,4 +343,4 @@ with ecol:
         st.markdown(f'<div class="event-item"><div class="event-info"><div class="etitle">{title}</div><div class="edesc">{desc}</div></div><div class="event-date">{d_str}</div></div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#484f58; font-size:0.8rem;'>🌒 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#484f58; font-size:0.8rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
