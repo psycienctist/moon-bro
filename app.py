@@ -1,12 +1,26 @@
 import streamlit as st
 import ephem
 import math
+import json
+import os
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="🌑 Lunatick", page_icon="🌑", layout="wide")
+
+CONFIG_FILE = "user_config.json"
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f)
 
 LUNATICK_CSS = """
 <style>
@@ -36,24 +50,29 @@ LUNATICK_CSS = """
         text-align: center;
     }
 
-    /* Countdown Styling */
+    /* Countdown Styling - Forced Horizontal Row */
     .countdown-display {
         display: flex;
+        flex-direction: row;
         justify-content: center;
-        gap: 1.5rem;
+        align-items: center;
+        gap: 1rem;
         margin: 1.5rem 0;
+        flex-wrap: nowrap; /* Prevent stacking */
     }
     .unit-box {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
-        padding: 1rem;
-        min-width: 90px;
+        padding: 1rem 0.5rem;
+        flex: 1;
+        max-width: 120px;
+        min-width: 70px;
         box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
     }
     .unit-box .num {
         font-family: 'Orbitron', sans-serif;
-        font-size: 3.2rem;
+        font-size: 2.2rem;
         font-weight: 700;
         background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
         -webkit-background-clip: text;
@@ -61,10 +80,11 @@ LUNATICK_CSS = """
         line-height: 1;
     }
     .unit-box .label {
-        font-size: 0.7rem;
+        font-size: 0.6rem;
         color: #8b949e;
-        margin-top: 0.5rem;
+        margin-top: 0.4rem;
         font-weight: 600;
+        text-transform: uppercase;
     }
 
     /* Stats Cards */
@@ -82,14 +102,14 @@ LUNATICK_CSS = """
         border-color: #58a6ff;
     }
     .stat-val {
-        font-size: 1.8rem;
+        font-size: 1.6rem;
         font-weight: 700;
         margin: 0.5rem 0;
         color: #f0f6fc;
     }
     .stat-label {
         color: #8b949e;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
@@ -133,9 +153,9 @@ LUNATICK_CSS = """
         justify-content: space-between;
         align-items: center;
     }
-    .event-info .etitle { font-weight: 600; color: #f0f6fc; font-size: 0.95rem; }
-    .event-info .edesc { color: #8b949e; font-size: 0.85rem; margin-top: 0.2rem; }
-    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.75rem; }
+    .event-info .etitle { font-weight: 600; color: #f0f6fc; font-size: 0.9rem; }
+    .event-info .edesc { color: #8b949e; font-size: 0.8rem; margin-top: 0.2rem; }
+    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.7rem; }
 
     /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 8px; }
@@ -230,15 +250,34 @@ def get_moon_data(now_utc: datetime) -> dict:
 now_utc = datetime.now(timezone.utc)
 data = get_moon_data(now_utc)
 
+# Persistence Logic
+config = load_config()
+persisted_birthdate = config.get("birthdate")
+
 # Sidebar for Personalization
 with st.sidebar:
     st.markdown("### 🧬 Personal Cosmic Profile")
-    birth_date = st.date_input("When were you born?", value=datetime(1990, 1, 1), min_value=datetime(1920, 1, 1), max_value=now_utc)
+    
+    default_date = datetime.fromisoformat(persisted_birthdate) if persisted_birthdate else datetime(1990, 1, 1)
+    
+    birth_date_input = st.date_input(
+        "Enter your birthdate once to lock it in:",
+        value=default_date,
+        min_value=datetime(1920, 1, 1),
+        max_value=now_utc
+    )
+    
+    # Save if changed
+    if not persisted_birthdate or birth_date_input.isoformat() != persisted_birthdate:
+        save_config({"birthdate": birth_date_input.isoformat()})
+        st.success("Cosmic profile locked! 🔒")
+        st.rerun()
+
     st.markdown("---")
     st.markdown("#### About Lunatick")
     st.info("Lunatick uses the PyEphem high-precision engine to calculate real-time lunar positions and astrological transits.")
 
-# 1. TOP & CENTER: COUNTDOWN
+# 1. TOP & CENTER: COUNTDOWN (Horizontal Row)
 delta = data["next_full_dt"] - now_utc
 total_sec = int(delta.total_seconds())
 d, remainder = divmod(total_sec, 86400)
@@ -249,13 +288,13 @@ st.markdown(
     f"""
     <div class="glow-container">
         <h1 style="color:#bc8cff; margin-bottom:0.5rem;">LUNATICK</h1>
-        <p style="color:#8b949e; font-size:0.9rem; margin-bottom:2rem;">Next Full Moon Countdown</p>
+        <p style="color:#8b949e; font-size:0.9rem; margin-bottom:1rem;">Next Full Moon Countdown</p>
         <div class="countdown-display">
-            <div class="unit-box"><div class="num">{d}</div><div class="label">DAYS</div></div>
-            <div class="unit-box"><div class="num">{h}</div><div class="label">HOURS</div></div>
-            <div class="unit-box"><div class="num">{m}</div><div class="label">MINUTES</div></div>
+            <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
+            <div class="unit-box"><div class="num">{h}</div><div class="label">Hours</div></div>
+            <div class="unit-box"><div class="num">{m}</div><div class="label">Minutes</div></div>
         </div>
-        <p style="color:#58a6ff; font-weight:600; margin-top:1.5rem;">
+        <p style="color:#58a6ff; font-weight:600; margin-top:1.5rem; font-size: 0.9rem;">
             {data['next_full_dt'].strftime('%B %d, %Y at %H:%M UTC')}
         </p>
     </div>
@@ -284,41 +323,40 @@ with c3:
         <div class="stat-label" style="font-size:0.7rem;">In current cycle</div>
     </div>""", unsafe_allow_html=True)
 
-# 3. PERSONAL INSIGHTS (IF BIRTHDATE PROVIDED)
-if birth_date:
-    birth_utc = datetime.combine(birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-    natal_data = get_moon_data(birth_utc)
-    
-    # Calculate Lunations since birth
-    days_since_birth = (now_utc - birth_utc).days
-    total_moons = days_since_birth / 29.53059
-    
-    # Check alignment
-    phase_alignment = "harmonious" if abs(data['phase_frac'] - natal_data['phase_frac']) < 0.1 else "different"
-    alignment_text = "The cosmic tide today matches your birth rhythm! You may feel more 'at home' or intuitive right now." if phase_alignment == "harmonious" else "The current moon phase is a different frequency than your birth moon. A time for growth and adaptation."
+# 3. PERSONAL INSIGHTS
+birth_utc = datetime.combine(birth_date_input, datetime.min.time()).replace(tzinfo=timezone.utc)
+natal_data = get_moon_data(birth_utc)
 
-    st.markdown(f"""
-    <div class="personal-card">
-        <h3 style="color:#58a6ff; font-size:1.2rem; margin-bottom:1rem;">🧬 YOUR COSMIC PROFILE</h3>
-        <div style="display:flex; justify-content:space-around; text-align:center;">
-            <div>
-                <div style="color:#8b949e; font-size:0.7rem; text-transform:uppercase;">Natal Moon Sign</div>
-                <div style="font-size:1.5rem; font-weight:700; color:#fff;">{natal_data['sign_symbol']} {natal_data['sign_name']}</div>
-            </div>
-            <div>
-                <div style="color:#8b949e; font-size:0.7rem; text-transform:uppercase;">Natal Moon Phase</div>
-                <div style="font-size:1.5rem; font-weight:700; color:#fff;">{natal_data['phase_emoji']} {natal_data['phase_name']}</div>
-            </div>
-            <div>
-                <div style="color:#8b949e; font-size:0.7rem; text-transform:uppercase;">Full Moons Experienced</div>
-                <div style="font-size:1.5rem; font-weight:700; color:#fff;">{int(total_moons)}</div>
-            </div>
+# Calculate Lunations since birth
+days_since_birth = (now_utc - birth_utc).days
+total_moons = days_since_birth / 29.53059
+
+# Check alignment
+phase_alignment = "harmonious" if abs(data['phase_frac'] - natal_data['phase_frac']) < 0.1 else "different"
+alignment_text = "The cosmic tide today matches your birth rhythm! You may feel more 'at home' or intuitive right now." if phase_alignment == "harmonious" else "The current moon phase is a different frequency than your birth moon. A time for growth and adaptation."
+
+st.markdown(f"""
+<div class="personal-card">
+    <h3 style="color:#58a6ff; font-size:1.1rem; margin-bottom:1rem;">🧬 YOUR COSMIC PROFILE</h3>
+    <div style="display:flex; justify-content:space-around; text-align:center;">
+        <div>
+            <div style="color:#8b949e; font-size:0.65rem; text-transform:uppercase;">Natal Moon Sign</div>
+            <div style="font-size:1.3rem; font-weight:700; color:#fff;">{natal_data['sign_symbol']} {natal_data['sign_name']}</div>
         </div>
-        <div style="margin-top:1.5rem; color:#c9d1d9; font-size:0.95rem; border-top:1px solid #1f6feb; padding-top:1rem;">
-            <b>Personal Alignment:</b> {alignment_text}
+        <div>
+            <div style="color:#8b949e; font-size:0.65rem; text-transform:uppercase;">Natal Moon Phase</div>
+            <div style="font-size:1.3rem; font-weight:700; color:#fff;">{natal_data['phase_emoji']} {natal_data['phase_name']}</div>
+        </div>
+        <div>
+            <div style="color:#8b949e; font-size:0.65rem; text-transform:uppercase;">Full Moons Experienced</div>
+            <div style="font-size:1.3rem; font-weight:700; color:#fff;">{int(total_moons)}</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div style="margin-top:1.5rem; color:#c9d1d9; font-size:0.9rem; border-top:1px solid #1f6feb; padding-top:1rem;">
+        <b>Personal Alignment:</b> {alignment_text}
+    </div>
+</div>
+", unsafe_allow_html=True)
 
 st.write("")
 
@@ -329,8 +367,8 @@ with vcol:
     st.markdown(f"""
     <div class="vibe-card">
         <div class="vibe-tag">TODAY'S COSMIC ENERGY</div>
-        <h2 style="color:#fff; margin-bottom:1rem;">{data['sign_symbol']} Moon in {data['sign_name']}</h2>
-        <p style="font-size:1.1rem; line-height:1.6; color:#c9d1d9;">{data['sign_vibe']}</p>
+        <h2 style="color:#fff; margin-bottom:1rem; font-size:1.5rem;">{data['sign_symbol']} Moon in {data['sign_name']}</h2>
+        <p style="font-size:1rem; line-height:1.6; color:#c9d1d9;">{data['sign_vibe']}</p>
         <div style="margin-top:1.5rem; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border-left:3px solid #bc8cff;">
             <span style="color:#bc8cff; font-weight:600;">Brobot Tip:</span> 
             Focus on {data['sign_name'].lower()}-themed activities for maximum alignment today.
@@ -353,4 +391,4 @@ with ecol:
 
 st.markdown("---")
 
-st.markdown("<p style='text-align:center; color:#484f58;'>🌒 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#484f58; font-size:0.8rem;'>🌒 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
