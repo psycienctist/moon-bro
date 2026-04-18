@@ -48,12 +48,12 @@ LUNATICK_CSS = """
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 1rem;
-        min-width: 80px;
+        min-width: 90px;
         box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
     }
     .unit-box .num {
         font-family: 'Orbitron', sans-serif;
-        font-size: 2.8rem;
+        font-size: 3.2rem;
         font-weight: 700;
         background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
         -webkit-background-clip: text;
@@ -61,7 +61,7 @@ LUNATICK_CSS = """
         line-height: 1;
     }
     .unit-box .label {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         color: #8b949e;
         margin-top: 0.5rem;
         font-weight: 600;
@@ -242,8 +242,8 @@ with st.sidebar:
 delta = data["next_full_dt"] - now_utc
 total_sec = int(delta.total_seconds())
 d, remainder = divmod(total_sec, 86400)
-h, remainder = divmod(remainder, 3600)
-m, s = divmod(remainder, 60)
+h, m_total = divmod(remainder, 3600)
+m, _ = divmod(m_total, 60)
 
 st.markdown(
     f"""
@@ -253,8 +253,7 @@ st.markdown(
         <div class="countdown-display">
             <div class="unit-box"><div class="num">{d}</div><div class="label">DAYS</div></div>
             <div class="unit-box"><div class="num">{h}</div><div class="label">HOURS</div></div>
-            <div class="unit-box"><div class="num">{m}</div><div class="label">MINS</div></div>
-            <div class="unit-box"><div class="num">{s}</div><div class="label">SECS</div></div>
+            <div class="unit-box"><div class="num">{m}</div><div class="label">MINUTES</div></div>
         </div>
         <p style="color:#58a6ff; font-weight:600; margin-top:1.5rem;">
             {data['next_full_dt'].strftime('%B %d, %Y at %H:%M UTC')}
