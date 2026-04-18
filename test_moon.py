@@ -1,4 +1,4 @@
-\"\"\"Tests for Moon Management app components and check_full_moon script.\"\"\"
+"""Tests for Moon Management app components and check_full_moon script."""
 
 import json
 import math
@@ -22,7 +22,7 @@ from check_full_moon import check_full_moon
 # ---------------------------------------------------------------------------
 
 class TestCheckFullMoon:
-    \"\"\"Tests for the check_full_moon function.\"\"\"
+    """Tests for the check_full_moon function."""
 
     def test_returns_expected_keys(self):
         result = check_full_moon()
@@ -45,21 +45,21 @@ class TestCheckFullMoon:
         )
 
     def test_known_full_moon_date_march_3_2026(self):
-        \"\"\"March 3, 2026 is a known full moon (Worm Moon / Total Lunar Eclipse).\"\"\"
+        """March 3, 2026 is a known full moon (Worm Moon / Total Lunar Eclipse)."""
         ref = datetime(2026, 3, 3, 12, 0, 0, tzinfo=timezone.utc)
         result = check_full_moon(ref)
         assert result["full_moon_today"] is True
         assert result["is_full_moon_soon"] is True
 
     def test_known_full_moon_eve_march_2_2026(self):
-        \"\"\"March 2, 2026 – the full moon is tomorrow (March 3).\"\"\"
+        """March 2, 2026 – the full moon is tomorrow (March 3)."""
         ref = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
         result = check_full_moon(ref)
         assert result["full_moon_tomorrow"] is True
         assert result["is_full_moon_soon"] is True
 
     def test_no_full_moon_mid_month(self):
-        \"\"\"March 15, 2026 – nowhere near a full moon.\"\"\"
+        """March 15, 2026 – nowhere near a full moon."""
         ref = datetime(2026, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
         result = check_full_moon(ref)
         assert result["full_moon_today"] is False
@@ -67,19 +67,19 @@ class TestCheckFullMoon:
         assert result["is_full_moon_soon"] is False
 
     def test_known_full_moon_may_1_2026(self):
-        \"\"\"May 1, 2026 is a full moon (Flower Moon).\"\"\"
+        """May 1, 2026 is a full moon (Flower Moon)."""
         ref = datetime(2026, 5, 1, 18, 0, 0, tzinfo=timezone.utc)
         result = check_full_moon(ref)
-        assert result["full_moon_today" ] is True
+        assert result["full_moon_today"] is True
 
     def test_known_full_moon_august_28_2026(self):
-        \"\"\"August 28, 2026 – Partial Lunar Eclipse / Sturgeon Moon.\"\"\"
+        """August 28, 2026 – Partial Lunar Eclipse / Sturgeon Moon."""
         ref = datetime(2026, 8, 28, 6, 0, 0, tzinfo=timezone.utc)
         result = check_full_moon(ref)
         assert result["full_moon_today"] is True
 
     def test_next_full_moon_is_in_future(self):
-        \"\"\"next_full_moon_utc should always be >= now.\"\"\"
+        """next_full_moon_utc should always be >= now."""
         now = datetime.now(timezone.utc)
         result = check_full_moon(now)
         next_fm = datetime.fromisoformat(result["next_full_moon_utc"])
@@ -97,7 +97,7 @@ class TestCheckFullMoon:
 # ---------------------------------------------------------------------------
 
 class TestCheckFullMoonCLI:
-    \"\"\"Test the script as a CLI tool.\"\"\"
+    """Test the script as a CLI tool."""
 
     def test_json_output(self):
         proc = subprocess.run(
@@ -134,10 +134,10 @@ class TestCheckFullMoonCLI:
 # ---------------------------------------------------------------------------
 
 class TestAppHelpers:
-    \"\"\"Test the core calculation logic used by app.py.\"\"\"
+    """Test the core calculation logic used by app.py."""
 
     def test_ephem_moon_illumination_full_moon(self):
-        \"\"\"At full moon, illumination should be very high.\"\"\"
+        """At full moon, illumination should be very high."""
         obs = ephem.Observer()
         obs.lat = "0"
         obs.lon = "0"
@@ -146,7 +146,7 @@ class TestAppHelpers:
         assert moon.phase > 95  # should be ~99-100%
 
     def test_ephem_moon_illumination_new_moon(self):
-        \"\"\"At new moon, illumination should be very low.\"\"\"
+        """At new moon, illumination should be very low."""
         # New moon around Jan 18, 2026
         next_new = ephem.next_new_moon(ephem.Date(datetime(2026, 1, 15)))
         obs = ephem.Observer()
@@ -157,7 +157,7 @@ class TestAppHelpers:
         assert moon.phase < 5
 
     def test_zodiac_sign_calculation(self):
-        \"\"\"Ecliptic longitude should map to a valid zodiac index (0-11).\"\"\"
+        """Ecliptic longitude should map to a valid zodiac index (0-11)."""
         obs = ephem.Observer()
         obs.lat = "0"
         obs.lon = "0"
@@ -169,7 +169,7 @@ class TestAppHelpers:
         assert 0 <= sign_index <= 11
 
     def test_phase_fraction_range(self):
-        \"\"\"Phase fraction from elongation should be 0-1.\"\"\"
+        """Phase fraction from elongation should be 0-1."""
         obs = ephem.Observer()
         obs.lat = "0"
         obs.lon = "0"
@@ -183,7 +183,7 @@ class TestAppHelpers:
             assert 0 <= phase_frac <= 1, f"Phase fraction out of range on day offset {day_offset}"
 
     def test_next_full_moon_is_after_reference(self):
-        \"\"\"ephem.next_full_moon should return a date after the input.\"\"\"
+        """ephem.next_full_moon should return a date after the input."""
         ref = ephem.Date(datetime(2026, 4, 18, 12, 0, 0))
         nfm = ephem.next_full_moon(ref)
         assert nfm > ref

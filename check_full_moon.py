@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-\"\"\"
+"""
 check_full_moon.py – Returns whether a full moon is occurring today or tomorrow.
 
 Usage:
@@ -11,7 +11,7 @@ Exit codes:
     1 = no full moon today or tomorrow
 
 Designed to be called by schedulers, cron jobs, or other automation.
-\"\"\"
+"""
 
 import argparse
 import json
@@ -22,7 +22,7 @@ import ephem
 
 
 def check_full_moon(reference_utc: datetime | None = None) -> dict:
-    \"\"\"
+    """
     Check if a full moon falls on today or tomorrow (UTC dates).
 
     Returns a dict:
@@ -34,7 +34,7 @@ def check_full_moon(reference_utc: datetime | None = None) -> dict:
         "today_utc": "YYYY-MM-DD",
         "tomorrow_utc": "YYYY-MM-DD",
       }
-    \"\"\"
+    """
     now = reference_utc or datetime.now(timezone.utc)
     today = now.date()
     tomorrow = today + timedelta(days=1)

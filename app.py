@@ -134,7 +134,7 @@ KEY_EVENTS_2026 = [
 
 
 def get_moon_phase_name(phase_frac: float) -> tuple[str, str]:
-    \"\"\"Return (name, emoji) for a 0-1 phase fraction.\"\"\"
+    """Return (name, emoji) for a 0-1 phase fraction."""
     for i in range(len(PHASE_NAMES) - 1):
         lo = PHASE_NAMES[i][0]
         hi = PHASE_NAMES[i + 1][0]
@@ -144,7 +144,7 @@ def get_moon_phase_name(phase_frac: float) -> tuple[str, str]:
 
 
 def get_moon_data(now_utc: datetime) -> dict:
-    \"\"\"Compute current moon info using ephem.\"\"\"
+    """Compute current moon info using ephem."""
     obs = ephem.Observer()
     obs.lat = "0"
     obs.lon = "0"
@@ -204,7 +204,7 @@ data = get_moon_data(now_utc)
 
 # Header
 st.markdown(
-    f\"\"\"
+    f"""
     <div style="text-align:center; padding: 1rem 0 0.5rem 0;">
         <span style="font-size:4rem;">{data['phase_emoji']}</span>
         <h1 style="margin:0; color:#e6edf3;">Moon Management</h1>
@@ -212,7 +212,7 @@ st.markdown(
             {now_utc.strftime('%A, %B %d, %Y')} &mdash; {now_utc.strftime('%H:%M')} UTC
         </p>
     </div>
-    \"\"\",
+    """,
     unsafe_allow_html=True,
 )
 
@@ -221,33 +221,33 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown(
-        f\"\"\"<div class="moon-card">
+        f"""<div class="moon-card">
             <h3>Current Phase</h3>
             <div class="big">{data['phase_emoji']} {data['phase_name']}</div>
             <div class="sub">Cycle position {data['phase_frac']:.1%}</div>
-        </div>\"\"\",
+        </div>""",
         unsafe_allow_html=True,
     )
 
 with col2:
     pct = data["illumination"] * 100
     st.markdown(
-        f\"\"\"<div class="moon-card">
+        f"""<div class="moon-card">
             <h3>Illumination</h3>
             <div class="big">{pct:.1f}%</div>
             <div class="sub">Surface lit by the Sun</div>
-        </div>\"\"\",
+        </div>""",
         unsafe_allow_html=True,
     )
 
 with col3:
     age = data["moon_age_days"]
     st.markdown(
-        f\"\"\"<div class="moon-card">
+        f"""<div class="moon-card">
             <h3>Moon Age</h3>
             <div class="big">{age:.1f} days</div>
             <div class="sub">Since last New Moon (cycle ≈ 29.5 d)</div>
-        </div>\"\"\",
+        </div>""",
         unsafe_allow_html=True,
     )
 
@@ -274,10 +274,10 @@ with col_left:
     ]:
         with col:
             st.markdown(
-                f\"\"\"<div class="countdown-box">
+                f"""<div class="countdown-box">
                     <div class="number">{val}</div>
                     <div class="label">{lbl}</div>
-                </div>\"\"\",
+                </div>""",
                 unsafe_allow_html=True,
             )
 
@@ -290,10 +290,10 @@ with col_left:
 with col_right:
     st.subheader("✨ Moon Vibes – Astrological Insight")
     st.markdown(
-        f\"\"\"<div class="vibes-box">
+        f"""<div class="vibes-box">
             <h4>{data['sign_symbol']} Moon in {data['sign_name']} ({data['sign_degree']:.1f}°)</h4>
             <p style="color:#c9d1d9; font-size:1.05rem;">{data['sign_vibe']}</p>
-        </div>\"\"\",
+        </div>""",
         unsafe_allow_html=True,
     )
     # Quick tips based on element
@@ -323,11 +323,11 @@ with tab_events:
         past = ev_date.date() < now_utc.date()
         opacity = "0.5" if past else "1.0"
         st.markdown(
-            f\"\"\"<div class="event-row" style="opacity:{opacity}">
+            f"""<div class="event-row" style="opacity:{opacity}">
                 <span class="date">{date_str}</span><br/>
                 <span class="title">{title}</span>
                 <p style="color:#8b949e; margin:0.2rem 0 0 0; font-size:0.9rem;">{desc}</p>
-            </div>\"\"\",
+            </div>""",
             unsafe_allow_html=True,
         )
 
@@ -348,10 +348,10 @@ with tab_full_moons:
         rows_html += f'<tr class="{css_class}"><td>{date_str}</td><td>{name}</td><td>{time_str}</td></tr>\n'
 
     st.markdown(
-        f\"\"\"<table class="fm-table">
+        f"""<table class="fm-table">
             <tr><th>Date</th><th>Name</th><th>Time</th></tr>
             {rows_html}
-        </table>\"\"\",
+        </table>""",
         unsafe_allow_html=True,
     )
 
