@@ -214,7 +214,6 @@ with st.sidebar:
         st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
         st.rerun()
     st.success("🔒 Private: Insights are only visible to you.")
-    st.info("Tip: Bookmark your personalized URL!")
 
 # 1. TOP: COMPACT COUNTDOWN
 delta = current["next_full_dt"] - now_utc
@@ -249,8 +248,8 @@ else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you se
 
 st.markdown(f"""
 <div class="personal-card">
-    <div style="color:#58a6ff; font-size:0.65rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:1px; font-family:'Orbitron', sans-serif;">
-        CUSTOM COSMIC PROFILE AND DAILY DIARY
+    <div style="color:#58a6ff; font-size:0.8rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
+        YOUR COSMIC CHART
     </div>
     <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
         <div><div style="color:#8b949e; font-size:0.55rem;">SUN</div><div style="font-size:1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
@@ -268,7 +267,7 @@ st.markdown(f"""
 # 3. CURRENT STATS
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stat-card"><div class="stat-label">Phase</div><div class="stat-val">{current["phase_emoji"]}</div><div class="stat-label" style="font-size:0.6rem;">{current["phase_name"]}</div></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Glow</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.7rem;">Surface</div></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Glow</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.6rem;">Surface</div></div>', unsafe_allow_html=True)
 with c3: st.markdown(f'<div class="stat-card"><div class="stat-label">Age</div><div class="stat-val">{current["age_days"]:.1f}d</div><div class="stat-label" style="font-size:0.6rem;">Cycle</div></div>', unsafe_allow_html=True)
 
 # 4. MOON VIBES & EVENTS
