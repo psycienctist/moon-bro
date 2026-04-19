@@ -220,9 +220,9 @@ m, _ = divmod(m_total, 60)
 
 st.markdown(f"""
     <div class="glow-container">
-        <h2 style="color:#bc8cff; margin-bottom:0.1rem; font-size:1.2rem;">🌙 LUNATICK</h2>
-        <div style="color:#8b949e; font-size:0.65rem; letter-spacing:2px; margin-bottom:0.5rem; font-weight:700;">MOON MONITOR</div>
-        <p style="color:#8b949e; font-size:0.7rem; margin-bottom:0.5rem; letter-spacing:1px;">NEXT FULL MOON</p>
+        <h1 style="color:#bc8cff; margin-bottom:0rem; font-size:3.2rem; letter-spacing:4px;">🌙 LUNATICK</h1>
+        <div style="color:#8b949e; font-size:0.8rem; letter-spacing:3px; margin-bottom:1rem; font-weight:700;">MOON MONITOR</div>
+        <p style="color:#8b949e; font-size:0.75rem; margin-bottom:0.6rem; letter-spacing:1.5px;">NEXT FULL MOON</p>
         <div class="countdown-display">
             <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
             <div class="unit-box"><div class="num">{h}</div><div class="label">Hours</div></div>
@@ -245,18 +245,18 @@ else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you se
 
 st.markdown(f"""
 <div class="personal-card">
-    <div style="color:#58a6ff; font-size:0.8rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
+    <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
         YOUR COSMIC CHART
     </div>
     <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
-        <div><div style="color:#8b949e; font-size:0.55rem;">SUN</div><div style="font-size:1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.55rem;">MOON</div><div style="font-size:1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.55rem;">PHASE</div><div style="font-size:1rem; font-weight:700; color:#fff;">{natal['phase_emoji']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.55rem;">MOONS</div><div style="font-size:1rem; font-weight:700; color:#fff;">{int(total_moons)}</div></div>
+        <div><div style="color:#8b949e; font-size:0.6rem;">SUN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.6rem;">MOON</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.6rem;">PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.6rem;">MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{int(total_moons)}</div></div>
     </div>
     <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
-        <div style="color:#58a6ff; font-weight:700; font-size:0.75rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
-        <div style="color:#e6edf3; line-height:1.4; font-size:0.85rem;">{guidance}</div>
+        <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
+        <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{guidance}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -267,17 +267,17 @@ st.markdown(f"""
     <div class="stat-card">
         <div class="stat-label">Phase</div>
         <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
-        <div class="stat-label" style="font-size:0.5rem;">{current["phase_name"]}</div>
+        <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Glow</div>
         <div class="stat-val">{current["illum"]*100:.1f}%</div>
-        <div class="stat-label" style="font-size:0.5rem;">Surface</div>
+        <div class="stat-label" style="font-size:0.55rem;">Surface</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Age</div>
         <div class="stat-val">{current["age_days"]:.1f}d</div>
-        <div class="stat-label" style="font-size:0.5rem;">Cycle</div>
+        <div class="stat-label" style="font-size:0.55rem;">Cycle</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -290,19 +290,19 @@ with vcol:
     st.markdown(f"""
     <div class="vibe-card">
         <div class="vibe-tag">ENERGY</div>
-        <h3 style="color:#fff; margin-bottom:0.5rem; font-size:1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
-        <p style="font-size:0.85rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
+        <h3 style="color:#fff; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
+        <p style="font-size:0.9rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
     </div>
     """, unsafe_allow_html=True)
 
 with ecol:
-    st.markdown("<h4 style='font-size:0.8rem; margin-bottom:0.5rem;'>🔭 2026 CALENDAR</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='font-size:0.85rem; margin-bottom:0.5rem;'>🔭 2026 CALENDAR</h4>", unsafe_allow_html=True)
     for d_str, title, desc in [
         ("March 3", "Total Lunar Eclipse", "Americas, Europe, Africa."),
         ("Aug 12", "Total Solar Eclipse", "Europe & Greenland."),
         ("Aug 28", "Partial Lunar Eclipse", "Pacific region."),
     ]:
-        st.markdown(f'<div class="event-item" style="padding:0.5rem;"><div class="event-info"><div class="etitle" style="font-size:0.8rem;">{title}</div></div><div class="event-date" style="font-size:0.6rem;">{d_str}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="event-item" style="padding:0.5rem;"><div class="event-info"><div class="etitle" style="font-size:0.85rem;">{title}</div></div><div class="event-date" style="font-size:0.65rem;">{d_str}</div></div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#484f58; font-size:0.6rem; margin-top:1rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#484f58; font-size:0.65rem; margin-top:1rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
