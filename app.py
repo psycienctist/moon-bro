@@ -122,11 +122,7 @@ LUNATICK_CSS = """
         margin-bottom: 0.8rem;
         border-left: 4px solid #ff7b72;
     }
-    .event-date {
-        color: #ff7b72;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.65rem;
-    }
+    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; }
 
     ::-webkit-scrollbar { width: 6px; }
 </style>
@@ -204,10 +200,8 @@ current = get_celestial_data(now_utc)
 query_params = st.query_params
 initial_date = datetime(1990, 1, 1)
 if "dob" in query_params:
-    try:
-        initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
-    except:
-        pass
+    try: initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
+    except: pass
 
 if 'birth_date' not in st.session_state:
     st.session_state.birth_date = initial_date
@@ -230,8 +224,9 @@ m, _ = divmod(m_total, 60)
 
 st.markdown(f"""
     <div class="glow-container">
-        <h2 style="color:#bc8cff; margin-bottom:0.2rem; font-size:1.2rem;">🌙 LUNATICK</h2>
-        <p style="color:#8b949e; font-size:0.7rem; margin-bottom:0.5rem;">NEXT FULL MOON</p>
+        <h2 style="color:#bc8cff; margin-bottom:0.1rem; font-size:1.2rem;">🌙 LUNATICK</h2>
+        <div style="color:#8b949e; font-size:0.65rem; letter-spacing:2px; margin-bottom:0.5rem; font-weight:700;">MOON MONITOR</div>
+        <p style="color:#8b949e; font-size:0.7rem; margin-bottom:0.5rem; letter-spacing:1px;">NEXT FULL MOON</p>
         <div class="countdown-display">
             <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
             <div class="unit-box"><div class="num">{h}</div><div class="label">Hours</div></div>
@@ -246,19 +241,17 @@ natal = get_celestial_data(birth_utc)
 total_moons = (now_utc - birth_utc).days / 29.53
 diff = (current["moon_lon"] - natal["moon_lon"]) % 360
 
-if diff < 10 or diff > 350:
-    aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
-elif 170 < diff < 190:
-    aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
-elif 80 < diff < 100 or 260 < diff < 280:
-    aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
-elif 110 < diff < 130 or 230 < diff < 250:
-    aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
-else:
-    aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
+if diff < 10 or diff > 350: aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
+elif 170 < diff < 190: aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
+elif 80 < diff < 100 or 260 < diff < 280: aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
+elif 110 < diff < 130 or 230 < diff < 250: aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
+else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
 
 st.markdown(f"""
 <div class="personal-card">
+    <div style="color:#58a6ff; font-size:0.65rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:1px; font-family:'Orbitron', sans-serif;">
+        CUSTOM COSMIC PROFILE AND DAILY DIARY
+    </div>
     <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
         <div><div style="color:#8b949e; font-size:0.55rem;">SUN</div><div style="font-size:1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
         <div><div style="color:#8b949e; font-size:0.55rem;">MOON</div><div style="font-size:1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
@@ -275,7 +268,7 @@ st.markdown(f"""
 # 3. CURRENT STATS
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stat-card"><div class="stat-label">Phase</div><div class="stat-val">{current["phase_emoji"]}</div><div class="stat-label" style="font-size:0.6rem;">{current["phase_name"]}</div></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Glow</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.6rem;">Surface</div></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Glow</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.7rem;">Surface</div></div>', unsafe_allow_html=True)
 with c3: st.markdown(f'<div class="stat-card"><div class="stat-label">Age</div><div class="stat-val">{current["age_days"]:.1f}d</div><div class="stat-label" style="font-size:0.6rem;">Cycle</div></div>', unsafe_allow_html=True)
 
 # 4. MOON VIBES & EVENTS
