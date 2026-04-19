@@ -29,13 +29,13 @@ LUNATICK_CSS = """
         background: radial-gradient(circle at top right, #1b1040 0%, #05070a 100%);
         border: 1px solid #6e40c9;
         border-radius: 16px;
-        padding: 0.8rem 1rem; /* Compact padding */
-        margin-bottom: 0.5rem; /* Reduced margin */
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.5rem;
         box-shadow: 0 0 30px rgba(110, 64, 201, 0.15);
         text-align: center;
     }
 
-    .countdown-display {
+    .countdown-display, .stats-row {
         display: flex;
         flex-direction: row;
         justify-content: center;
@@ -44,30 +44,45 @@ LUNATICK_CSS = """
         margin: 0.5rem 0;
         flex-wrap: nowrap;
     }
-    .unit-box {
+
+    .unit-box, .stat-card {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 10px;
         padding: 0.5rem;
         flex: 1;
-        max-width: 90px;
-        min-width: 65px;
+        min-width: 60px;
+        text-align: center;
     }
+
     .unit-box .num {
         font-family: 'Orbitron', sans-serif;
-        font-size: 1.8rem; /* Scaled down */
+        font-size: 1.8rem;
         font-weight: 700;
         background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         line-height: 1.1;
     }
-    .unit-box .label {
+
+    .stat-card {
+        background: #0d1117;
+        border-color: #30363d;
+    }
+    
+    .stat-val {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #f0f6fc;
+        margin: 0.2rem 0;
+    }
+
+    .label, .stat-label {
         font-size: 0.55rem;
         color: #8b949e;
-        margin-top: 0.2rem;
         font-weight: 600;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
     /* COMPACT PERSONAL CARD */
@@ -75,27 +90,9 @@ LUNATICK_CSS = """
         background: linear-gradient(135deg, #0d1f3c 0%, #05070a 100%);
         border: 1px solid #1f6feb;
         border-radius: 16px;
-        padding: 1rem; /* Compact padding */
+        padding: 1rem;
         margin-bottom: 1rem;
         box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);
-    }
-
-    .stat-card {
-        background: #0d1117;
-        border: 1px solid #30363d;
-        border-radius: 16px;
-        padding: 1rem;
-        text-align: center;
-    }
-    .stat-val {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #f0f6fc;
-    }
-    .stat-label {
-        color: #8b949e;
-        font-size: 0.7rem;
-        text-transform: uppercase;
     }
 
     .vibe-card {
@@ -234,7 +231,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# 2. PERSONAL INSIGHTS (VISIBLE IF NOT DEFAULT)
+# 2. PERSONAL INSIGHTS
 birth_utc = datetime.combine(st.session_state.birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
 natal = get_celestial_data(birth_utc)
 total_moons = (now_utc - birth_utc).days / 29.53
@@ -264,11 +261,28 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 3. CURRENT STATS
-c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f'<div class="stat-card"><div class="stat-label">Phase</div><div class="stat-val">{current["phase_emoji"]}</div><div class="stat-label" style="font-size:0.6rem;">{current["phase_name"]}</div></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="stat-card"><div class="stat-label">Glow</div><div class="stat-val">{current["illum"]*100:.1f}%</div><div class="stat-label" style="font-size:0.6rem;">Surface</div></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="stat-card"><div class="stat-label">Age</div><div class="stat-val">{current["age_days"]:.1f}d</div><div class="stat-label" style="font-size:0.6rem;">Cycle</div></div>', unsafe_allow_html=True)
+# 3. CURRENT STATS (FORCED HORIZONTAL ROW)
+st.markdown(f"""
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-label">Phase</div>
+        <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
+        <div class="stat-label" style="font-size:0.5rem;">{current["phase_name"]}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Glow</div>
+        <div class="stat-val">{current["illum"]*100:.1f}%</div>
+        <div class="stat-label" style="font-size:0.5rem;">Surface</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Age</div>
+        <div class="stat-val">{current["age_days"]:.1f}d</div>
+        <div class="stat-label" style="font-size:0.5rem;">Cycle</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.write("")
 
 # 4. MOON VIBES & EVENTS
 vcol, ecol = st.columns([1, 1])
@@ -290,4 +304,5 @@ with ecol:
     ]:
         st.markdown(f'<div class="event-item" style="padding:0.5rem;"><div class="event-info"><div class="etitle" style="font-size:0.8rem;">{title}</div></div><div class="event-date" style="font-size:0.6rem;">{d_str}</div></div>', unsafe_allow_html=True)
 
+st.markdown("---")
 st.markdown("<p style='text-align:center; color:#484f58; font-size:0.6rem; margin-top:1rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
