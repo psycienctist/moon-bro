@@ -29,8 +29,8 @@ LUNATICK_CSS = """
         background: radial-gradient(circle at top right, #1b1040 0%, #05070a 100%);
         border: 1px solid #6e40c9;
         border-radius: 16px;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.5rem;
+        padding: 0.8rem 1rem; /* Compact padding */
+        margin-bottom: 0.5rem; /* Reduced margin */
         box-shadow: 0 0 30px rgba(110, 64, 201, 0.15);
         text-align: center;
     }
@@ -57,7 +57,7 @@ LUNATICK_CSS = """
 
     .unit-box .num {
         font-family: 'Orbitron', sans-serif;
-        font-size: 1.8rem;
+        font-size: 1.8rem; /* Scaled down */
         font-weight: 700;
         background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
         -webkit-background-clip: text;
@@ -78,7 +78,7 @@ LUNATICK_CSS = """
     }
 
     .label, .stat-label {
-        font-size: 0.55rem;
+        font-size: 0.5rem;
         color: #8b949e;
         font-weight: 600;
         text-transform: uppercase;
@@ -197,8 +197,10 @@ current = get_celestial_data(now_utc)
 query_params = st.query_params
 initial_date = datetime(1990, 1, 1)
 if "dob" in query_params:
-    try: initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
-    except: pass
+    try:
+        initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
+    except:
+        pass
 
 if 'birth_date' not in st.session_state:
     st.session_state.birth_date = initial_date
@@ -249,10 +251,10 @@ st.markdown(f"""
         YOUR COSMIC CHART
     </div>
     <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
-        <div><div style="color:#8b949e; font-size:0.6rem;">SUN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.6rem;">MOON</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.6rem;">PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.6rem;">MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{int(total_moons)}</div></div>
+        <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{int(total_moons)}</div></div>
     </div>
     <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
         <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
@@ -296,13 +298,14 @@ with vcol:
     """, unsafe_allow_html=True)
 
 with ecol:
-    st.markdown("<h4 style='font-size:0.85rem; margin-bottom:0.5rem;'>🔭 2026 CALENDAR</h4>", unsafe_allow_html=True)
+    st.subheader("🔭 2026 Cosmic Calendar")
     for d_str, title, desc in [
-        ("March 3", "Total Lunar Eclipse", "Americas, Europe, Africa."),
-        ("Aug 12", "Total Solar Eclipse", "Europe & Greenland."),
-        ("Aug 28", "Partial Lunar Eclipse", "Pacific region."),
+        ("March 3", "Total Lunar Eclipse", "Visible across the Americas, Europe, and Africa."),
+        ("August 12, 2026", "Total Solar Eclipse", "Major eclipse visible in Europe & Greenland."),
+        ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
+        ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
     ]:
-        st.markdown(f'<div class="event-item" style="padding:0.5rem;"><div class="event-info"><div class="etitle" style="font-size:0.85rem;">{title}</div></div><div class="event-date" style="font-size:0.65rem;">{d_str}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="event-item"><div class="event-info"><div class="etitle">{title}</div><div class="edesc">{desc}</div></div><div class="event-date">{d_str}</div></div>', unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:#484f58; font-size:0.65rem; margin-top:1rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
