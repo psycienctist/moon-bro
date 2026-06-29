@@ -16,4 +16,4 @@ A high-performance, cosmic-themed Streamlit application for tracking the moon's 
 - **Streamlit**: Modern UI with a custom cosmic CSS theme.
 - **PyEphem**: High-precision astronomical calculations.
 
-Built with 🤝 by **Brobot**.
+AI + I = All 🦾🤖
