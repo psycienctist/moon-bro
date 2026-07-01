@@ -1,0 +1,28 @@
+name: Full Moon Alerts
+
+on:
+  schedule:
+    - cron: '0 14 * * *' # 10:00 AM EDT (UTC-4)
+  workflow_dispatch:
+
+jobs:
+  check-moon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install ephem requests
+
+      - name: Check Moon & Send Alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python check_full_moon.py --alert
