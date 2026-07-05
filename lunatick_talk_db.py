@@ -244,7 +244,7 @@ def seed_talk_posts():
             """, ("seed_user", display_name, content, phase, sign, False))
         conn.commit()
         
-        # Add comments
+        # Add a couple of comments
         c.execute("SELECT id FROM lunatick_talk_posts LIMIT 1")
         post_id = c.fetchone()[0]
         c.execute("""
