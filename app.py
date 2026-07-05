@@ -9,12 +9,13 @@ from datetime import datetime, timezone, timedelta
 # ---------------------------------------------------------------------------
 import journal as journal_ui
 import lunatick_talk_ui as talk_ui
+import lunatick_talk_db as talk_db
 import daily_reflection as reflection_ui
 
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="🌙 LunaTick", page_icon="🌙", layout="wide")
+st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
 
 LUNATICK_CSS = """
 <style>
@@ -483,7 +484,7 @@ def render_settings():
 
 # Initialize database for journal and talk modules
 journal_ui.init_db()
-talk_ui.init_db()
+talk_db.init_db()   # <--- FIXED: now uses talk_db, not talk_ui
 
 # Set up user hash for privacy
 if "user_hash" not in st.session_state:
