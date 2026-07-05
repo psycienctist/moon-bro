@@ -1,6 +1,7 @@
 import streamlit as st
 import ephem
 import math
+import requests
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
@@ -119,7 +120,10 @@ LUNATICK_CSS = """
         margin-bottom: 0.8rem;
         border-left: 4px solid #ff7b72;
     }
-    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; }
+    .event-info { display: flex; flex-direction: column; }
+    .etitle { color: #fff; font-weight: 600; font-size: 0.9rem; }
+    .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
+    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
 
     ::-webkit-scrollbar { width: 6px; }
 </style>
@@ -186,6 +190,38 @@ def get_celestial_data(date_utc: datetime):
         "next_full_dt": nfm_dt, "age_days": phase_frac * 29.53
     }
 
+@st.cache_data(ttl=3600)
+def get_ai_insight(natal, current, aspect):
+    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        return None
+    
+    prompt = f"""
+    As a cosmic guide, provide a short, poetic, and encouraging astrology insight (max 3 sentences).
+    User Natal: Sun in {natal['sun_sign']}, Moon in {natal['moon_sign']}.
+    Current Sky: Moon in {current['moon_sign']} ({current['phase_name']}).
+    Natal-Current Aspect: {aspect}.
+    Tone: Mystical, empowering, and modern.
+    """
+    
+    try:
+        response = requests.post(
+            "https://api.deepseek.com/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "You are a mystical cosmic guide for the Lunatick app."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False
+            },
+            timeout=10
+        )
+        return response.json()['choices'][0]['message']['content']
+    except Exception:
+        return None
+
 # ---------------------------------------------------------------------------
 # UI Rendering
 # ---------------------------------------------------------------------------
@@ -245,6 +281,8 @@ elif 80 < diff < 100 or 260 < diff < 280: aspect, guidance = "Square", "Tension 
 elif 110 < diff < 130 or 230 < diff < 250: aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
 else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
 
+insight = get_ai_insight(natal, current, aspect)
+
 st.markdown(f"""
 <div class="personal-card">
     <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
@@ -253,13 +291,19 @@ st.markdown(f"""
     <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
         <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
         <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{int(total_moons)}</div></div>
+        <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
+        <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
     </div>
     <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
         <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
         <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{guidance}</div>
     </div>
+    {f'''
+    <div style="margin-top:0.8rem; background:rgba(188, 140, 255, 0.1); padding:0.8rem; border-radius:10px; border:1px solid #bc8cff;">
+        <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 DEEPSEEK AI INSIGHT</div>
+        <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem; font-style: italic;">"{insight}"</div>
+    </div>
+    ''' if insight else ''}
 </div>
 """, unsafe_allow_html=True)
 
@@ -305,7 +349,15 @@ with ecol:
         ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
         ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
     ]:
-        st.markdown(f'<div class="event-item"><div class="event-info"><div class="etitle">{title}</div><div class="edesc">{desc}</div></div><div class="event-date">{d_str}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'''
+            <div class="event-item">
+                <div class="event-info">
+                    <div class="etitle">{title}</div>
+                    <div class="edesc">{desc}</div>
+                </div>
+                <div class="event-date">{d_str}</div>
+            </div>
+        ''', unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:#484f58; font-size:0.65rem; margin-top:1rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
