@@ -516,6 +516,7 @@ def render_settings():
 # Initialize database for journal and talk modules
 journal_ui.init_db()
 talk_db.init_db()
+talk_db.seed_talk_posts()
 
 # Set up user hash for privacy
 if "user_hash" not in st.session_state:
