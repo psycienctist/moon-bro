@@ -125,11 +125,16 @@ def render_journal_tab():
 
     current_phase = st.session_state.get("current_phase", "Waxing Gibbous")
 
+    # --- FIX: Initialize session state key before using it ---
+    input_key = f"journal_{prompt_key}_input"
+    if input_key not in st.session_state:
+        st.session_state[input_key] = ""
+
     entry_text = st.text_area(
         "Your reflection:",
         placeholder=prompt_data['placeholder'],
         height=200,
-        key=f"journal_{prompt_key}_input"
+        key=input_key
     )
 
     col1, col2 = st.columns([2, 1])
@@ -138,14 +143,14 @@ def render_journal_tab():
             if entry_text.strip():
                 save_entry(current_phase, prompt_key, entry_text.strip())
                 st.success("✨ Your reflection has been sealed.")
-                st.session_state[f"journal_{prompt_key}_input"] = ""
+                st.session_state[input_key] = ""
                 st.rerun()
             else:
                 st.warning("Please write something before sealing.")
 
     with col2:
         if st.button("Clear", use_container_width=True):
-            st.session_state[f"journal_{prompt_key}_input"] = ""
+            st.session_state[input_key] = ""
             st.rerun()
 
     # ------------------------------------------------------------------
