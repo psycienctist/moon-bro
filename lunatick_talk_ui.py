@@ -5,6 +5,11 @@
 import streamlit as st
 from datetime import datetime
 import lunatick_talk_db as db
+import os
+from PIL import Image
+
+UPLOAD_DIR = "talk_uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # --------------------------------------------------------------------------
 # Render the Main LunaTick Talk Tab
@@ -34,13 +39,21 @@ def render_talk_tab():
     with st.expander("🌙 Share something with the community"):
         display_name = st.text_input("Your display name", value=st.session_state.get("display_name", "Moon Wanderer"))
         content = st.text_area("Your post", max_chars=1000, placeholder="What's on your mind under tonight's moon?")
+        uploaded_image = st.file_uploader("Attach an image (optional)", type=["jpg", "jpeg", "png", "webp"])
         is_anonymous = st.checkbox("Post anonymously", value=True)
 
         if st.button("Share"):
             if content.strip():
+                image_path = None
+                if uploaded_image:
+                    ext = uploaded_image.name.split(".")[-1]
+                    filename = f"{st.session_state.get('user_hash', 'anonymous')}_{datetime.now().timestamp()}.{ext}"
+                    image_path = os.path.join(UPLOAD_DIR, filename)
+                    with open(image_path, "wb") as f:
+                        f.write(uploaded_image.getbuffer())
                 user_moon_sign = st.session_state.get("user_moon_sign", "Unknown")
                 current_moon_phase = st.session_state.get("current_phase", "Waxing Gibbous")
-                db.create_post(display_name, content, user_moon_sign, current_moon_phase, is_anonymous)
+                db.create_post(display_name, content, user_moon_sign, current_moon_phase, is_anonymous, image_path)
                 st.success("🌙 Your post has been shared with the community.")
                 st.rerun()
             else:
@@ -65,8 +78,10 @@ def render_talk_tab():
         st.info("No posts yet. Be the first to share!")
         return
 
+    user_hash = st.session_state.get("user_hash", "anonymous")
+
     for post in posts:
-        post_id, user_hash, display_name, user_moon_sign, current_moon_phase, content, upvotes, downvotes, created_at, is_anon, is_hidden = post
+        post_id, user_hash_db, display_name, user_moon_sign, current_moon_phase, content, image_path, upvotes, downvotes, created_at, is_anon, is_hidden = post
 
         # Display each post
         st.markdown(f"""
@@ -80,11 +95,40 @@ def render_talk_tab():
                 <div style="font-size: 0.55rem; color: #8b949e; font-family: 'Orbitron', sans-serif;">{created_at[:16]}</div>
             </div>
             <div style="color: #c9d1d9; line-height: 1.6; font-size: 0.95rem; margin: 0.5rem 0;">{content}</div>
+        """, unsafe_allow_html=True)
+
+        # Display image if it exists
+        if image_path and os.path.exists(image_path):
+            try:
+                st.image(image_path, use_container_width=True)
+            except Exception:
+                st.warning("Image could not be loaded.")
+
+        st.markdown(f"""
             <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.3rem;">
                 <span style="font-size: 0.7rem; color: #8b949e;">❤️ {upvotes} · 💔 {downvotes}</span>
             </div>
-        </div>
         """, unsafe_allow_html=True)
+
+        # --- Voting (with persistence) ---
+        current_vote = db.get_user_vote(user_hash, post_id)
+
+        col_vote1, col_vote2, col_vote3 = st.columns([1, 1, 2])
+        with col_vote1:
+            if st.button("👍", key=f"up_{post_id}"):
+                db.set_user_vote(user_hash, post_id, "up")
+                st.rerun()
+        with col_vote2:
+            if st.button("👎", key=f"down_{post_id}"):
+                db.set_user_vote(user_hash, post_id, "down")
+                st.rerun()
+        with col_vote3:
+            if current_vote:
+                if st.button("🗑️ Remove Vote", key=f"remove_{post_id}"):
+                    db.set_user_vote(user_hash, post_id, None)
+                    st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # -- Comments --
         with st.expander(f"💬 Comments ({len(db.get_comments(post_id))})"):
