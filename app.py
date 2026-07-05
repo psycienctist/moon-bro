@@ -453,22 +453,53 @@ def render_settings():
     </div>
     """, unsafe_allow_html=True)
 
-    display_name = st.text_input("Display Name", value=st.session_state.get("display_name", "Moon Wanderer"))
-    if display_name != st.session_state.get("display_name", "Moon Wanderer"):
-        st.session_state.display_name = display_name
-        st.success("Display name updated.")
+    # --- Display Name ---
+    current_name = st.session_state.get("display_name", "Moon Wanderer")
+    display_name = st.text_input("Display Name", value=current_name)
+    
+    # --- Birth Date ---
+    current_birth_date = st.session_state.get("birth_date", datetime(1990, 1, 1).date())
+    birth_date = st.date_input(
+        "Your Birth Date",
+        value=current_birth_date,
+        min_value=datetime(1920, 1, 1).date(),
+        max_value=datetime.now().date()
+    )
+    
+    # --- Save Button ---
+    if st.button("💾 Save Profile", type="primary"):
+        if display_name.strip():
+            st.session_state.display_name = display_name.strip()
+            st.session_state.birth_date = birth_date
+            talk_db.set_user_profile(
+                st.session_state.user_hash,
+                display_name.strip(),
+                birth_date.isoformat()
+            )
+            st.success("✅ Profile saved permanently!")
+            st.rerun()
+        else:
+            st.warning("Please enter a display name.")
 
+    st.markdown("---")
+    
+    # --- Privacy & Consent ---
     st.markdown("### 🔒 Privacy & Consent")
     if st.button("Opt in to community sharing"):
-        # Placeholder — will be connected to consent layer
         st.success("You have opted in to community sharing.")
     if st.button("Opt out of community sharing"):
         st.success("You have opted out of community sharing.")
 
+    st.markdown("---")
+    
+    # --- Subscription ---
     st.markdown("### 💎 Subscription")
     tier = st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
     st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
 
+    st.markdown("---")
+    
+    # --- Danger Zone ---
     st.markdown("### 🗑️ Danger Zone")
     if st.button("Clear all journal entries", type="secondary"):
         if "journal_entries" in st.session_state:
@@ -479,12 +510,12 @@ def render_settings():
         st.success("Preferences reset. Please refresh the page.")
 
 # ---------------------------------------------------------------------------
-# Main App — Bottom Navigation Tabs
+# Load User Profile from Database
 # ---------------------------------------------------------------------------
 
 # Initialize database for journal and talk modules
 journal_ui.init_db()
-talk_db.init_db()   # <--- FIXED: now uses talk_db, not talk_ui
+talk_db.init_db()
 
 # Set up user hash for privacy
 if "user_hash" not in st.session_state:
@@ -492,11 +523,25 @@ if "user_hash" not in st.session_state:
     from datetime import datetime
     st.session_state.user_hash = hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
 
+# Load user profile from database if it exists
+if "user_hash" in st.session_state:
+    profile = talk_db.get_user_profile(st.session_state.user_hash)
+    if profile:
+        st.session_state.display_name = profile["display_name"]
+        if profile["birth_date"]:
+            st.session_state.birth_date = datetime.strptime(profile["birth_date"], "%Y-%m-%d").date()
+    else:
+        if "display_name" not in st.session_state:
+            st.session_state.display_name = "Moon Wanderer"
+
 # Set a default phase for the demo (will be overwritten by real data)
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
-# Define tabs
+# ---------------------------------------------------------------------------
+# Main App — Bottom Navigation Tabs
+# ---------------------------------------------------------------------------
+
 tabs = st.tabs(["🌕 Home", "💬 LunaTick Talk", "📓 Journal", "📅 Calendar", "⚙️ Settings"])
 
 with tabs[0]:
