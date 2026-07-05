@@ -13,6 +13,8 @@ import streamlit as st
 def init_db():
     conn = sqlite3.connect("lunatick.db")
     c = conn.cursor()
+    
+    # Posts table
     c.execute("""
         CREATE TABLE IF NOT EXISTS lunatick_talk_posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +30,8 @@ def init_db():
             is_hidden BOOLEAN DEFAULT FALSE
         )
     """)
+    
+    # Comments table
     c.execute("""
         CREATE TABLE IF NOT EXISTS lunatick_talk_comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +47,23 @@ def init_db():
             FOREIGN KEY(post_id) REFERENCES lunatick_talk_posts(id)
         )
     """)
+    
+    # User profiles table (NEW)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            user_hash TEXT PRIMARY KEY,
+            display_name TEXT,
+            birth_date TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # Add birth_date column if it doesn't exist (for existing databases)
+    try:
+        c.execute("ALTER TABLE user_profiles ADD COLUMN birth_date TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
     conn.commit()
     conn.close()
 
@@ -144,5 +165,27 @@ def hide_post(post_id):
     conn = sqlite3.connect("lunatick.db")
     c = conn.cursor()
     c.execute("UPDATE lunatick_talk_posts SET is_hidden = 1 WHERE id = ?", (post_id,))
+    conn.commit()
+    conn.close()
+
+# --------------------------------------------------------------------------
+# User Profile (NEW)
+# --------------------------------------------------------------------------
+
+def get_user_profile(user_hash):
+    conn = sqlite3.connect("lunatick.db")
+    c = conn.cursor()
+    c.execute("SELECT display_name, birth_date FROM user_profiles WHERE user_hash = ?", (user_hash,))
+    row = c.fetchone()
+    conn.close()
+    return {"display_name": row[0], "birth_date": row[1]} if row else None
+
+def set_user_profile(user_hash, display_name, birth_date=None):
+    conn = sqlite3.connect("lunatick.db")
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO user_profiles (user_hash, display_name, birth_date, updated_at)
+        VALUES (?, ?, ?, ?)
+    """, (user_hash, display_name, birth_date, datetime.now().isoformat()))
     conn.commit()
     conn.close()
