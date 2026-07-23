@@ -5,6 +5,46 @@ import requests
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
+# Import our new modules
+# ---------------------------------------------------------------------------
+import journal as journal_ui
+import lunatick_talk_ui as talk_ui
+import lunatick_talk_db as talk_db
+import daily_reflection as reflection_ui
+
+
+# ---------------------------------------------------------------------------
+# Session State Init
+# ---------------------------------------------------------------------------
+def init_session_state():
+    """
+    One-shot initialization for all session state keys used across Lunatick.
+    Safe to call on every script run — only sets values if the key is missing.
+    """
+    defaults = {
+        # ─── Core / Auth ─────────────────────────────────
+        "user_hash": "anonymous",
+        "is_authenticated": False,
+        "current_phase": "Waxing Gibbous",
+        "current_view": "home",
+
+        # ─── Journal Tab (widget keys) ───────────────────
+        "journal_prompt_mode": "🌙 Phase Reflection",
+        "journal_phase_input": "",
+        "journal_chart_input": "",
+        "journal_free_input": "",
+    }
+
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+# ─── Run before any UI renders ───────────────────────────
+init_session_state()
+
+
+# ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
@@ -25,13 +65,12 @@ LUNATICK_CSS = """
         letter-spacing: 1px;
     }
 
-    /* COMPACT HEADER & COUNTDOWN */
     .glow-container {
         background: radial-gradient(circle at top right, #1b1040 0%, #05070a 100%);
         border: 1px solid #6e40c9;
         border-radius: 16px;
-        padding: 0.8rem 1rem; /* Compact padding */
-        margin-bottom: 0.5rem; /* Reduced margin */
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.5rem;
         box-shadow: 0 0 30px rgba(110, 64, 201, 0.15);
         text-align: center;
     }
@@ -58,7 +97,7 @@ LUNATICK_CSS = """
 
     .unit-box .num {
         font-family: 'Orbitron', sans-serif;
-        font-size: 1.8rem; /* Scaled down */
+        font-size: 1.8rem;
         font-weight: 700;
         background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
         -webkit-background-clip: text;
@@ -86,7 +125,6 @@ LUNATICK_CSS = """
         letter-spacing: 0.5px;
     }
 
-    /* COMPACT PERSONAL CARD */
     .personal-card {
         background: linear-gradient(135deg, #0d1f3c 0%, #05070a 100%);
         border: 1px solid #1f6feb;
@@ -131,7 +169,7 @@ LUNATICK_CSS = """
 st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Logic
+# Logic Functions
 # ---------------------------------------------------------------------------
 
 ZODIAC_SIGNS = [
@@ -172,7 +210,8 @@ def get_celestial_data(date_utc: datetime):
     sun = ephem.Sun(obs)
     illum = moon.phase / 100.0
     elong = float(moon.elong)
-    if elong < 0: elong += 2 * math.pi
+    if elong < 0:
+        elong += 2 * math.pi
     phase_frac = elong / (2 * math.pi)
     phase_name, phase_emoji = get_moon_phase_name(phase_frac)
     moon_ecl = ephem.Ecliptic(moon)
@@ -223,43 +262,43 @@ def get_ai_insight(natal, current, aspect):
         return None
 
 # ---------------------------------------------------------------------------
-# UI Rendering
+# Render Home Tab
 # ---------------------------------------------------------------------------
 
-now_utc = datetime.now(timezone.utc)
-current = get_celestial_data(now_utc)
+def render_home():
+    now_utc = datetime.now(timezone.utc)
+    current = get_celestial_data(now_utc)
 
-# PRIVACY PATCH
-query_params = st.query_params
-initial_date = datetime(1990, 1, 1)
-if "dob" in query_params:
-    try:
-        initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
-    except:
-        pass
+    query_params = st.query_params
+    initial_date = datetime(1990, 1, 1)
+    if "dob" in query_params:
+        try:
+            initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
+        except:
+            pass
 
-if 'birth_date' not in st.session_state:
-    st.session_state.birth_date = initial_date
+    if 'birth_date' not in st.session_state:
+        st.session_state.birth_date = initial_date
 
-with st.sidebar:
-    st.markdown("### 🧬 Personal Cosmic Profile")
-    birth_date_input = st.date_input("When were you born?", value=st.session_state.birth_date, min_value=datetime(1920, 1, 1), max_value=now_utc)
-    if birth_date_input != st.session_state.birth_date:
-        st.session_state.birth_date = birth_date_input
-        st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
-        st.rerun()
-    st.success("🔒 Private: Insights are only visible to you.")
+    with st.sidebar:
+        st.markdown("### 🧬 Personal Cosmic Profile")
+        birth_date_input = st.date_input("When were you born?", value=st.session_state.birth_date, min_value=datetime(1920, 1, 1), max_value=now_utc)
+        if birth_date_input != st.session_state.birth_date:
+            st.session_state.birth_date = birth_date_input
+            st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
+            st.rerun()
+        st.success("🔒 Private: Insights are only visible to you.")
 
-# 1. TOP: COMPACT COUNTDOWN
-delta = current["next_full_dt"] - now_utc
-d, rem = divmod(int(delta.total_seconds()), 86400)
-h, m_total = divmod(rem, 3600)
-m, _ = divmod(m_total, 60)
+    # Countdown
+    delta = current["next_full_dt"] - now_utc
+    d, rem = divmod(int(delta.total_seconds()), 86400)
+    h, m_total = divmod(rem, 3600)
+    m, _ = divmod(m_total, 60)
 
-st.markdown(f"""
+    # NOTE: The <h1>🌙 LUNATICK</h1> and "MOON MONITOR" subtitle have been
+    # removed from here — they now live in the global clickable header above.
+    st.markdown(f"""
     <div class="glow-container">
-        <h1 style="color:#bc8cff; margin-bottom:0rem; font-size:3.2rem; letter-spacing:4px;">🌙 LUNATICK</h1>
-        <div style="color:#8b949e; font-size:0.8rem; letter-spacing:3px; margin-bottom:1rem; font-weight:700;">MOON MONITOR</div>
         <p style="color:#8b949e; font-size:0.75rem; margin-bottom:0.6rem; letter-spacing:1.5px;">NEXT FULL MOON</p>
         <div class="countdown-display">
             <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
@@ -267,89 +306,87 @@ st.markdown(f"""
             <div class="unit-box"><div class="num">{m}</div><div class="label">Mins</div></div>
         </div>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# 2. PERSONAL INSIGHTS
-birth_utc = datetime.combine(st.session_state.birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-natal = get_celestial_data(birth_utc)
-total_moons = (now_utc - birth_utc).days / 29.53
-diff = (current["moon_lon"] - natal["moon_lon"]) % 360
+    # Personal Insights
+    birth_utc = datetime.combine(st.session_state.birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+    natal = get_celestial_data(birth_utc)
+    total_moons = (now_utc - birth_utc).days / 29.53
+    diff = (current["moon_lon"] - natal["moon_lon"]) % 360
 
-if diff < 10 or diff > 350: aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
-elif 170 < diff < 190: aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
-elif 80 < diff < 100 or 260 < diff < 280: aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
-elif 110 < diff < 130 or 230 < diff < 250: aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
-else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
+    if diff < 10 or diff > 350: aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
+    elif 170 < diff < 190: aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
+    elif 80 < diff < 100 or 260 < diff < 280: aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
+    elif 110 < diff < 130 or 230 < diff < 250: aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
+    else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
 
-insight = get_ai_insight(natal, current, aspect)
+    insight = get_ai_insight(natal, current, aspect)
 
-st.markdown(f"""
-<div class="personal-card">
-    <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
-        YOUR COSMIC CHART
-    </div>
-    <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
-        <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
-        <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
-    </div>
-    <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
-        <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
-        <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{guidance}</div>
-    </div>
-    {f'''
-    <div style="margin-top:0.8rem; background:rgba(188, 140, 255, 0.1); padding:0.8rem; border-radius:10px; border:1px solid #bc8cff;">
-        <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 DEEPSEEK AI INSIGHT</div>
-        <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem; font-style: italic;">"{insight}"</div>
-    </div>
-    ''' if insight else ''}
-</div>
-""", unsafe_allow_html=True)
-
-# 3. CURRENT STATS (FORCED HORIZONTAL ROW)
-st.markdown(f"""
-<div class="stats-row">
-    <div class="stat-card">
-        <div class="stat-label">Phase</div>
-        <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
-        <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Glow</div>
-        <div class="stat-val">{current["illum"]*100:.1f}%</div>
-        <div class="stat-label" style="font-size:0.55rem;">Surface</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Age</div>
-        <div class="stat-val">{current["age_days"]:.1f}d</div>
-        <div class="stat-label" style="font-size:0.55rem;">Cycle</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.write("")
-
-# 4. MOON VIBES & EVENTS
-vcol, ecol = st.columns([1, 1])
-with vcol:
     st.markdown(f"""
-    <div class="vibe-card">
-        <div class="vibe-tag">ENERGY</div>
-        <h3 style="color:#fff; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
-        <p style="font-size:0.9rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
+    <div class="personal-card">
+        <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
+            YOUR COSMIC CHART
+        </div>
+        <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
+            <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
+            <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
+            <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
+            <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
+        </div>
+        <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
+            <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
+            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{guidance}</div>
+        </div>
+        {f'''
+        <div style="margin-top:0.8rem; background:rgba(188, 140, 255, 0.1); padding:0.8rem; border-radius:10px; border:1px solid #bc8cff;">
+            <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 DEEPSEEK AI INSIGHT</div>
+            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem; font-style: italic;">"{insight}"</div>
+        </div>
+        ''' if insight else ''}
     </div>
     """, unsafe_allow_html=True)
 
-with ecol:
-    st.subheader("🔭 2026 Cosmic Calendar")
-    for d_str, title, desc in [
-        ("March 3", "Total Lunar Eclipse", "Visible across the Americas, Europe, and Africa."),
-        ("August 12, 2026", "Total Solar Eclipse", "Major eclipse visible in Europe & Greenland."),
-        ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
-        ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
-    ]:
-        st.markdown(f'''
+    # Stats
+    st.markdown(f"""
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Phase</div>
+            <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
+            <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Glow</div>
+            <div class="stat-val">{current["illum"]*100:.1f}%</div>
+            <div class="stat-label" style="font-size:0.55rem;">Surface</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Age</div>
+            <div class="stat-val">{current["age_days"]:.1f}d</div>
+            <div class="stat-label" style="font-size:0.55rem;">Cycle</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Moon Vibes & Events
+    vcol, ecol = st.columns([1, 1])
+    with vcol:
+        st.markdown(f"""
+        <div class="vibe-card">
+            <div class="vibe-tag">ENERGY</div>
+            <h3 style="color:#fff; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
+            <p style="font-size:0.9rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with ecol:
+        st.subheader("🔭 2026 Cosmic Calendar")
+        for d_str, title, desc in [
+            ("March 3", "Total Lunar Eclipse", "Visible across the Americas, Europe, and Africa."),
+            ("August 12, 2026", "Total Solar Eclipse", "Major eclipse visible in Europe & Greenland."),
+            ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
+            ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
+        ]:
+            st.markdown(f'''
             <div class="event-item">
                 <div class="event-info">
                     <div class="etitle">{title}</div>
@@ -357,7 +394,174 @@ with ecol:
                 </div>
                 <div class="event-date">{d_str}</div>
             </div>
-        ''', unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
+
+    # Daily Reflection (Ask AI Anything)
+    st.markdown("---")
+    st.markdown("### 🧠 Daily Reflection")
+    reflection_ui.render_daily_reflection()
+
+# ---------------------------------------------------------------------------
+# Render Settings Tab
+# ---------------------------------------------------------------------------
+
+def render_settings():
+    st.markdown("""
+    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
+        ⚙️ Settings
+    </div>
+    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
+        Manage your account, privacy, and subscription.
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Display Name ---
+    current_name = st.session_state.get("display_name", "Moon Wanderer")
+    display_name = st.text_input("Display Name", value=current_name)
+    
+    # --- Birth Date ---
+    current_birth_date = st.session_state.get("birth_date", datetime(1990, 1, 1).date())
+    birth_date = st.date_input(
+        "Your Birth Date",
+        value=current_birth_date,
+        min_value=datetime(1920, 1, 1).date(),
+        max_value=datetime.now().date()
+    )
+    
+    # --- Save Button ---
+    if st.button("💾 Save Profile", type="primary"):
+        if display_name.strip():
+            st.session_state.display_name = display_name.strip()
+            st.session_state.birth_date = birth_date
+            talk_db.set_user_profile(
+                st.session_state.user_hash,
+                display_name.strip(),
+                birth_date.isoformat()
+            )
+            st.success("✅ Profile saved permanently!")
+            st.rerun()
+        else:
+            st.warning("Please enter a display name.")
+
+    st.markdown("---")
+    
+    # --- Privacy & Consent ---
+    st.markdown("### 🔒 Privacy & Consent")
+    if st.button("Opt in to community sharing"):
+        st.success("You have opted in to community sharing.")
+    if st.button("Opt out of community sharing"):
+        st.success("You have opted out of community sharing.")
+
+    st.markdown("---")
+    
+    # --- Subscription ---
+    st.markdown("### 💎 Subscription")
+    tier = st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
+    st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
+
+    st.markdown("---")
+    
+    # --- Danger Zone ---
+    st.markdown("### 🗑️ Danger Zone")
+    if st.button("Clear all journal entries", type="secondary"):
+        if "journal_entries" in st.session_state:
+            st.session_state.journal_entries = []
+            st.success("Journal entries cleared.")
+    if st.button("Reset all preferences", type="secondary"):
+        st.session_state.clear()
+        st.success("Preferences reset. Please refresh the page.")
+
+# ---------------------------------------------------------------------------
+# Load User Profile from Database
+# ---------------------------------------------------------------------------
+
+# Initialize database for journal and talk modules
+journal_ui.init_db()
+talk_db.init_db()
+talk_db.seed_talk_posts()
+
+# Set up user hash for privacy
+if "user_hash" not in st.session_state:
+    import hashlib
+    from datetime import datetime
+    st.session_state.user_hash = hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
+
+# Load user profile from database if it exists
+if "user_hash" in st.session_state:
+    profile = talk_db.get_user_profile(st.session_state.user_hash)
+    if profile:
+        st.session_state.display_name = profile["display_name"]
+        if profile["birth_date"]:
+            st.session_state.birth_date = datetime.strptime(profile["birth_date"], "%Y-%m-%d").date()
+    else:
+        if "display_name" not in st.session_state:
+            st.session_state.display_name = "Moon Wanderer"
+
+# Set a default phase for the demo (will be overwritten by real data)
+if "current_phase" not in st.session_state:
+    st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
+
+# ---------------------------------------------------------------------------
+# GLOBAL HEADER: Logo + Navigation
+# ---------------------------------------------------------------------------
+
+# ─── Clickable Logo ──────────────────────────────────────
+logo_col, _ = st.columns([1, 3])
+with logo_col:
+    if st.button("🌙 LUNATICK", key="nav_logo_home", use_container_width=True):
+        st.session_state.current_view = "home"
+        st.rerun()
+
+st.markdown("""
+<div style="text-align:center; color:#8b949e; font-size:0.8rem; letter-spacing:3px; margin-bottom:1rem; font-weight:700; font-family:'Orbitron', sans-serif;">
+    MOON MONITOR
+</div>
+""", unsafe_allow_html=True)
+
+# ─── Navigation Buttons ──────────────────────────────────
+nav_c1, nav_c2, nav_c3 = st.columns(3)
+with nav_c1:
+    if st.button("🌐 Community", key="nav_community", use_container_width=True):
+        st.session_state.current_view = "community"
+        st.rerun()
+with nav_c2:
+    if st.button("📓 Journal", key="nav_journal", use_container_width=True):
+        st.session_state.current_view = "journal"
+        st.rerun()
+with nav_c3:
+    if st.button("⚙️ Settings", key="nav_settings", use_container_width=True):
+        st.session_state.current_view = "settings"
+        st.rerun()
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#484f58; font-size:0.65rem; margin-top:1rem;'>🌙 LUNATICK &mdash; Your Cosmic Moon Companion</p>", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# CONTENT ROUTER
+# ---------------------------------------------------------------------------
+
+current_view = st.session_state.current_view
+
+if current_view == "home":
+    render_home()
+
+elif current_view == "community":
+    talk_ui.render_talk_tab()
+
+elif current_view == "journal":
+    journal_ui.render_journal_tab()
+
+elif current_view == "settings":
+    render_settings()
+
+# ---------------------------------------------------------------------------
+# Footer
+# ---------------------------------------------------------------------------
+
+st.markdown("---")
+st.markdown(
+    "<p style='text-align:center; color:#484f58; font-size:0.65rem; font-family:'Orbitron', sans-serif;'>"
+    "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
+    "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
+    "</p>",
+    unsafe_allow_html=True
+)
