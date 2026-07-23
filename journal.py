@@ -120,7 +120,7 @@ def render_journal_tab():
     """, unsafe_allow_html=True)
 
     # ------------------------------------------------------------------
-    # Step 3: Write and Submit
+    # Step 3: Write and Submit (with session state fix)
     # ------------------------------------------------------------------
 
     current_phase = st.session_state.get("current_phase", "Waxing Gibbous")
@@ -154,8 +154,12 @@ def render_journal_tab():
             st.rerun()
 
     # ------------------------------------------------------------------
-    # Step 4: Show Recent Entries
+    # Step 4: Show Recent Entries (with safe fallback)
     # ------------------------------------------------------------------
+
+    # --- FIX: Ensure journal entries exist in session state ---
+    if "journal_entries" not in st.session_state:
+        st.session_state.journal_entries = []
 
     recent = get_recent_entries(limit=5)
     if recent:
@@ -185,3 +189,4 @@ def render_journal_tab():
         Your journal is private. Only you can see what you've written.
     </div>
     """, unsafe_allow_html=True)
+```
