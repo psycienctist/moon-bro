@@ -59,21 +59,122 @@ init_session_state()
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
 
-@media (max-width: 600px) {
-    .stColumn {
-        padding: 0.25rem !important;
+LUNATICK_CSS = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+
+    .stApp {
+        background-color: #05070a;
+        color: #e6edf3;
+        font-family: 'Inter', sans-serif;
     }
-    .stButton button {
-        font-size: 0.8rem !important;
-        padding: 0.4rem 0.5rem !important;
+
+    h1, h2, h3, h4 {
+        font-family: 'Orbitron', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        font-size: 1.2rem !important;
+
+    .glow-container {
+        background: radial-gradient(circle at top right, #1b1040 0%, #05070a 100%);
+        border: 1px solid #6e40c9;
+        border-radius: 16px;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 0 30px rgba(110, 64, 201, 0.15);
+        text-align: center;
     }
-    .glow-container, .personal-card, .vibe-card {
-        padding: 0.8rem !important;
+
+    .countdown-display, .stats-row {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 0.8rem;
+        margin: 0.5rem 0;
+        flex-wrap: nowrap;
     }
-}
+
+    .unit-box, .stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 0.5rem;
+        flex: 1;
+        min-width: 60px;
+        text-align: center;
+    }
+
+    .unit-box .num {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1.1;
+    }
+
+    .stat-card {
+        background: #0d1117;
+        border-color: #30363d;
+    }
+    
+    .stat-val {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #f0f6fc;
+        margin: 0.2rem 0;
+    }
+
+    .label, .stat-label {
+        font-size: 0.5rem;
+        color: #8b949e;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .personal-card {
+        background: linear-gradient(135deg, #0d1f3c 0%, #05070a 100%);
+        border: 1px solid #1f6feb;
+        border-radius: 16px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);
+    }
+
+    .vibe-card {
+        background: linear-gradient(135deg, #2d1b69 0%, #1a1f36 100%);
+        border-radius: 16px;
+        padding: 1.5rem;
+        border: 1px solid #bc8cff;
+    }
+    .vibe-tag {
+        background: rgba(210, 168, 255, 0.2);
+        color: #d2a8ff;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 0.5rem;
+    }
+
+    .event-item {
+        background: #161b22;
+        border-radius: 10px;
+        padding: 0.8rem;
+        margin-bottom: 0.8rem;
+        border-left: 4px solid #ff7b72;
+    }
+    .event-info { display: flex; flex-direction: column; }
+    .etitle { color: #fff; font-weight: 600; font-size: 0.9rem; }
+    .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
+    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
+
+    ::-webkit-scrollbar { width: 6px; }
+</style>
 """
 st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
 
