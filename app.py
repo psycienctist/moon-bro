@@ -12,8 +12,10 @@ import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
 import daily_reflection as reflection_ui
 
-import streamlit as st
 
+# ---------------------------------------------------------------------------
+# Session State Init
+# ---------------------------------------------------------------------------
 def init_session_state():
     """
     One-shot initialization for all session state keys used across Lunatick.
@@ -24,24 +26,13 @@ def init_session_state():
         "user_hash": "anonymous",
         "is_authenticated": False,
         "current_phase": "Waxing Gibbous",
-
-        # ─── Navigation ──────────────────────────────────
-        "current_tab": "Journal",
+        "current_view": "home",
 
         # ─── Journal Tab (widget keys) ───────────────────
         "journal_prompt_mode": "🌙 Phase Reflection",
         "journal_phase_input": "",
         "journal_chart_input": "",
         "journal_free_input": "",
-
-        # ─── Settings Tab (add your actual keys below) ───
-        # "settings_username": "",
-        # "settings_email": "",
-        # "settings_notifications": True,
-
-        # ─── Calendar Tab (add your actual keys below) ────
-        # "calendar_selected_date": None,
-        # "calendar_view": "month",
     }
 
     for key, value in defaults.items():
@@ -52,7 +43,6 @@ def init_session_state():
 # ─── Run before any UI renders ───────────────────────────
 init_session_state()
 
-# ... rest of your app.py (tabs, auth, etc.) ...
 
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
@@ -305,10 +295,10 @@ def render_home():
     h, m_total = divmod(rem, 3600)
     m, _ = divmod(m_total, 60)
 
+    # NOTE: The <h1>🌙 LUNATICK</h1> and "MOON MONITOR" subtitle have been
+    # removed from here — they now live in the global clickable header above.
     st.markdown(f"""
     <div class="glow-container">
-        <h1 style="color:#bc8cff; margin-bottom:0rem; font-size:3.2rem; letter-spacing:4px;">🌙 LUNATICK</h1>
-        <div style="color:#8b949e; font-size:0.8rem; letter-spacing:3px; margin-bottom:1rem; font-weight:700;">MOON MONITOR</div>
         <p style="color:#8b949e; font-size:0.75rem; margin-bottom:0.6rem; letter-spacing:1.5px;">NEXT FULL MOON</p>
         <div class="countdown-display">
             <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
@@ -412,76 +402,6 @@ def render_home():
     reflection_ui.render_daily_reflection()
 
 # ---------------------------------------------------------------------------
-# Render Calendar Tab
-# ---------------------------------------------------------------------------
-
-def render_calendar():
-    st.markdown("""
-    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
-        📅 Lunar Calendar
-    </div>
-    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Track moon phases throughout the month.
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Month navigation
-    now = datetime.now()
-    if 'calendar_month' not in st.session_state:
-        st.session_state.calendar_month = now.month
-    if 'calendar_year' not in st.session_state:
-        st.session_state.calendar_year = now.year
-
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
-    with nav_col1:
-        if st.button("◀ Previous", use_container_width=True):
-            if st.session_state.calendar_month == 1:
-                st.session_state.calendar_month = 12
-                st.session_state.calendar_year -= 1
-            else:
-                st.session_state.calendar_month -= 1
-            st.rerun()
-    with nav_col2:
-        st.markdown(f"<h3 style='text-align:center; color:#fff;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>", unsafe_allow_html=True)
-    with nav_col3:
-        if st.button("Next ▶", use_container_width=True):
-            if st.session_state.calendar_month == 12:
-                st.session_state.calendar_month = 1
-                st.session_state.calendar_year += 1
-            else:
-                st.session_state.calendar_month += 1
-            st.rerun()
-
-    # Calendar grid
-    import calendar as cal
-    month_cal = cal.monthcalendar(st.session_state.calendar_year, st.session_state.calendar_month)
-    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    header_cols = st.columns(7)
-    for i, day in enumerate(weekdays):
-        with header_cols[i]:
-            st.markdown(f"<div style='text-align:center; color:#8b949e; font-size:0.7rem; font-weight:700;'>{day}</div>", unsafe_allow_html=True)
-
-    today = datetime.now()
-    for week in month_cal:
-        day_cols = st.columns(7)
-        for i, day in enumerate(week):
-            with day_cols[i]:
-                if day == 0:
-                    st.markdown("<div style='min-height:80px;'></div>", unsafe_allow_html=True)
-                else:
-                    date_obj = datetime(st.session_state.calendar_year, st.session_state.calendar_month, day)
-                    day_data = get_celestial_data(date_obj.replace(tzinfo=timezone.utc))
-                    is_today = (day == today.day and st.session_state.calendar_month == today.month and st.session_state.calendar_year == today.year)
-                    today_class = "calendar-today" if is_today else ""
-                    st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.5rem; text-align:center; min-height:80px; {'' if not is_today else 'border:2px solid #6e40c9; background:rgba(110,64,201,0.1);'}">
-                        <div style="font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">{day}</div>
-                        <div style="font-size:1.5rem; margin-bottom:0.2rem;">{day_data['phase_emoji']}</div>
-                        <div style="font-size:0.6rem; color:#8b949e;">{day_data['illum']*100:.0f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------------
 # Render Settings Tab
 # ---------------------------------------------------------------------------
 
@@ -582,24 +502,55 @@ if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
 # ---------------------------------------------------------------------------
-# Main App — Bottom Navigation Tabs
+# GLOBAL HEADER: Logo + Navigation
 # ---------------------------------------------------------------------------
 
-tabs = st.tabs(["🌕 Home", "💬 LunaTick Talk", "📓 Journal", "📅 Calendar", "⚙️ Settings"])
+# ─── Clickable Logo ──────────────────────────────────────
+logo_col, _ = st.columns([1, 3])
+with logo_col:
+    if st.button("🌙 LUNATICK", key="nav_logo_home", use_container_width=True):
+        st.session_state.current_view = "home"
+        st.rerun()
 
-with tabs[0]:
+st.markdown("""
+<div style="text-align:center; color:#8b949e; font-size:0.8rem; letter-spacing:3px; margin-bottom:1rem; font-weight:700; font-family:'Orbitron', sans-serif;">
+    MOON MONITOR
+</div>
+""", unsafe_allow_html=True)
+
+# ─── Navigation Buttons ──────────────────────────────────
+nav_c1, nav_c2, nav_c3 = st.columns(3)
+with nav_c1:
+    if st.button("🌐 Community", key="nav_community", use_container_width=True):
+        st.session_state.current_view = "community"
+        st.rerun()
+with nav_c2:
+    if st.button("📓 Journal", key="nav_journal", use_container_width=True):
+        st.session_state.current_view = "journal"
+        st.rerun()
+with nav_c3:
+    if st.button("⚙️ Settings", key="nav_settings", use_container_width=True):
+        st.session_state.current_view = "settings"
+        st.rerun()
+
+st.markdown("---")
+
+# ---------------------------------------------------------------------------
+# CONTENT ROUTER
+# ---------------------------------------------------------------------------
+
+current_view = st.session_state.current_view
+
+if current_view == "home":
     render_home()
 
-with tabs[1]:
+elif current_view == "community":
     talk_ui.render_talk_tab()
 
-with tabs[2]:
+elif current_view == "journal":
     journal_ui.render_journal_tab()
 
-with tabs[3]:
-    render_calendar()
-
-with tabs[4]:
+elif current_view == "settings":
     render_settings()
 
 # ---------------------------------------------------------------------------
