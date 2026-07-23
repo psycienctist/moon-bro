@@ -231,4 +231,3 @@ def render_journal_tab():
         Your journal is private. Only you can see what you've written.
     </div>
     """, unsafe_allow_html=True)
-```
