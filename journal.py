@@ -120,16 +120,21 @@ def render_journal_tab():
     """, unsafe_allow_html=True)
 
     # ------------------------------------------------------------------
+    ```python
+    # ------------------------------------------------------------------
     # Step 3: Write and Submit (with session state fix)
     # ------------------------------------------------------------------
 
     current_phase = st.session_state.get("current_phase", "Waxing Gibbous")
 
-    # --- FIX: Initialize session state key before using it ---
-    input_key = f"journal_{prompt_key}_input"
-    if input_key not in st.session_state:
-        st.session_state[input_key] = ""
+    # --- FIX: Initialize ALL journal input keys before using any of them ---
+    for mode in ["phase", "chart", "free"]:
+        key = f"journal_{mode}_input"
+        if key not in st.session_state:
+            st.session_state[key] = ""
 
+    # Now it's safe to use the current input key
+    input_key = f"journal_{prompt_key}_input"
     entry_text = st.text_area(
         "Your reflection:",
         placeholder=prompt_data['placeholder'],
@@ -152,6 +157,7 @@ def render_journal_tab():
         if st.button("Clear", use_container_width=True):
             st.session_state[input_key] = ""
             st.rerun()
+```
 
     # ------------------------------------------------------------------
     # Step 4: Show Recent Entries (with safe fallback)
