@@ -12,6 +12,48 @@ import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
 import daily_reflection as reflection_ui
 
+import streamlit as st
+
+def init_session_state():
+    """
+    One-shot initialization for all session state keys used across Lunatick.
+    Safe to call on every script run — only sets values if the key is missing.
+    """
+    defaults = {
+        # ─── Core / Auth ─────────────────────────────────
+        "user_hash": "anonymous",
+        "is_authenticated": False,
+        "current_phase": "Waxing Gibbous",
+
+        # ─── Navigation ──────────────────────────────────
+        "current_tab": "Journal",
+
+        # ─── Journal Tab (widget keys) ───────────────────
+        "journal_prompt_mode": "🌙 Phase Reflection",
+        "journal_phase_input": "",
+        "journal_chart_input": "",
+        "journal_free_input": "",
+
+        # ─── Settings Tab (add your actual keys below) ───
+        # "settings_username": "",
+        # "settings_email": "",
+        # "settings_notifications": True,
+
+        # ─── Calendar Tab (add your actual keys below) ────
+        # "calendar_selected_date": None,
+        # "calendar_view": "month",
+    }
+
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+# ─── Run before any UI renders ───────────────────────────
+init_session_state()
+
+# ... rest of your app.py (tabs, auth, etc.) ...
+
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
 # ---------------------------------------------------------------------------
