@@ -99,7 +99,6 @@ def render_journal_tab():
         key="journal_prompt_mode"
     )
 
-    # Map selection to internal key
     prompt_key = {
         "🌙 Phase Reflection": "phase",
         "✨ Chart Resonance": "chart",
@@ -120,20 +119,17 @@ def render_journal_tab():
     """, unsafe_allow_html=True)
 
     # ------------------------------------------------------------------
-    ```python
-    # ------------------------------------------------------------------
-    # Step 3: Write and Submit (with session state fix)
+    # Step 3: Write and Submit
     # ------------------------------------------------------------------
 
     current_phase = st.session_state.get("current_phase", "Waxing Gibbous")
 
-    # --- FIX: Initialize ALL journal input keys before using any of them ---
+    # Initialize all three input keys so the widget never sees a missing key
     for mode in ["phase", "chart", "free"]:
         key = f"journal_{mode}_input"
         if key not in st.session_state:
             st.session_state[key] = ""
 
-    # Now it's safe to use the current input key
     input_key = f"journal_{prompt_key}_input"
     entry_text = st.text_area(
         "Your reflection:",
@@ -148,16 +144,56 @@ def render_journal_tab():
             if entry_text.strip():
                 save_entry(current_phase, prompt_key, entry_text.strip())
                 st.success("✨ Your reflection has been sealed.")
-                st.session_state[input_key] = ""
+                
+                # FIXED: Delete the key so the widget resets on next run.
+                # Do NOT assign an empty string here — Streamlit owns this key.
+                if input_key in st.session_state:
+                    del st.session_state[input_key]
+                
                 st.rerun()
             else:
                 st.warning("Please write something before sealing.")
 
     with col2:
         if st.button("Clear", use_container_width=True):
-            st.session_state[input_key] = ""
+            # FIXED: Same pattern here.
+            if input_key in st.session_state:
+                del st.session_state[input_key]
+            
             st.rerun()
-```
+
+    # ------------------------------------------------------------------
+    # Step 4: Show Recent Entries
+    # ------------------------------------------------------------------
+
+    recent = get_recent_entries(limit=5)
+    if recent:
+        st.markdown("""
+        <div style="font-family: 'Orbitron', sans-serif; font-size: 0.6rem; letter-spacing: 2px; color: #484f58; text-transform: uppercase; margin: 2rem 0 0.5rem 0;">
+            — Recent Sealed Entries —
+        </div>
+        """, unsafe_allow_html=True)
+
+        for phase, prompt_type, content, created_at in recent:
+            prompt_label = PROMPTS[prompt_type]['label']
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 0.6rem;">
+                <div style="display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.3rem;">
+                    <span style="font-family: 'Orbitron', sans-serif; font-size: 0.55rem; color: #bc8cff;">{phase}</span>
+                    <span style="font-family: 'Orbitron', sans-serif; font-size: 0.5rem; color: #484f58;">{prompt_label}</span>
+                    <span style="font-family: 'Orbitron', sans-serif; font-size: 0.45rem; color: #484f58;">{created_at[:16]}</span>
+                </div>
+                <div style="color: #c9d1d9; font-size: 0.95rem; line-height: 1.5; font-style: italic; margin: 0;">"{content[:140]}{'...' if len(content) > 140 else ''}"</div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("🌙 No entries yet. The moon is waiting for your first reflection.")
+
+    st.markdown("""
+    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: #484f58; text-align: center; border-top: 1px solid #1a1040; padding-top: 1rem;">
+        Your journal is private. Only you can see what you've written.
+    </div>
+    """, unsafe_allow_html=True)
 
     # ------------------------------------------------------------------
     # Step 4: Show Recent Entries (with safe fallback)
