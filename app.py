@@ -1155,7 +1155,7 @@ def render_bottom_nav():
         nav_html += f'''
         <button class="{active_class}" onclick="
             var key = 'nav_{view}';
-            var btn = document.querySelector('[data-testid=\\"button\\"][data-key=\\"{key}\\"');
+            var btn = document.querySelector('[data-testid="button"][data-key="'+key+'"]');
             if (btn) btn.click();
         ">
             <div style="font-size:1.4rem; line-height:1.2;">{icon}</div>
