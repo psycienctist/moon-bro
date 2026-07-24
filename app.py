@@ -1246,3 +1246,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    render_bottom_nav()
