@@ -1,616 +1,1246 @@
 import streamlit as st
-import ephem
+import datetime
+import random
+import hashlib
 import math
-import requests
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass, asdict
+from typing import List, Optional, Dict
+import json
 
-# ---------------------------------------------------------------------------
-# Import our new modules
-# ---------------------------------------------------------------------------
-import journal as journal_ui
-import lunatick_talk_ui as talk_ui
-import lunatick_talk_db as talk_db
-import daily_reflection as reflection_ui
+# ── EPHEM FALLBACK ──────────────────────────────────────────
+try:
+    import ephem
+    HAS_EPHEM = True
+except ImportError:
+    HAS_EPHEM = False
 
-import streamlit as st
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+st.set_page_config(
+    page_title="LunaTick",
+    page_icon="🌙",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-def init_session_state():
-    """
-    One-shot initialization for all session state keys used across Lunatick.
-    Safe to call on every script run — only sets values if the key is missing.
-    """
-    defaults = {
-        # ─── Core / Auth ─────────────────────────────────
-        "user_hash": "anonymous",
-        "is_authenticated": False,
-        "current_phase": "Waxing Gibbous",
-
-        # ─── Navigation ──────────────────────────────────
-        "current_tab": "Journal",
-
-        # ─── Journal Tab (widget keys) ───────────────────
-        "journal_prompt_mode": "🌙 Phase Reflection",
-        "journal_phase_input": "",
-        "journal_chart_input": "",
-        "journal_free_input": "",
-
-        # ─── Settings Tab (add your actual keys below) ───
-        # "settings_username": "",
-        # "settings_email": "",
-        # "settings_notifications": True,
-
-        # ─── Calendar Tab (add your actual keys below) ────
-        # "calendar_selected_date": None,
-        # "calendar_view": "month",
-    }
-
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-
-# ─── Run before any UI renders ───────────────────────────
-init_session_state()
-
-# ... rest of your app.py (tabs, auth, etc.) ...
-
-# ---------------------------------------------------------------------------
-# Page config & Lunatick Theme
-# ---------------------------------------------------------------------------
-st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
-
-LUNATICK_CSS = """
+# ============================================================
+# COSMIC THEME CSS — matches screenshots exactly
+# ============================================================
+st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-    .stApp {
-        background-color: #05070a;
-        color: #e6edf3;
-        font-family: 'Inter', sans-serif;
-    }
+/* ── Base ── */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+    background-color: #0a0a0f;
+    color: #e8e6f0;
+}
 
-    h1, h2, h3, h4 {
-        font-family: 'Orbitron', sans-serif;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
+.stApp {
+    background: linear-gradient(180deg, #0a0a0f 0%, #0f0f1a 50%, #0a0a0f 100%);
+}
 
-    .glow-container {
-        background: radial-gradient(circle at top right, #1b1040 0%, #05070a 100%);
-        border: 1px solid #6e40c9;
-        border-radius: 16px;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.5rem;
-        box-shadow: 0 0 30px rgba(110, 64, 201, 0.15);
-        text-align: center;
-    }
+/* ── Typography ── */
+h1, h2, h3 {
+    font-family: 'Space Grotesk', sans-serif !important;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
 
-    .countdown-display, .stats-row {
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        align-items: center;
-        gap: 0.8rem;
-        margin: 0.5rem 0;
-        flex-wrap: nowrap;
-    }
+/* ── Hide default Streamlit chrome ── */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
 
-    .unit-box, .stat-card {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        padding: 0.5rem;
-        flex: 1;
-        min-width: 60px;
-        text-align: center;
-    }
+/* ── Buttons ── */
+.stButton>button {
+    background: linear-gradient(135deg, #7c3aed, #5b21b6);
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 12px 28px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    width: 100%;
+}
 
-    .unit-box .num {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 1.8rem;
-        font-weight: 700;
-        background: linear-gradient(180deg, #fff 30%, #58a6ff 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        line-height: 1.1;
-    }
+.stButton>button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(124, 58, 237, 0.4);
+}
 
-    .stat-card {
-        background: #0d1117;
-        border-color: #30363d;
-    }
-    
-    .stat-val {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #f0f6fc;
-        margin: 0.2rem 0;
-    }
+.stButton>button[kind="secondary"] {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+}
 
-    .label, .stat-label {
-        font-size: 0.5rem;
-        color: #8b949e;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
+/* ── Inputs ── */
+.stTextInput>div>div>input, .stTextArea>div>div>textarea,
+.stDateInput>div>div>input, .stTimeInput>div>div>input {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 12px !important;
+    color: #e8e6f0 !important;
+    font-family: 'Inter', sans-serif !important;
+}
 
-    .personal-card {
-        background: linear-gradient(135deg, #0d1f3c 0%, #05070a 100%);
-        border: 1px solid #1f6feb;
-        border-radius: 16px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);
-    }
+.stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
+    border-color: #7c3aed !important;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2) !important;
+}
 
-    .vibe-card {
-        background: linear-gradient(135deg, #2d1b69 0%, #1a1f36 100%);
-        border-radius: 16px;
-        padding: 1.5rem;
-        border: 1px solid #bc8cff;
-    }
-    .vibe-tag {
-        background: rgba(210, 168, 255, 0.2);
-        color: #d2a8ff;
-        padding: 0.2rem 0.6rem;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        font-weight: 600;
-        display: inline-block;
-        margin-bottom: 0.5rem;
-    }
+/* ── Cards ── */
+.cosmic-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(10px);
+}
 
-    .event-item {
-        background: #161b22;
-        border-radius: 10px;
-        padding: 0.8rem;
-        margin-bottom: 0.8rem;
-        border-left: 4px solid #ff7b72;
-    }
-    .event-info { display: flex; flex-direction: column; }
-    .etitle { color: #fff; font-weight: 600; font-size: 0.9rem; }
-    .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
-    .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
+.cosmic-card:hover {
+    border-color: rgba(124, 58, 237, 0.3);
+}
 
-    ::-webkit-scrollbar { width: 6px; }
+.pulse-card {
+    background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(91,33,182,0.1));
+    border: 1px solid rgba(124,58,237,0.25);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 16px;
+}
+
+/* ── Tags / Pills ── */
+.phase-pill {
+    display: inline-block;
+    background: rgba(124,58,237,0.15);
+    color: #a78bfa;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    margin-right: 6px;
+}
+
+.sign-pill {
+    display: inline-block;
+    background: rgba(255,255,255,0.06);
+    color: #c4b5fd;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-right: 6px;
+}
+
+/* ── Countdown boxes ── */
+.countdown-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+}
+
+.countdown-number {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #a78bfa;
+    line-height: 1;
+}
+
+.countdown-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6b7280;
+    margin-top: 8px;
+}
+
+/* ── Section headers ── */
+.section-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.section-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #f3f4f6;
+    margin-bottom: 8px;
+}
+
+.section-subtitle {
+    font-style: italic;
+    color: #9ca3af;
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+}
+
+/* ── Bottom nav ── */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 12px 20px;
+    z-index: 9999;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.nav-item {
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: color 0.2s;
+    text-decoration: none;
+}
+
+.nav-item:hover, .nav-item.active {
+    color: #a78bfa;
+}
+
+.nav-icon {
+    font-size: 1.4rem;
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* ── C3 Badge ── */
+.c3-badge {
+    text-align: center;
+    padding: 16px;
+    color: #4b5563;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* ── Post card ── */
+.post-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.post-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #4c1d95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: white;
+    margin-right: 12px;
+}
+
+.post-meta {
+    color: #9ca3af;
+    font-size: 0.8rem;
+}
+
+.post-content {
+    color: #e8e6f0;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+/* ── Board card ── */
+.board-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.board-card:hover {
+    border-color: rgba(124,58,237,0.3);
+    transform: translateY(-2px);
+}
+
+.board-icon {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.board-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #f3f4f6;
+    margin-bottom: 8px;
+}
+
+.board-desc {
+    color: #9ca3af;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+.board-count {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6b7280;
+}
+
+/* ── Chart card (social object) ── */
+.chart-card {
+    background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(91,33,182,0.05));
+    border: 1px solid rgba(124,58,237,0.2);
+    border-radius: 20px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+    border-color: rgba(124,58,237,0.4);
+    box-shadow: 0 8px 30px rgba(124,58,237,0.15);
+}
+
+.chart-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #4c1d95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin: 0 auto 12px;
+}
+
+/* ── Journal prompt ── */
+.prompt-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.prompt-card:hover {
+    border-color: rgba(124,58,237,0.3);
+}
+
+.prompt-card.selected {
+    border-color: #7c3aed;
+    background: rgba(124,58,237,0.08);
+}
+
+/* ── Scroll padding for fixed bottom nav ── */
+.main .block-container {
+    padding-bottom: 100px !important;
+}
+
+/* ── Tab styling override ── */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0;
+    background: rgba(255,255,255,0.02);
+    border-radius: 16px;
+    padding: 4px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    color: #6b7280;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 12px;
+    padding: 10px 20px;
+}
+
+.stTabs [aria-selected="true"] {
+    background: rgba(124,58,237,0.2) !important;
+    color: #a78bfa !important;
+}
+
+/* ── Expander ── */
+.streamlit-expanderHeader {
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 12px !important;
+    color: #e8e6f0 !important;
+}
+
+/* ── Selectbox / Multiselect ── */
+.stSelectbox>div>div, .stMultiSelect>div>div {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 12px !important;
+    color: #e8e6f0 !important;
+}
+
+/* ── Divider ── */
+hr {
+    border-color: rgba(255,255,255,0.06) !important;
+    margin: 24px 0 !important;
+}
 </style>
-"""
-st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# Logic Functions
-# ---------------------------------------------------------------------------
+# ============================================================
+# CONSTANTS
+# ============================================================
+SIGNS = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo",
+         "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
+SIGN_EMOJIS = {
+    "Aries":"♈","Taurus":"♉","Gemini":"♊","Cancer":"♋",
+    "Leo":"♌","Virgo":"♍","Libra":"♎","Scorpio":"♏",
+    "Sagittarius":"♐","Capricorn":"♑","Aquarius":"♒","Pisces":"♓"
+}
+ELEMENTS = {
+    "Fire":["Aries","Leo","Sagittarius"],
+    "Earth":["Taurus","Virgo","Capricorn"],
+    "Air":["Gemini","Libra","Aquarius"],
+    "Water":["Cancer","Scorpio","Pisces"]
+}
 
-ZODIAC_SIGNS = [
-    ("Aries", "♈", "Bold, assertive energy. Great for starting new projects."),
-    ("Taurus", "♉", "Grounded, sensual vibes. Focus on comfort and stability."),
-    ("Gemini", "♊", "Curious, communicative mood. Ideal for learning and socialising."),
-    ("Cancer", "♋", "Nurturing, emotional depth. Prioritise home and family."),
-    ("Leo", "♌", "Creative, warm-hearted energy. Shine and express yourself."),
-    ("Virgo", "♍", "Analytical, detail-oriented. Perfect for organising and health."),
-    ("Libra", "♎", "Harmonious, balanced mood. Focus on relationships and beauty."),
-    ("Scorpio", "♏", "Intense, transformative energy. Dive deep within."),
-    ("Sagittarius", "♐", "Adventurous, optimistic vibes. Seek truth and explore."),
-    ("Capricorn", "♑", "Disciplined, ambitious. Build towards long-term goals."),
-    ("Aquarius", "♒", "Innovative, humanitarian energy. Think outside the box."),
-    ("Pisces", "♓", "Dreamy, intuitive mood. Meditate and create art."),
+BOARDS = [
+    {"id":"general","icon":"🌙","name":"General","desc":"Open discussion for all moon bros & sis.","posts":1},
+    {"id":"rituals","icon":"🕯️","name":"Full Moon Rituals","desc":"Share & discover lunar rituals and practices.","posts":2},
+    {"id":"astrology","icon":"♒","name":"Astrology","desc":"Birth charts, transits, retrogrades — all welcome.","posts":0},
+    {"id":"sightings","icon":"🔭","name":"Sky Sightings","desc":"Photos of the moon, eclipses, planets & beyond.","posts":0},
+    {"id":"memes","icon":"😹","name":"Cosmic Memes","desc":"Lunar humor & cosmic chaos.","posts":0},
+    {"id":"intentions","icon":"✨","name":"Intentions","desc":"Set, share, and reflect on your lunar intentions.","posts":0},
 ]
 
-def get_zodiac_sign(lon_deg):
-    idx = int(lon_deg / 30) % 12
-    return ZODIAC_SIGNS[idx]
+PHASE_NAMES = ["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous",
+               "Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"]
 
-def get_moon_phase_name(phase_frac: float) -> tuple[str, str]:
-    phases = [
-        (0.00, "New Moon", "🌑"), (0.07, "Waxing Crescent", "🌒"), (0.25, "First Quarter", "🌓"),
-        (0.43, "Waxing Gibbous", "🌔"), (0.50, "Full Moon", "🌕"), (0.57, "Waning Gibbous", "🌖"),
-        (0.75, "Last Quarter", "🌗"), (0.93, "Waning Crescent", "🌘"), (1.00, "New Moon", "🌑"),
-    ]
-    for i in range(len(phases) - 1):
-        if phases[i][0] <= phase_frac < phases[i+1][0]:
-            return phases[i][1], phases[i][2]
-    return "New Moon", "🌑"
+# ============================================================
+# ASTRONOMY ENGINE (PyEphem or fallback)
+# ============================================================
+def get_moon_data(d: datetime.date = None):
+    """Returns moon phase, illumination, age, next full moon."""
+    if d is None:
+        d = datetime.date.today()
+    dt = datetime.datetime.combine(d, datetime.time(12,0))
 
-def get_celestial_data(date_utc: datetime):
-    obs = ephem.Observer()
-    obs.lat, obs.lon = "0", "0"
-    obs.date = ephem.Date(date_utc)
-    moon = ephem.Moon(obs)
-    sun = ephem.Sun(obs)
-    illum = moon.phase / 100.0
-    elong = float(moon.elong)
-    if elong < 0:
-        elong += 2 * math.pi
-    phase_frac = elong / (2 * math.pi)
-    phase_name, phase_emoji = get_moon_phase_name(phase_frac)
-    moon_ecl = ephem.Ecliptic(moon)
-    moon_lon = math.degrees(float(moon_ecl.lon)) % 360
-    moon_sign, moon_symbol, moon_vibe = get_zodiac_sign(moon_lon)
-    sun_ecl = ephem.Ecliptic(sun)
-    sun_lon = math.degrees(float(sun_ecl.lon)) % 360
-    sun_sign, sun_symbol, _ = get_zodiac_sign(sun_lon)
-    nfm = ephem.next_full_moon(obs.date)
-    nfm_dt = ephem.Date(nfm).datetime().replace(tzinfo=timezone.utc)
+    if HAS_EPHEM:
+        o = ephem.Observer()
+        o.date = dt
+        m = ephem.Moon(o)
+        phase = m.phase  # illumination %
+        # Age in days (approximate from phase)
+        age = (m.phase / 100.0) * 29.53
+        # Next full moon
+        nm = ephem.next_full_moon(o.date)
+        next_full = nm.datetime().replace(tzinfo=None)
+        # Moon sign (simplified — ecliptic longitude)
+        lon = math.degrees(m.hlon)
+        sign_idx = int((lon % 360) / 30)
+        moon_sign = SIGNS[sign_idx]
+    else:
+        # Fallback: simplified calculations
+        day_of_year = d.timetuple().tm_yday
+        year = d.year
+        # Known new moon reference: Jan 6, 2000
+        ref = datetime.date(2000,1,6)
+        days_since = (d - ref).days
+        synodic = 29.53059
+        age = days_since % synodic
+        phase = (age / synodic) * 100
+        # Next full moon = next time age ≈ 14.77
+        current_age = age
+        days_to_full = (14.765 - current_age) % synodic
+        if days_to_full < 0.5:
+            days_to_full += synodic
+        next_full = dt + datetime.timedelta(days=days_to_full)
+        # Moon sign (simplified)
+        moon_sign = SIGNS[int((days_since * 0.9856) % 12)]
+
+    phase_idx = min(7, int((age / 29.53) * 8))
+    phase_name = PHASE_NAMES[phase_idx]
+
     return {
-        "moon_sign": moon_sign, "moon_symbol": moon_symbol, "moon_vibe": moon_vibe, "moon_lon": moon_lon,
-        "sun_sign": sun_sign, "sun_symbol": sun_symbol,
-        "phase_frac": phase_frac, "phase_name": phase_name, "phase_emoji": phase_emoji, "illum": illum,
-        "next_full_dt": nfm_dt, "age_days": phase_frac * 29.53
+        "phase_name": phase_name,
+        "illumination": round(phase, 1),
+        "age_days": round(age, 1),
+        "next_full_moon": next_full,
+        "moon_sign": moon_sign,
+        "full_moons_lived": _full_moons_lived(d)
     }
 
-@st.cache_data(ttl=3600)
-def get_ai_insight(natal, current, aspect):
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        return None
-    
-    prompt = f"""
-    As a cosmic guide, provide a short, poetic, and encouraging astrology insight (max 3 sentences).
-    User Natal: Sun in {natal['sun_sign']}, Moon in {natal['moon_sign']}.
-    Current Sky: Moon in {current['moon_sign']} ({current['phase_name']}).
-    Natal-Current Aspect: {aspect}.
-    Tone: Mystical, empowering, and modern.
-    """
-    
-    try:
-        response = requests.post(
-            "https://api.deepseek.com/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": "You are a mystical cosmic guide for the Lunatick app."},
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False
-            },
-            timeout=10
+def _full_moons_lived(birth_date: datetime.date) -> int:
+    """Count full moons since birth."""
+    ref = datetime.date(2000,1,6)
+    if birth_date < ref:
+        days = (ref - birth_date).days
+        return int(days / 29.53)
+    else:
+        days = (datetime.date.today() - birth_date).days
+        return int(days / 29.53)
+
+def get_countdown(target: datetime.datetime) -> dict:
+    """Days, hours, mins until target."""
+    now = datetime.datetime.now()
+    diff = target - now
+    if diff.total_seconds() < 0:
+        return {"days":0,"hours":0,"mins":0}
+    days = diff.days
+    hours, rem = divmod(diff.seconds, 3600)
+    mins, _ = divmod(rem, 60)
+    return {"days":days,"hours":hours,"mins":mins}
+
+def get_sun_sign(dob: datetime.date) -> str:
+    """Actual sun sign from date."""
+    d, m = dob.day, dob.month
+    if (m==3 and d>=21) or (m==4 and d<=19): return "Aries"
+    if (m==4 and d>=20) or (m==5 and d<=20): return "Taurus"
+    if (m==5 and d>=21) or (m==6 and d<=20): return "Gemini"
+    if (m==6 and d>=21) or (m==7 and d<=22): return "Cancer"
+    if (m==7 and d>=23) or (m==8 and d<=22): return "Leo"
+    if (m==8 and d>=23) or (m==9 and d<=22): return "Virgo"
+    if (m==9 and d>=23) or (m==10 and d<=22): return "Libra"
+    if (m==10 and d>=23) or (m==11 and d<=21): return "Scorpio"
+    if (m==11 and d>=22) or (m==12 and d<=21): return "Sagittarius"
+    if (m==12 and d>=22) or (m==1 and d<=19): return "Capricorn"
+    if (m==1 and d>=20) or (m==2 and d<=18): return "Aquarius"
+    return "Pisces"
+
+def get_moon_sign_from_dob(dob: datetime.date) -> str:
+    """Deterministic moon sign from DOB."""
+    seed = int(hashlib.md5(f"moon_{dob.isoformat()}".encode()).hexdigest(), 16)
+    return SIGNS[seed % 12]
+
+def get_cycle_forecast(phase_name: str) -> str:
+    forecasts = {
+        "New Moon": "A fresh beginning. Plant seeds, set intentions, embrace the blank slate.",
+        "Waxing Crescent": "Nurture what you've planted. Take the first steps toward your goals.",
+        "First Quarter": "Decision time. Push through resistance — the half-light reveals your path.",
+        "Waxing Gibbous": "Refine and adjust. You're close to the peak — polish your work.",
+        "Full Moon": "Illumination and release. What was hidden comes to light. Celebrate, then let go.",
+        "Waning Gibbous": "Gratitude and sharing. Spread the wisdom you've gathered under the full light.",
+        "Last Quarter": "Forgiveness and surrender. Cut what no longer serves. Prepare for rest.",
+        "Waning Crescent": "Rest and reflect. Dream deep. The cycle renews soon.",
+    }
+    return forecasts.get(phase_name, "Trust the current phase.")
+
+def get_daily_prompt(phase_name: str) -> str:
+    prompts = {
+        "New Moon": "What seed are you planting under this dark moon?",
+        "Waxing Crescent": "What small step can you take today toward your intention?",
+        "First Quarter": "Where are you meeting resistance, and what does it teach you?",
+        "Waxing Gibbous": "What needs refinement before you reach the peak?",
+        "Full Moon": "What truth is being illuminated for you right now?",
+        "Waning Gibbous": "What wisdom from this cycle are you ready to share?",
+        "Last Quarter": "What are you releasing with gratitude?",
+        "Waning Crescent": "What is your inner voice whispering as the cycle closes?",
+    }
+    return prompts.get(phase_name, "What does the moon reflect in you tonight?")
+
+# ============================================================
+# DATA MODELS
+# ============================================================
+@dataclass
+class UserProfile:
+    display_name: str
+    birth_date: datetime.date
+    birth_time: Optional[datetime.time]
+    birth_location: str
+    sun_sign: str
+    moon_sign: str
+    handle: str
+    privacy_opt_in: bool = False
+    subscription_tier: str = "Free"
+
+@dataclass
+class Post:
+    id: str
+    author: str
+    author_handle: str
+    title: str
+    content: str
+    board_id: str
+    phase_tag: str
+    timestamp: str
+    likes: int = 0
+    broken_hearts: int = 0
+
+@dataclass
+class JournalEntry:
+    id: str
+    prompt_type: str
+    prompt_text: str
+    content: str
+    phase: str
+    timestamp: str
+
+@dataclass
+class CosmicCard:
+    handle: str
+    display_name: str
+    sun_sign: str
+    moon_sign: str
+    birth_phase: str
+    full_moons: int
+    collected: bool = False
+
+# ============================================================
+# SESSION STATE INIT
+# ============================================================
+def init_state():
+    defaults = {
+        "onboarded": False,
+        "current_view": "home",  # home, community, journal, settings
+        "current_tab": "timeline",  # within community
+        "profile": None,
+        "posts": _seed_posts(),
+        "journal_entries": [],
+        "collected_cards": [],
+        "friends": [],  # mutual card exchanges
+        "liked_posts": set(),
+        "broken_posts": set(),
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+def _seed_posts() -> List[Post]:
+    return [
+        Post("p1","luna_admin","@luna_admin","luna_admin's Cosmic Card",
+             "♑ Capricorn · ♍ Virgo · Born under Waning Gibbous","general",
+             "Waning Gibbous","2026-07-23 20:37",0,0),
+        Post("p2","Unifinality","@Unifinality","Full Moon Reflections",
+             "Anyone else feeling extra emotional tonight? I've been crying at everything. The moon is so bright.","general",
+             "Waxing Gibbous","2026-07-23 18:15",0,0),
+        Post("p3","TEST_7dc90ead","@TEST_7dc90ead","Ritual Setup",
+             "My Wolf Moon ritual setup is ready. Candles, crystals, and a lot of intention.","rituals",
+             "Full Moon","2026-07-22 21:00",0,0),
+    ]
+
+init_state()
+
+# ============================================================
+# ONBOARDING
+# ============================================================
+def render_onboarding():
+    st.markdown("""
+    <div style="text-align:center; padding: 40px 0 20px;">
+        <div style="font-size: 4rem; margin-bottom: 8px;">🌙</div>
+        <h1 style="font-size: 2.5rem; margin-bottom: 8px;">LUNATICK</h1>
+        <p style="color: #9ca3af; font-style: italic;">Gather under the same moon.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div class='section-label'>Step 1 of 1</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>Enter Your Birth Data</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>We use this to generate your Cosmic Chart. Nothing leaves your orbit without consent.</div>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        dob = st.date_input("Birth Date", value=datetime.date(1990,1,15),
+                           min_value=datetime.date(1900,1,1),
+                           max_value=datetime.date.today(), key="onb_dob")
+    with col2:
+        tob = st.time_input("Birth Time (optional)", value=None, key="onb_tob")
+
+    location = st.text_input("Birth Location (city or coordinates)", 
+                            placeholder="e.g., Brooklyn, NY",
+                            key="onb_loc")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.button("✨ Generate My Cosmic Chart", use_container_width=True):
+        sun = get_sun_sign(dob)
+        moon = get_moon_sign_from_dob(dob)
+        handle = f"TEST_{hashlib.md5(str(random.random()).encode()).hexdigest()[:8]}"
+
+        st.session_state.profile = UserProfile(
+            display_name=handle,
+            birth_date=dob,
+            birth_time=tob,
+            birth_location=location or "Unknown",
+            sun_sign=sun,
+            moon_sign=moon,
+            handle=handle,
+            privacy_opt_in=False,
+            subscription_tier="Free"
         )
-        return response.json()['choices'][0]['message']['content']
-    except Exception:
-        return None
+        st.session_state.onboarded = True
+        st.rerun()
 
-# ---------------------------------------------------------------------------
-# Render Home Tab
-# ---------------------------------------------------------------------------
-
+# ============================================================
+# HOME VIEW
+# ============================================================
 def render_home():
-    now_utc = datetime.now(timezone.utc)
-    current = get_celestial_data(now_utc)
+    moon = get_moon_data()
+    countdown = get_countdown(moon["next_full_moon"])
 
-    query_params = st.query_params
-    initial_date = datetime(1990, 1, 1)
-    if "dob" in query_params:
-        try:
-            initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
-        except:
-            pass
-
-    if 'birth_date' not in st.session_state:
-        st.session_state.birth_date = initial_date
-
-    with st.sidebar:
-        st.markdown("### 🧬 Personal Cosmic Profile")
-        birth_date_input = st.date_input("When were you born?", value=st.session_state.birth_date, min_value=datetime(1920, 1, 1), max_value=now_utc)
-        if birth_date_input != st.session_state.birth_date:
-            st.session_state.birth_date = birth_date_input
-            st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
-            st.rerun()
-        st.success("🔒 Private: Insights are only visible to you.")
-
-    # Countdown
-    delta = current["next_full_dt"] - now_utc
-    d, rem = divmod(int(delta.total_seconds()), 86400)
-    h, m_total = divmod(rem, 3600)
-    m, _ = divmod(m_total, 60)
-
-    st.markdown(f"""
-    <div class="glow-container">
-        <h1 style="color:#bc8cff; margin-bottom:0rem; font-size:3.2rem; letter-spacing:4px;">🌙 LUNATICK</h1>
-        <div style="color:#8b949e; font-size:0.8rem; letter-spacing:3px; margin-bottom:1rem; font-weight:700;">MOON MONITOR</div>
-        <p style="color:#8b949e; font-size:0.75rem; margin-bottom:0.6rem; letter-spacing:1.5px;">NEXT FULL MOON</p>
-        <div class="countdown-display">
-            <div class="unit-box"><div class="num">{d}</div><div class="label">Days</div></div>
-            <div class="unit-box"><div class="num">{h}</div><div class="label">Hours</div></div>
-            <div class="unit-box"><div class="num">{m}</div><div class="label">Mins</div></div>
-        </div>
+    # ── Logo / Branding ──
+    st.markdown("""
+    <div style="text-align:center; padding: 20px 0 10px;">
+        <div style="font-size: 3rem;">🌙</div>
+        <h1 style="font-size: 2.2rem; margin: 4px 0; background: linear-gradient(135deg, #a78bfa, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">LUNATICK</h1>
+        <p style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3em;">Moon Monitor</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Personal Insights
-    birth_utc = datetime.combine(st.session_state.birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-    natal = get_celestial_data(birth_utc)
-    total_moons = (now_utc - birth_utc).days / 29.53
-    diff = (current["moon_lon"] - natal["moon_lon"]) % 360
-
-    if diff < 10 or diff > 350: aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
-    elif 170 < diff < 190: aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
-    elif 80 < diff < 100 or 260 < diff < 280: aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
-    elif 110 < diff < 130 or 230 < diff < 250: aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
-    else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
-
-    insight = get_ai_insight(natal, current, aspect)
-
-    st.markdown(f"""
-    <div class="personal-card">
-        <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
-            YOUR COSMIC CHART
-        </div>
-        <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
-            <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
-            <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
-            <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
-            <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
-        </div>
-        <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
-            <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
-            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{guidance}</div>
-        </div>
-        {f'''
-        <div style="margin-top:0.8rem; background:rgba(188, 140, 255, 0.1); padding:0.8rem; border-radius:10px; border:1px solid #bc8cff;">
-            <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 DEEPSEEK AI INSIGHT</div>
-            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem; font-style: italic;">"{insight}"</div>
-        </div>
-        ''' if insight else ''}
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Stats
-    st.markdown(f"""
-    <div class="stats-row">
-        <div class="stat-card">
-            <div class="stat-label">Phase</div>
-            <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
-            <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Glow</div>
-            <div class="stat-val">{current["illum"]*100:.1f}%</div>
-            <div class="stat-label" style="font-size:0.55rem;">Surface</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Age</div>
-            <div class="stat-val">{current["age_days"]:.1f}d</div>
-            <div class="stat-label" style="font-size:0.55rem;">Cycle</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Moon Vibes & Events
-    vcol, ecol = st.columns([1, 1])
-    with vcol:
+    # ── Next Full Moon Countdown ──
+    st.markdown("<div class='section-label' style='text-align:center;'>Next Full Moon</div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
         st.markdown(f"""
-        <div class="vibe-card">
-            <div class="vibe-tag">ENERGY</div>
-            <h3 style="color:#fff; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
-            <p style="font-size:0.9rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
+        <div class="countdown-box">
+            <div class="countdown-number">{countdown['days']}</div>
+            <div class="countdown-label">Days</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""
+        <div class="countdown-box">
+            <div class="countdown-number">{countdown['hours']}</div>
+            <div class="countdown-label">Hours</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""
+        <div class="countdown-box">
+            <div class="countdown-number">{countdown['mins']}</div>
+            <div class="countdown-label">Mins</div>
         </div>
         """, unsafe_allow_html=True)
 
-    with ecol:
-        st.subheader("🔭 2026 Cosmic Calendar")
-        for d_str, title, desc in [
-            ("March 3", "Total Lunar Eclipse", "Visible across the Americas, Europe, and Africa."),
-            ("August 12, 2026", "Total Solar Eclipse", "Major eclipse visible in Europe & Greenland."),
-            ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
-            ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
-        ]:
-            st.markdown(f'''
-            <div class="event-item">
-                <div class="event-info">
-                    <div class="etitle">{title}</div>
-                    <div class="edesc">{desc}</div>
-                </div>
-                <div class="event-date">{d_str}</div>
-            </div>
-            ''', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # Daily Reflection (Ask AI Anything)
-    st.markdown("---")
-    st.markdown("### 🧠 Daily Reflection")
-    reflection_ui.render_daily_reflection()
-
-# ---------------------------------------------------------------------------
-# Render Calendar Tab
-# ---------------------------------------------------------------------------
-
-def render_calendar():
-    st.markdown("""
-    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
-        📅 Lunar Calendar
-    </div>
-    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Track moon phases throughout the month.
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Month navigation
-    now = datetime.now()
-    if 'calendar_month' not in st.session_state:
-        st.session_state.calendar_month = now.month
-    if 'calendar_year' not in st.session_state:
-        st.session_state.calendar_year = now.year
-
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
-    with nav_col1:
-        if st.button("◀ Previous", use_container_width=True):
-            if st.session_state.calendar_month == 1:
-                st.session_state.calendar_month = 12
-                st.session_state.calendar_year -= 1
-            else:
-                st.session_state.calendar_month -= 1
-            st.rerun()
-    with nav_col2:
-        st.markdown(f"<h3 style='text-align:center; color:#fff;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>", unsafe_allow_html=True)
-    with nav_col3:
-        if st.button("Next ▶", use_container_width=True):
-            if st.session_state.calendar_month == 12:
-                st.session_state.calendar_month = 1
-                st.session_state.calendar_year += 1
-            else:
-                st.session_state.calendar_month += 1
-            st.rerun()
-
-    # Calendar grid
-    import calendar as cal
-    month_cal = cal.monthcalendar(st.session_state.calendar_year, st.session_state.calendar_month)
-    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    header_cols = st.columns(7)
-    for i, day in enumerate(weekdays):
-        with header_cols[i]:
-            st.markdown(f"<div style='text-align:center; color:#8b949e; font-size:0.7rem; font-weight:700;'>{day}</div>", unsafe_allow_html=True)
-
-    today = datetime.now()
-    for week in month_cal:
-        day_cols = st.columns(7)
-        for i, day in enumerate(week):
-            with day_cols[i]:
-                if day == 0:
-                    st.markdown("<div style='min-height:80px;'></div>", unsafe_allow_html=True)
-                else:
-                    date_obj = datetime(st.session_state.calendar_year, st.session_state.calendar_month, day)
-                    day_data = get_celestial_data(date_obj.replace(tzinfo=timezone.utc))
-                    is_today = (day == today.day and st.session_state.calendar_month == today.month and st.session_state.calendar_year == today.year)
-                    today_class = "calendar-today" if is_today else ""
-                    st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.5rem; text-align:center; min-height:80px; {'' if not is_today else 'border:2px solid #6e40c9; background:rgba(110,64,201,0.1);'}">
-                        <div style="font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">{day}</div>
-                        <div style="font-size:1.5rem; margin-bottom:0.2rem;">{day_data['phase_emoji']}</div>
-                        <div style="font-size:0.6rem; color:#8b949e;">{day_data['illum']*100:.0f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------------
-# Render Settings Tab
-# ---------------------------------------------------------------------------
-
-def render_settings():
-    st.markdown("""
-    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
-        ⚙️ Settings
-    </div>
-    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Manage your account, privacy, and subscription.
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- Display Name ---
-    current_name = st.session_state.get("display_name", "Moon Wanderer")
-    display_name = st.text_input("Display Name", value=current_name)
-    
-    # --- Birth Date ---
-    current_birth_date = st.session_state.get("birth_date", datetime(1990, 1, 1).date())
-    birth_date = st.date_input(
-        "Your Birth Date",
-        value=current_birth_date,
-        min_value=datetime(1920, 1, 1).date(),
-        max_value=datetime.now().date()
-    )
-    
-    # --- Save Button ---
-    if st.button("💾 Save Profile", type="primary"):
-        if display_name.strip():
-            st.session_state.display_name = display_name.strip()
-            st.session_state.birth_date = birth_date
-            talk_db.set_user_profile(
-                st.session_state.user_hash,
-                display_name.strip(),
-                birth_date.isoformat()
-            )
-            st.success("✅ Profile saved permanently!")
-            st.rerun()
-        else:
-            st.warning("Please enter a display name.")
-
-    st.markdown("---")
-    
-    # --- Privacy & Consent ---
-    st.markdown("### 🔒 Privacy & Consent")
-    if st.button("Opt in to community sharing"):
-        st.success("You have opted in to community sharing.")
-    if st.button("Opt out of community sharing"):
-        st.success("You have opted out of community sharing.")
-
-    st.markdown("---")
-    
-    # --- Subscription ---
-    st.markdown("### 💎 Subscription")
-    tier = st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
-    st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
-
-    st.markdown("---")
-    
-    # --- Danger Zone ---
-    st.markdown("### 🗑️ Danger Zone")
-    if st.button("Clear all journal entries", type="secondary"):
-        if "journal_entries" in st.session_state:
-            st.session_state.journal_entries = []
-            st.success("Journal entries cleared.")
-    if st.button("Reset all preferences", type="secondary"):
-        st.session_state.clear()
-        st.success("Preferences reset. Please refresh the page.")
-
-# ---------------------------------------------------------------------------
-# Load User Profile from Database
-# ---------------------------------------------------------------------------
-
-# Initialize database for journal and talk modules
-journal_ui.init_db()
-talk_db.init_db()
-talk_db.seed_talk_posts()
-
-# Set up user hash for privacy
-if "user_hash" not in st.session_state:
-    import hashlib
-    from datetime import datetime
-    st.session_state.user_hash = hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
-
-# Load user profile from database if it exists
-if "user_hash" in st.session_state:
-    profile = talk_db.get_user_profile(st.session_state.user_hash)
+    # ── Your Cosmic Chart ──
+    profile = st.session_state.profile
+    full_moons = moon["full_moons_lived"] if profile else 0
     if profile:
-        st.session_state.display_name = profile["display_name"]
-        if profile["birth_date"]:
-            st.session_state.birth_date = datetime.strptime(profile["birth_date"], "%Y-%m-%d").date()
+        full_moons = _full_moons_lived(profile.birth_date)
+
+    st.markdown("""
+    <div class="cosmic-card">
+        <div style="text-align:center; margin-bottom: 16px;">
+            <span style="color: #7c3aed; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.2em;">Your Cosmic Chart</span>
+        </div>
+        <div style="display: flex; justify-content: space-around; text-align: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 8px;">Sun Sign</div>
+                <div style="font-size: 2rem; margin-bottom: 4px;">{}</div>
+                <div style="font-family: 'Space Grotesk'; font-weight: 600; font-size: 1.1rem;">{}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 8px;">Moon Sign</div>
+                <div style="font-size: 2rem; margin-bottom: 4px;">{}</div>
+                <div style="font-family: 'Space Grotesk'; font-weight: 600; font-size: 1.1rem;">{}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 8px;">Lunar Phase</div>
+                <div style="font-size: 2rem; margin-bottom: 4px;">🌙</div>
+                <div style="font-family: 'Space Grotesk'; font-weight: 600; font-size: 1.1rem;">{}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 8px;">Full Moons</div>
+                <div style="font-family: 'Space Grotesk'; font-weight: 700; font-size: 2rem; color: #a78bfa;">{}</div>
+                <div style="font-size: 0.75rem; color: #6b7280;">LIVED</div>
+            </div>
+        </div>
+    </div>
+    """.format(
+        SIGN_EMOJIS.get(profile.sun_sign, "☉") if profile else "☉",
+        profile.sun_sign if profile else "—",
+        SIGN_EMOJIS.get(profile.moon_sign, "☽") if profile else "☽",
+        profile.moon_sign if profile else "—",
+        moon["phase_name"],
+        full_moons
+    ), unsafe_allow_html=True)
+
+    # ── Stats Row ──
+    st.markdown("""
+    <div style="display: flex; justify-content: space-around; margin: 16px 0;">
+        <div style="text-align: center;">
+            <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280;">Phase</div>
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #a78bfa;">{}</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280;">Glow</div>
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #a78bfa;">{}%</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280;">Age</div>
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #a78bfa;">{}d</div>
+        </div>
+    </div>
+    """.format(moon["phase_name"], moon["illumination"], moon["age_days"]), unsafe_allow_html=True)
+
+    # ── Cycle Forecast ──
+    forecast = get_cycle_forecast(moon["phase_name"])
+    st.markdown(f"""
+    <div class="pulse-card">
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 1.2rem; margin-right: 8px;">✨</span>
+            <span style="font-family: 'Space Grotesk'; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.1em;">Cycle Forecast</span>
+        </div>
+        <p style="color: #e8e6f0; line-height: 1.6; margin: 0;">{forecast}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Daily Reflection Prompt ──
+    prompt = get_daily_prompt(moon["phase_name"])
+    st.markdown(f"""
+    <div class="cosmic-card">
+        <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.2em; color: #6b7280; margin-bottom: 8px;">Daily Reflection</div>
+        <p style="color: #e8e6f0; font-style: italic; line-height: 1.6; margin: 0;">{prompt}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================
+# COMMUNITY TAB
+# ============================================================
+def render_community():
+    moon = get_moon_data()
+
+    st.markdown("<div class='section-label'>LunaTick Talk</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>The Cosmic Timeline</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Share your reflections. Read what others are feeling. You are not alone under the moon.</div>", unsafe_allow_html=True)
+
+    # ── LunaTick Pulse ──
+    st.markdown(f"""
+    <div class="pulse-card">
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 1.2rem; margin-right: 8px;">🌕</span>
+            <span style="font-family: 'Space Grotesk'; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.1em;">LunaTick Pulse</span>
+        </div>
+        <p style="color: #e8e6f0; line-height: 1.6; margin: 0;">
+            Tonight's {moon['phase_name']} calls for {get_cycle_forecast(moon['phase_name']).split('.')[0].lower()}. 
+            The community is reflecting under the same light. You are not alone.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Sub-tabs ──
+    sub = st.tabs(["💬 Timeline", "🌐 Boards", "🃏 Cards", "👥 Kindred"])
+
+    with sub[0]:
+        render_timeline()
+    with sub[1]:
+        render_boards()
+    with sub[2]:
+        render_cards()
+    with sub[3]:
+        render_kindred()
+
+def render_timeline():
+    # Composer
+    with st.expander("🌙 Share something with the community"):
+        name = st.text_input("Your display name", value=st.session_state.profile.display_name if st.session_state.profile else "", key="post_name")
+        title = st.text_input("Title (e.g., 'My Wolf Moon ritual setup')", key="post_title")
+        body = st.text_area("What's on your mind under tonight's moon?", key="post_body")
+        phase = st.selectbox("Phase tag", PHASE_NAMES, key="post_phase")
+        board = st.selectbox("Board", [b["name"] for b in BOARDS], key="post_board")
+        if st.button("🌙 Cast Into the Void", use_container_width=True):
+            if body.strip():
+                bid = [b["id"] for b in BOARDS if b["name"]==board][0]
+                new_post = Post(
+                    id=f"p{len(st.session_state.posts)+1}",
+                    author=name or "Anonymous",
+                    author_handle=f"@{name or 'anon'}",
+                    title=title or "Untitled Transmission",
+                    content=body,
+                    board_id=bid,
+                    phase_tag=phase,
+                    timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    likes=0, broken_hearts=0
+                )
+                st.session_state.posts.insert(0, new_post)
+                st.success("✨ Cast into the void.")
+                st.rerun()
+
+    # Filter
+    filter_phase = st.selectbox("Filter by Phase", ["All Phases"] + PHASE_NAMES, key="filter_phase")
+
+    # Posts
+    posts = st.session_state.posts
+    if filter_phase != "All Phases":
+        posts = [p for p in posts if p.phase_tag == filter_phase]
+
+    for post in posts:
+        st.markdown(f"""
+        <div class="post-card">
+            <div class="post-header">
+                <div class="post-avatar">{post.author[:2].upper()}</div>
+                <div>
+                    <div style="font-weight: 600; color: #f3f4f6;">{post.author}</div>
+                    <div class="post-meta">{post.timestamp} · #{post.board_id.upper()}</div>
+                </div>
+            </div>
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">{post.title}</div>
+            <div class="post-content">{post.content}</div>
+            <div>
+                <span class="phase-pill">{post.phase_tag}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        c1, c2, c3 = st.columns([1,1,6])
+        with c1:
+            if st.button(f"❤️ {post.likes}", key=f"like_{post.id}"):
+                if post.id not in st.session_state.liked_posts:
+                    post.likes += 1
+                    st.session_state.liked_posts.add(post.id)
+                    st.rerun()
+        with c2:
+            if st.button(f"💔 {post.broken_hearts}", key=f"break_{post.id}"):
+                if post.id not in st.session_state.broken_posts:
+                    post.broken_hearts += 1
+                    st.session_state.broken_posts.add(post.id)
+                    st.rerun()
+
+def render_boards():
+    st.markdown("<div class='section-label'>Message Boards</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>Categorized Constellations</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Pick a constellation. Drop your transmission.</div>", unsafe_allow_html=True)
+
+    for board in BOARDS:
+        st.markdown(f"""
+        <div class="board-card">
+            <div class="board-icon">{board['icon']}</div>
+            <div class="board-title">{board['name']}</div>
+            <div class="board-desc">{board['desc']}</div>
+            <div class="board-count">{board['posts']} Posts</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def render_cards():
+    st.markdown("<div class='section-label'>Cosmic Collection</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>Birth Chart Cards</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Request, exchange, and collect. Each card is a soul's cosmic signature.</div>", unsafe_allow_html=True)
+
+    # Demo cards available to collect
+    demo_cards = [
+        CosmicCard("@TEST_7dc90ead","TEST_7dc90ead","Capricorn","Virgo","Waning Gibbous",365,False),
+        CosmicCard("@luna_admin","luna_admin","Capricorn","Virgo","Waning Gibbous",450,True),
+        CosmicCard("@Stardust_9e2b","Stardust_9e2b","Aquarius","Pisces","New Moon",289,False),
+    ]
+
+    cols = st.columns(3)
+    for i, card in enumerate(demo_cards):
+        with cols[i]:
+            st.markdown(f"""
+            <div class="chart-card">
+                <div class="chart-avatar">{card.display_name[:2].upper()}</div>
+                <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #f3f4f6; margin-bottom: 4px;">{card.display_name}</div>
+                <div style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 12px;">{card.handle}</div>
+                <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <div style="font-size: 1.5rem;">{SIGN_EMOJIS[card.sun_sign]}</div>
+                        <div style="font-size: 0.7rem; color: #6b7280;">{card.sun_sign}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.5rem;">{SIGN_EMOJIS[card.moon_sign]}</div>
+                        <div style="font-size: 0.7rem; color: #6b7280;">{card.moon_sign}</div>
+                    </div>
+                </div>
+                <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 4px;">☉ TWIN SUN</div>
+                <div style="font-size: 0.7rem; color: #4b5563;">{card.full_moons} Full Moons</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if card.collected:
+                st.button("✨ In Collection", disabled=True, key=f"col_{i}")
+            else:
+                if st.button("🤝 Request Exchange", key=f"req_{i}"):
+                    st.session_state.friends.append(card.handle)
+                    st.success(f"✨ Friend request sent to {card.display_name}!")
+                    st.rerun()
+
+def render_kindred():
+    st.markdown("<div class='section-label'>Cosmic Kindred</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>Your Connections</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Souls who have exchanged cards with you.</div>", unsafe_allow_html=True)
+
+    if not st.session_state.friends:
+        st.markdown("""
+        <div style="text-align: center; padding: 60px 20px; color: #4b5563;">
+            <div style="font-size: 3rem; margin-bottom: 16px;">🌑</div>
+            <p>No kindred connections yet.</p>
+            <p style="font-size: 0.85rem;">Exchange cosmic cards to build your constellation.</p>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        if "display_name" not in st.session_state:
-            st.session_state.display_name = "Moon Wanderer"
+        for friend in st.session_state.friends:
+            st.markdown(f"""
+            <div class="post-card">
+                <div class="post-header">
+                    <div class="post-avatar">{friend[1:3].upper()}</div>
+                    <div>
+                        <div style="font-weight: 600; color: #f3f4f6;">{friend}</div>
+                        <div class="post-meta">Cosmic Card Exchanged</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-# Set a default phase for the demo (will be overwritten by real data)
-if "current_phase" not in st.session_state:
-    st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
+# ============================================================
+# JOURNAL TAB
+# ============================================================
+def render_journal():
+    moon = get_moon_data()
 
-# ---------------------------------------------------------------------------
-# Main App — Bottom Navigation Tabs
-# ---------------------------------------------------------------------------
+    st.markdown("<div class='section-label'>Luna Journal</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>Three Prompts. One Moon. Your Voice.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Choose your prompt mode:</div>", unsafe_allow_html=True)
 
-tabs = st.tabs(["🌕 Home", "💬 LunaTick Talk", "📓 Journal", "📅 Calendar", "⚙️ Settings"])
+    # Prompt selection
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🌙 Phase Reflection", use_container_width=True):
+            st.session_state.journal_prompt = "phase"
+    with col2:
+        if st.button("✨ Chart Resonance", use_container_width=True):
+            st.session_state.journal_prompt = "chart"
+    with col3:
+        if st.button("📖 Free Write", use_container_width=True):
+            st.session_state.journal_prompt = "free"
 
-with tabs[0]:
-    render_home()
+    prompt_type = st.session_state.get("journal_prompt", "phase")
 
-with tabs[1]:
-    talk_ui.render_talk_tab()
+    if prompt_type == "phase":
+        prompt_text = f"Consider the current phase — {moon['phase_name']}. Are you planting, building, refining, releasing, or resting?"
+        st.markdown(f"""
+        <div class="prompt-card selected">
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #f3f4f6; margin-bottom: 8px;">🌙 Phase Reflection</div>
+            <p style="color: #9ca3af; font-style: italic; margin: 0;">{prompt_text}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    elif prompt_type == "chart":
+        profile = st.session_state.profile
+        sun = profile.sun_sign if profile else "your Sun"
+        moon_sign = profile.moon_sign if profile else "your Moon"
+        prompt_text = f"Your {sun} Sun and {moon_sign} Moon — how are they dancing today?"
+        st.markdown(f"""
+        <div class="prompt-card selected">
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #f3f4f6; margin-bottom: 8px;">✨ Chart Resonance</div>
+            <p style="color: #9ca3af; font-style: italic; margin: 0;">{prompt_text}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="prompt-card selected">
+            <div style="font-family: 'Space Grotesk'; font-weight: 600; color: #f3f4f6; margin-bottom: 8px;">📖 Free Write</div>
+            <p style="color: #9ca3af; font-style: italic; margin: 0;">No prompt. Just you, the page, and the moon.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-with tabs[2]:
-    journal_ui.render_journal_tab()
+    st.markdown("<div style='margin-top: 16px; color: #6b7280; font-size: 0.85rem;'>Your reflection:</div>", unsafe_allow_html=True)
+    entry = st.text_area("", placeholder="How is this moon phase showing up in your life right now?", key="journal_entry", label_visibility="collapsed")
 
-with tabs[3]:
-    render_calendar()
+    if st.button("🌙 Seal Entry to the Moon", use_container_width=True):
+        if entry.strip():
+            new_entry = JournalEntry(
+                id=f"j{len(st.session_state.journal_entries)+1}",
+                prompt_type=prompt_type,
+                prompt_text=prompt_text if prompt_type != "free" else "Free Write",
+                content=entry,
+                phase=moon["phase_name"],
+                timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            )
+            st.session_state.journal_entries.insert(0, new_entry)
+            st.success("✨ Entry sealed.")
+            st.rerun()
 
-with tabs[4]:
-    render_settings()
+    # Entry history
+    if st.session_state.journal_entries:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("<div class='section-label'>Entry History</div>", unsafe_allow_html=True)
+        for ent in st.session_state.journal_entries[:5]:
+            st.markdown(f"""
+            <div class="cosmic-card">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span class="phase-pill">{ent.phase}</span>
+                    <span style="font-size: 0.75rem; color: #4b5563;">{ent.timestamp}</span>
+                </div>
+                <div style="font-size: 0.8rem; color: #a78bfa; margin-bottom: 8px;">{ent.prompt_text}</div>
+                <p style="color: #e8e6f0; line-height: 1.6; margin: 0;">{ent.content}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# Footer
-# ---------------------------------------------------------------------------
+# ============================================================
+# SETTINGS TAB
+# ============================================================
+def render_settings():
+    st.markdown("<div class='section-label'>Settings</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>Manage Your Orbit</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Your account, privacy, and subscription.</div>", unsafe_allow_html=True)
 
-st.markdown("---")
-st.markdown(
-    "<p style='text-align:center; color:#484f58; font-size:0.65rem; font-family:'Orbitron', sans-serif;'>"
-    "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
-    "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
-    "</p>",
-    unsafe_allow_html=True
-)
+    profile = st.session_state.profile
+
+    # Profile
+    st.markdown("<div style='font-family: Space Grotesk; font-weight: 600; color: #f3f4f6; margin-bottom: 12px;'>Profile</div>", unsafe_allow_html=True)
+
+    new_name = st.text_input("Display Name", value=profile.display_name if profile else "", key="set_name")
+    new_dob = st.date_input("Birth Date", value=profile.birth_date if profile else datetime.date(1990,1,15), key="set_dob")
+    new_tob = st.time_input("Birth Time", value=profile.birth_time if profile else None, key="set_tob")
+    new_loc = st.text_input("Birth Location", value=profile.birth_location if profile else "", key="set_loc")
+
+    if st.button("💾 Save Profile"):
+        if profile:
+            profile.display_name = new_name
+            profile.birth_date = new_dob
+            profile.birth_time = new_tob
+            profile.birth_location = new_loc
+            profile.sun_sign = get_sun_sign(new_dob)
+            profile.moon_sign = get_moon_sign_from_dob(new_dob)
+        st.success("✨ Profile updated.")
+        st.rerun()
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # Privacy
+    st.markdown("<div style='font-family: Space Grotesk; font-weight: 600; color: #f3f4f6; margin-bottom: 12px;'>🔒 Privacy & Consent</div>", unsafe_allow_html=True)
+
+    opt_in = st.toggle("Opt in to anonymous community sharing", value=profile.privacy_opt_in if profile else False, key="set_privacy")
+    if profile:
+        profile.privacy_opt_in = opt_in
+
+    st.markdown("""
+    <p style="color: #6b7280; font-size: 0.8rem;">
+        When opted in, your birth chart data is anonymized and aggregated 
+        to help the LunaTick community discover cosmic patterns. 
+        Your identity is never shared.
+    </p>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # Subscription
+    st.markdown("<div style='font-family: Space Grotesk; font-weight: 600; color: #f3f4f6; margin-bottom: 12px;'>💎 Subscription</div>", unsafe_allow_html=True)
+
+    tier = st.selectbox("Your Tier", ["Free", "Community", "Resonance"], 
+                       index=["Free","Community","Resonance"].index(profile.subscription_tier) if profile else 0,
+                       key="set_tier")
+    if profile:
+        profile.subscription_tier = tier
+
+    st.markdown("""
+    <div style="background: rgba(255,255,255,0.02); border-radius: 12px; padding: 16px; margin-top: 12px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #9ca3af;">Free</span>
+            <span style="color: #6b7280;">Basic access</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #a78bfa;">Community</span>
+            <span style="color: #6b7280;">Full timeline + boards</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <span style="color: #a78bfa;">Resonance</span>
+            <span style="color: #6b7280;">AI insights + card trading</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # Danger zone
+    if st.button("🔄 Reset App (Clear All Data)", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+# ============================================================
+# BOTTOM NAVIGATION
+# ============================================================
+def render_bottom_nav():
+    """Fixed bottom nav with 3 tabs + logo home button."""
+    views = [
+        ("🌙", "LunaTick", "home"),
+        ("🌐", "Community", "community"),
+        ("📓", "Journal", "journal"),
+        ("⚙️", "Settings", "settings"),
+    ]
+
+    st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)  # Spacer
+
+    cols = st.columns(4)
+    for i, (icon, label, view) in enumerate(views):
+        with cols[i]:
+            active = st.session_state.current_view == view
+            btn_label = f"**{icon}**<br><span style='font-size:0.65rem;'>{label}</span>" if active else f"{icon}<br><span style='font-size:0.65rem; color:#6b7280'>{label}</span>"
+            if st.button(btn_label, key=f"nav_{view}", use_container_width=True):
+                st.session_state.current_view = view
+                st.rerun()
+
+# ============================================================
+# C3 FOOTER
+# ============================================================
+def render_footer():
+    st.markdown("""
+    <div class="c3-badge">
+        🌙 A Common Cents Culture (C3) Project
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================
+# MAIN
+# ============================================================
+def main():
+    if not st.session_state.onboarded:
+        render_onboarding()
+        render_footer()
+        return
+
+    # Top branding (small)
+    st.markdown("""
+    <div style="text-align:center; padding: 8px 0;">
+        <span style="font-size: 1.2rem; font-family: 'Space Grotesk'; font-weight: 700; letter-spacing: 0.15em; color: #a78bfa;">🌙 LUNATICK</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Route to view
+    view = st.session_state.current_view
+    if view == "home":
+        render_home()
+    elif view == "community":
+        render_community()
+    elif view == "journal":
+        render_journal()
+    elif view == "settings":
+        render_settings()
+
+    render_footer()
+    render_bottom_nav()
+
