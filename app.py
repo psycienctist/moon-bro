@@ -1244,3 +1244,5 @@ def main():
     render_footer()
     render_bottom_nav()
 
+if __name__ == "__main__":
+    main()
