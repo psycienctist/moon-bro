@@ -3,8 +3,8 @@ import datetime
 import random
 import hashlib
 import math
-from dataclasses import dataclass, asdict
-from typing import List, Optional, Dict
+from dataclasses import dataclass
+from typing import List, Optional
 import json
 
 try:
@@ -29,21 +29,17 @@ html, body, [class*="css"] {
     background-color: #0a0a0f;
     color: #e8e6f0;
 }
-
 .stApp {
     background: linear-gradient(180deg, #0a0a0f 0%, #0f0f1a 50%, #0a0a0f 100%);
 }
-
 h1, h2, h3 {
     font-family: 'Space Grotesk', sans-serif !important;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
-
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
-
 .stButton>button {
     background: linear-gradient(135deg, #7c3aed, #5b21b6);
     color: #ffffff;
@@ -57,17 +53,14 @@ header {visibility: hidden;}
     transition: all 0.3s ease;
     width: 100%;
 }
-
 .stButton>button:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 30px rgba(124, 58, 237, 0.4);
 }
-
 .stButton>button[kind="secondary"] {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
 }
-
 .stTextInput>div>div>input, .stTextArea>div>div>textarea,
 .stDateInput>div>div>input, .stTimeInput>div>div>input {
     background: rgba(255,255,255,0.03) !important;
@@ -76,12 +69,10 @@ header {visibility: hidden;}
     color: #e8e6f0 !important;
     font-family: 'Inter', sans-serif !important;
 }
-
 .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
     border-color: #7c3aed !important;
     box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2) !important;
 }
-
 .cosmic-card {
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.06);
@@ -90,11 +81,9 @@ header {visibility: hidden;}
     margin-bottom: 16px;
     backdrop-filter: blur(10px);
 }
-
 .cosmic-card:hover {
     border-color: rgba(124, 58, 237, 0.3);
 }
-
 .pulse-card {
     background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(91,33,182,0.1));
     border: 1px solid rgba(124,58,237,0.25);
@@ -102,7 +91,6 @@ header {visibility: hidden;}
     padding: 24px;
     margin-bottom: 16px;
 }
-
 .phase-pill {
     display: inline-block;
     background: rgba(124,58,237,0.15);
@@ -114,7 +102,6 @@ header {visibility: hidden;}
     letter-spacing: 0.05em;
     margin-right: 6px;
 }
-
 .sign-pill {
     display: inline-block;
     background: rgba(255,255,255,0.06);
@@ -125,7 +112,6 @@ header {visibility: hidden;}
     font-weight: 500;
     margin-right: 6px;
 }
-
 .countdown-box {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.08);
@@ -133,7 +119,6 @@ header {visibility: hidden;}
     padding: 20px;
     text-align: center;
 }
-
 .countdown-number {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 2.5rem;
@@ -141,7 +126,6 @@ header {visibility: hidden;}
     color: #a78bfa;
     line-height: 1;
 }
-
 .countdown-label {
     font-size: 0.7rem;
     text-transform: uppercase;
@@ -149,7 +133,6 @@ header {visibility: hidden;}
     color: #6b7280;
     margin-top: 8px;
 }
-
 .section-label {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.75rem;
@@ -158,7 +141,6 @@ header {visibility: hidden;}
     color: #6b7280;
     margin-bottom: 4px;
 }
-
 .section-title {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 1.8rem;
@@ -168,14 +150,12 @@ header {visibility: hidden;}
     color: #f3f4f6;
     margin-bottom: 8px;
 }
-
 .section-subtitle {
     font-style: italic;
     color: #9ca3af;
     font-size: 0.95rem;
     margin-bottom: 24px;
 }
-
 .fixed-bottom-nav {
     position: fixed;
     bottom: 0;
@@ -213,7 +193,6 @@ header {visibility: hidden;}
 .main-content {
     padding-bottom: 80px;
 }
-
 .c3-badge {
     text-align: center;
     padding: 16px;
@@ -222,7 +201,6 @@ header {visibility: hidden;}
     letter-spacing: 0.1em;
     text-transform: uppercase;
 }
-
 .post-card {
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.06);
@@ -230,13 +208,11 @@ header {visibility: hidden;}
     padding: 20px;
     margin-bottom: 12px;
 }
-
 .post-header {
     display: flex;
     align-items: center;
     margin-bottom: 12px;
 }
-
 .post-avatar {
     width: 36px;
     height: 36px;
@@ -250,18 +226,15 @@ header {visibility: hidden;}
     color: white;
     margin-right: 12px;
 }
-
 .post-meta {
     color: #9ca3af;
     font-size: 0.8rem;
 }
-
 .post-content {
     color: #e8e6f0;
     line-height: 1.6;
     margin-bottom: 12px;
 }
-
 .board-card {
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.06);
@@ -271,17 +244,14 @@ header {visibility: hidden;}
     cursor: pointer;
     transition: all 0.3s ease;
 }
-
 .board-card:hover {
     border-color: rgba(124,58,237,0.3);
     transform: translateY(-2px);
 }
-
 .board-icon {
     font-size: 2rem;
     margin-bottom: 12px;
 }
-
 .board-title {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 1.3rem;
@@ -289,13 +259,11 @@ header {visibility: hidden;}
     color: #f3f4f6;
     margin-bottom: 8px;
 }
-
 .board-desc {
     color: #9ca3af;
     font-size: 0.9rem;
     margin-bottom: 12px;
 }
-
 .board-count {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.75rem;
@@ -303,7 +271,6 @@ header {visibility: hidden;}
     letter-spacing: 0.15em;
     color: #6b7280;
 }
-
 .chart-card {
     background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(91,33,182,0.05));
     border: 1px solid rgba(124,58,237,0.2);
@@ -312,12 +279,10 @@ header {visibility: hidden;}
     text-align: center;
     transition: all 0.3s ease;
 }
-
 .chart-card:hover {
     border-color: rgba(124,58,237,0.4);
     box-shadow: 0 8px 30px rgba(124,58,237,0.15);
 }
-
 .chart-avatar {
     width: 60px;
     height: 60px;
@@ -331,7 +296,6 @@ header {visibility: hidden;}
     color: white;
     margin: 0 auto 12px;
 }
-
 .prompt-card {
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.06);
@@ -341,27 +305,22 @@ header {visibility: hidden;}
     cursor: pointer;
     transition: all 0.3s ease;
 }
-
 .prompt-card:hover {
     border-color: rgba(124,58,237,0.3);
 }
-
 .prompt-card.selected {
     border-color: #7c3aed;
     background: rgba(124,58,237,0.08);
 }
-
 .main .block-container {
     padding-bottom: 100px !important;
 }
-
 .stTabs [data-baseweb="tab-list"] {
     gap: 0;
     background: rgba(255,255,255,0.02);
     border-radius: 16px;
     padding: 4px;
 }
-
 .stTabs [data-baseweb="tab"] {
     color: #6b7280;
     font-family: 'Space Grotesk', sans-serif;
@@ -371,26 +330,22 @@ header {visibility: hidden;}
     border-radius: 12px;
     padding: 10px 20px;
 }
-
 .stTabs [aria-selected="true"] {
     background: rgba(124,58,237,0.2) !important;
     color: #a78bfa !important;
 }
-
 .streamlit-expanderHeader {
     background: rgba(255,255,255,0.02) !important;
     border: 1px solid rgba(255,255,255,0.06) !important;
     border-radius: 12px !important;
     color: #e8e6f0 !important;
 }
-
 .stSelectbox>div>div, .stMultiSelect>div>div {
     background: rgba(255,255,255,0.03) !important;
     border: 1px solid rgba(255,255,255,0.08) !important;
     border-radius: 12px !important;
     color: #e8e6f0 !important;
 }
-
 hr {
     border-color: rgba(255,255,255,0.06) !important;
     margin: 24px 0 !important;
@@ -405,13 +360,6 @@ SIGN_EMOJIS = {
     "Leo":"♌","Virgo":"♍","Libra":"♎","Scorpio":"♏",
     "Sagittarius":"♐","Capricorn":"♑","Aquarius":"♒","Pisces":"♓"
 }
-ELEMENTS = {
-    "Fire":["Aries","Leo","Sagittarius"],
-    "Earth":["Taurus","Virgo","Capricorn"],
-    "Air":["Gemini","Libra","Aquarius"],
-    "Water":["Cancer","Scorpio","Pisces"]
-}
-
 BOARDS = [
     {"id":"general","icon":"🌙","name":"General","desc":"Open discussion for all moon bros & sis.","posts":1},
     {"id":"rituals","icon":"🕯️","name":"Full Moon Rituals","desc":"Share & discover lunar rituals and practices.","posts":2},
@@ -420,7 +368,6 @@ BOARDS = [
     {"id":"memes","icon":"😹","name":"Cosmic Memes","desc":"Lunar humor & cosmic chaos.","posts":0},
     {"id":"intentions","icon":"✨","name":"Intentions","desc":"Set, share, and reflect on your lunar intentions.","posts":0},
 ]
-
 PHASE_NAMES = ["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous",
                "Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"]
 
@@ -428,7 +375,6 @@ def get_moon_data(d: datetime.date = None):
     if d is None:
         d = datetime.date.today()
     dt = datetime.datetime.combine(d, datetime.time(12,0))
-
     if HAS_EPHEM:
         o = ephem.Observer()
         o.date = dt
@@ -452,10 +398,8 @@ def get_moon_data(d: datetime.date = None):
             days_to_full += synodic
         next_full = dt + datetime.timedelta(days=days_to_full)
         moon_sign = SIGNS[int((days_since * 0.9856) % 12)]
-
     phase_idx = min(7, int((age / 29.53) * 8))
     phase_name = PHASE_NAMES[phase_idx]
-
     return {
         "phase_name": phase_name,
         "illumination": round(phase, 1),
@@ -613,11 +557,9 @@ def render_onboarding():
         <p style="color: #9ca3af; font-style: italic;">Gather under the same moon.</p>
     </div>
     """, unsafe_allow_html=True)
-
     st.markdown("<div class='section-label'>Step 1 of 1</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>Enter Your Birth Data</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>We use this to generate your Cosmic Chart. Nothing leaves your orbit without consent.</div>", unsafe_allow_html=True)
-
     col1, col2 = st.columns(2)
     with col1:
         dob = st.date_input("Birth Date", value=datetime.date(1990,1,15),
@@ -625,18 +567,14 @@ def render_onboarding():
                            max_value=datetime.date.today(), key="onb_dob")
     with col2:
         tob = st.time_input("Birth Time (optional)", value=None, key="onb_tob")
-
     location = st.text_input("Birth Location (city or coordinates)", 
                             placeholder="e.g., Brooklyn, NY",
                             key="onb_loc")
-
     st.markdown("<br>", unsafe_allow_html=True)
-
     if st.button("✨ Generate My Cosmic Chart", use_container_width=True):
         sun = get_sun_sign(dob)
         moon = get_moon_sign_from_dob(dob)
         handle = f"TEST_{hashlib.md5(str(random.random()).encode()).hexdigest()[:8]}"
-
         st.session_state.profile = UserProfile(
             display_name=handle,
             birth_date=dob,
@@ -654,7 +592,6 @@ def render_onboarding():
 def render_home():
     moon = get_moon_data()
     countdown = get_countdown(moon["next_full_moon"])
-
     st.markdown("""
     <div style="text-align:center; padding: 20px 0 10px;">
         <div style="font-size: 3rem;">🌙</div>
@@ -662,7 +599,6 @@ def render_home():
         <p style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3em;">Moon Monitor</p>
     </div>
     """, unsafe_allow_html=True)
-
     st.markdown("<div class='section-label' style='text-align:center;'>Next Full Moon</div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -686,14 +622,11 @@ def render_home():
             <div class="countdown-label">Mins</div>
         </div>
         """, unsafe_allow_html=True)
-
     st.markdown("<br>", unsafe_allow_html=True)
-
     profile = st.session_state.profile
     full_moons = moon["full_moons_lived"] if profile else 0
     if profile:
         full_moons = _full_moons_lived(profile.birth_date)
-
     st.markdown("""
     <div class="cosmic-card">
         <div style="text-align:center; margin-bottom: 16px;">
@@ -730,7 +663,6 @@ def render_home():
         moon["phase_name"],
         full_moons
     ), unsafe_allow_html=True)
-
     st.markdown("""
     <div style="display: flex; justify-content: space-around; margin: 16px 0;">
         <div style="text-align: center;">
@@ -747,7 +679,6 @@ def render_home():
         </div>
     </div>
     """.format(moon["phase_name"], moon["illumination"], moon["age_days"]), unsafe_allow_html=True)
-
     forecast = get_cycle_forecast(moon["phase_name"])
     st.markdown(f"""
     <div class="pulse-card">
@@ -758,7 +689,6 @@ def render_home():
         <p style="color: #e8e6f0; line-height: 1.6; margin: 0;">{forecast}</p>
     </div>
     """, unsafe_allow_html=True)
-
     prompt = get_daily_prompt(moon["phase_name"])
     st.markdown(f"""
     <div class="cosmic-card">
@@ -769,11 +699,9 @@ def render_home():
 
 def render_community():
     moon = get_moon_data()
-
     st.markdown("<div class='section-label'>LunaTick Talk</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>The Cosmic Timeline</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Share your reflections. Read what others are feeling. You are not alone under the moon.</div>", unsafe_allow_html=True)
-
     st.markdown(f"""
     <div class="pulse-card">
         <div style="display: flex; align-items: center; margin-bottom: 12px;">
@@ -786,9 +714,7 @@ def render_community():
         </p>
     </div>
     """, unsafe_allow_html=True)
-
     sub = st.tabs(["💬 Timeline", "🌐 Boards", "🃏 Cards", "👥 Kindred"])
-
     with sub[0]:
         render_timeline()
     with sub[1]:
@@ -822,13 +748,10 @@ def render_timeline():
                 st.session_state.posts.insert(0, new_post)
                 st.success("✨ Cast into the void.")
                 st.rerun()
-
     filter_phase = st.selectbox("Filter by Phase", ["All Phases"] + PHASE_NAMES, key="filter_phase")
-
     posts = st.session_state.posts
     if filter_phase != "All Phases":
         posts = [p for p in posts if p.phase_tag == filter_phase]
-
     for post in posts:
         st.markdown(f"""
         <div class="post-card">
@@ -846,7 +769,6 @@ def render_timeline():
             </div>
         </div>
         """, unsafe_allow_html=True)
-
         c1, c2, c3 = st.columns([1,1,6])
         with c1:
             if st.button(f"❤️ {post.likes}", key=f"like_{post.id}"):
@@ -865,7 +787,6 @@ def render_boards():
     st.markdown("<div class='section-label'>Message Boards</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>Categorized Constellations</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Pick a constellation. Drop your transmission.</div>", unsafe_allow_html=True)
-
     for board in BOARDS:
         st.markdown(f"""
         <div class="board-card">
@@ -880,13 +801,11 @@ def render_cards():
     st.markdown("<div class='section-label'>Cosmic Collection</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>Birth Chart Cards</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Request, exchange, and collect. Each card is a soul's cosmic signature.</div>", unsafe_allow_html=True)
-
     demo_cards = [
         CosmicCard("@TEST_7dc90ead","TEST_7dc90ead","Capricorn","Virgo","Waning Gibbous",365,False),
         CosmicCard("@luna_admin","luna_admin","Capricorn","Virgo","Waning Gibbous",450,True),
         CosmicCard("@Stardust_9e2b","Stardust_9e2b","Aquarius","Pisces","New Moon",289,False),
     ]
-
     cols = st.columns(3)
     for i, card in enumerate(demo_cards):
         with cols[i]:
@@ -909,7 +828,6 @@ def render_cards():
                 <div style="font-size: 0.7rem; color: #4b5563;">{card.full_moons} Full Moons</div>
             </div>
             """, unsafe_allow_html=True)
-
             if card.collected:
                 st.button("✨ In Collection", disabled=True, key=f"col_{i}")
             else:
@@ -922,7 +840,6 @@ def render_kindred():
     st.markdown("<div class='section-label'>Cosmic Kindred</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>Your Connections</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Souls who have exchanged cards with you.</div>", unsafe_allow_html=True)
-
     if not st.session_state.friends:
         st.markdown("""
         <div style="text-align: center; padding: 60px 20px; color: #4b5563;">
@@ -947,11 +864,9 @@ def render_kindred():
 
 def render_journal():
     moon = get_moon_data()
-
     st.markdown("<div class='section-label'>Luna Journal</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>Three Prompts. One Moon. Your Voice.</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Choose your prompt mode:</div>", unsafe_allow_html=True)
-
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🌙 Phase Reflection", use_container_width=True):
@@ -962,9 +877,7 @@ def render_journal():
     with col3:
         if st.button("📖 Free Write", use_container_width=True):
             st.session_state.journal_prompt = "free"
-
     prompt_type = st.session_state.get("journal_prompt", "phase")
-
     if prompt_type == "phase":
         prompt_text = f"Consider the current phase — {moon['phase_name']}. Are you planting, building, refining, releasing, or resting?"
         st.markdown(f"""
@@ -991,10 +904,8 @@ def render_journal():
             <p style="color: #9ca3af; font-style: italic; margin: 0;">No prompt. Just you, the page, and the moon.</p>
         </div>
         """, unsafe_allow_html=True)
-
     st.markdown("<div style='margin-top: 16px; color: #6b7280; font-size: 0.85rem;'>Your reflection:</div>", unsafe_allow_html=True)
     entry = st.text_area("", placeholder="How is this moon phase showing up in your life right now?", key="journal_entry", label_visibility="collapsed")
-
     if st.button("🌙 Seal Entry to the Moon", use_container_width=True):
         if entry.strip():
             new_entry = JournalEntry(
@@ -1008,7 +919,6 @@ def render_journal():
             st.session_state.journal_entries.insert(0, new_entry)
             st.success("✨ Entry sealed.")
             st.rerun()
-
     if st.session_state.journal_entries:
         st.markdown("<hr>", unsafe_allow_html=True)
         st.markdown("<div class='section-label'>Entry History</div>", unsafe_allow_html=True)
@@ -1028,16 +938,12 @@ def render_settings():
     st.markdown("<div class='section-label'>Settings</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>Manage Your Orbit</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Your account, privacy, and subscription.</div>", unsafe_allow_html=True)
-
     profile = st.session_state.profile
-
     st.markdown("<div style='font-family: Space Grotesk; font-weight: 600; color: #f3f4f6; margin-bottom: 12px;'>Profile</div>", unsafe_allow_html=True)
-
     new_name = st.text_input("Display Name", value=profile.display_name if profile else "", key="set_name")
     new_dob = st.date_input("Birth Date", value=profile.birth_date if profile else datetime.date(1990,1,15), key="set_dob")
     new_tob = st.time_input("Birth Time", value=profile.birth_time if profile else None, key="set_tob")
     new_loc = st.text_input("Birth Location", value=profile.birth_location if profile else "", key="set_loc")
-
     if st.button("💾 Save Profile"):
         if profile:
             profile.display_name = new_name
@@ -1048,15 +954,11 @@ def render_settings():
             profile.moon_sign = get_moon_sign_from_dob(new_dob)
         st.success("✨ Profile updated.")
         st.rerun()
-
     st.markdown("<hr>", unsafe_allow_html=True)
-
     st.markdown("<div style='font-family: Space Grotesk; font-weight: 600; color: #f3f4f6; margin-bottom: 12px;'>🔒 Privacy & Consent</div>", unsafe_allow_html=True)
-
     opt_in = st.toggle("Opt in to anonymous community sharing", value=profile.privacy_opt_in if profile else False, key="set_privacy")
     if profile:
         profile.privacy_opt_in = opt_in
-
     st.markdown("""
     <p style="color: #6b7280; font-size: 0.8rem;">
         When opted in, your birth chart data is anonymized and aggregated 
@@ -1064,17 +966,13 @@ def render_settings():
         Your identity is never shared.
     </p>
     """, unsafe_allow_html=True)
-
     st.markdown("<hr>", unsafe_allow_html=True)
-
     st.markdown("<div style='font-family: Space Grotesk; font-weight: 600; color: #f3f4f6; margin-bottom: 12px;'>💎 Subscription</div>", unsafe_allow_html=True)
-
     tier = st.selectbox("Your Tier", ["Free", "Community", "Resonance"], 
                        index=["Free","Community","Resonance"].index(profile.subscription_tier) if profile else 0,
                        key="set_tier")
     if profile:
         profile.subscription_tier = tier
-
     st.markdown("""
     <div style="background: rgba(255,255,255,0.02); border-radius: 12px; padding: 16px; margin-top: 12px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
@@ -1091,9 +989,7 @@ def render_settings():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     st.markdown("<hr>", unsafe_allow_html=True)
-
     if st.button("🔄 Reset App (Clear All Data)", use_container_width=True):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -1155,7 +1051,7 @@ def render_bottom_nav():
         nav_html += f'''
         <button class="{active_class}" onclick="
             var key = 'nav_{view}';
-            var btn = document.querySelector('[data-testid="button"][data-key="'+key+'"]');
+            var btn = document.querySelector('[data-testid="button"][data-key="' + key + '"]');
             if (btn) btn.click();
         ">
             <div style="font-size:1.4rem; line-height:1.2;">{icon}</div>
