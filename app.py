@@ -613,3 +613,4 @@ st.markdown(
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
     unsafe_allow_html=True
+)
