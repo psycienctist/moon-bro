@@ -5,14 +5,16 @@ import requests
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
-# Import our new modules
+# Import modules
 # ---------------------------------------------------------------------------
 import journal as journal_ui
 import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
 import daily_reflection as reflection_ui
+import cosmic_cards
+import boards
+import chat_room
 
-import streamlit as st
 
 def init_session_state():
     """
@@ -20,28 +22,15 @@ def init_session_state():
     Safe to call on every script run — only sets values if the key is missing.
     """
     defaults = {
-        # ─── Core / Auth ─────────────────────────────────
         "user_hash": "anonymous",
         "is_authenticated": False,
         "current_phase": "Waxing Gibbous",
-
-        # ─── Navigation ──────────────────────────────────
         "current_tab": "Journal",
-
-        # ─── Journal Tab (widget keys) ───────────────────
         "journal_prompt_mode": "🌙 Phase Reflection",
         "journal_phase_input": "",
         "journal_chart_input": "",
         "journal_free_input": "",
-
-        # ─── Settings Tab (add your actual keys below) ───
-        # "settings_username": "",
-        # "settings_email": "",
-        # "settings_notifications": True,
-
-        # ─── Calendar Tab (add your actual keys below) ────
-        # "calendar_selected_date": None,
-        # "calendar_view": "month",
+        "display_name": "Moon Wanderer",
     }
 
     for key, value in defaults.items():
@@ -49,10 +38,7 @@ def init_session_state():
             st.session_state[key] = value
 
 
-# ─── Run before any UI renders ───────────────────────────
 init_session_state()
-
-# ... rest of your app.py (tabs, auth, etc.) ...
 
 # ---------------------------------------------------------------------------
 # Page config & Lunatick Theme
@@ -119,7 +105,7 @@ LUNATICK_CSS = """
         background: #0d1117;
         border-color: #30363d;
     }
-    
+
     .stat-val {
         font-size: 1.2rem;
         font-weight: 700;
@@ -197,20 +183,23 @@ ZODIAC_SIGNS = [
     ("Pisces", "♓", "Dreamy, intuitive mood. Meditate and create art."),
 ]
 
+
 def get_zodiac_sign(lon_deg):
     idx = int(lon_deg / 30) % 12
     return ZODIAC_SIGNS[idx]
 
-def get_moon_phase_name(phase_frac: float) -> tuple[str, str]:
+
+def get_moon_phase_name(phase_frac: float):
     phases = [
         (0.00, "New Moon", "🌑"), (0.07, "Waxing Crescent", "🌒"), (0.25, "First Quarter", "🌓"),
         (0.43, "Waxing Gibbous", "🌔"), (0.50, "Full Moon", "🌕"), (0.57, "Waning Gibbous", "🌖"),
         (0.75, "Last Quarter", "🌗"), (0.93, "Waning Crescent", "🌘"), (1.00, "New Moon", "🌑"),
     ]
     for i in range(len(phases) - 1):
-        if phases[i][0] <= phase_frac < phases[i+1][0]:
+        if phases[i][0] <= phase_frac < phases[i + 1][0]:
             return phases[i][1], phases[i][2]
     return "New Moon", "🌑"
+
 
 def get_celestial_data(date_utc: datetime):
     obs = ephem.Observer()
@@ -236,15 +225,16 @@ def get_celestial_data(date_utc: datetime):
         "moon_sign": moon_sign, "moon_symbol": moon_symbol, "moon_vibe": moon_vibe, "moon_lon": moon_lon,
         "sun_sign": sun_sign, "sun_symbol": sun_symbol,
         "phase_frac": phase_frac, "phase_name": phase_name, "phase_emoji": phase_emoji, "illum": illum,
-        "next_full_dt": nfm_dt, "age_days": phase_frac * 29.53
+        "next_full_dt": nfm_dt, "age_days": phase_frac * 29.53,
     }
+
 
 @st.cache_data(ttl=3600)
 def get_ai_insight(natal, current, aspect):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key:
         return None
-    
+
     prompt = f"""
     As a cosmic guide, provide a short, poetic, and encouraging astrology insight (max 3 sentences).
     User Natal: Sun in {natal['sun_sign']}, Moon in {natal['moon_sign']}.
@@ -252,7 +242,7 @@ def get_ai_insight(natal, current, aspect):
     Natal-Current Aspect: {aspect}.
     Tone: Mystical, empowering, and modern.
     """
-    
+
     try:
         response = requests.post(
             "https://api.deepseek.com/chat/completions",
@@ -261,15 +251,16 @@ def get_ai_insight(natal, current, aspect):
                 "model": "deepseek-chat",
                 "messages": [
                     {"role": "system", "content": "You are a mystical cosmic guide for the Lunatick app."},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
-                "stream": False
+                "stream": False,
             },
-            timeout=10
+            timeout=10,
         )
-        return response.json()['choices'][0]['message']['content']
+        return response.json()["choices"][0]["message"]["content"]
     except Exception:
         return None
+
 
 # ---------------------------------------------------------------------------
 # Render Home Tab
@@ -284,22 +275,33 @@ def render_home():
     if "dob" in query_params:
         try:
             initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
-        except:
+        except Exception:
             pass
 
-    if 'birth_date' not in st.session_state:
+    if "birth_date" not in st.session_state:
         st.session_state.birth_date = initial_date
 
     with st.sidebar:
         st.markdown("### 🧬 Personal Cosmic Profile")
-        birth_date_input = st.date_input("When were you born?", value=st.session_state.birth_date, min_value=datetime(1920, 1, 1), max_value=now_utc)
+        birth_date_input = st.date_input(
+            "When were you born?",
+            value=st.session_state.birth_date,
+            min_value=datetime(1920, 1, 1),
+            max_value=now_utc,
+        )
         if birth_date_input != st.session_state.birth_date:
             st.session_state.birth_date = birth_date_input
             st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
+            # Keep cosmic_cards profile in sync
+            bd_str = birth_date_input.isoformat() if hasattr(birth_date_input, "isoformat") else str(birth_date_input)
+            cosmic_cards.save_profile(
+                st.session_state.get("user_hash", "anonymous"),
+                st.session_state.get("display_name", "Moon Wanderer"),
+                bd_str[:10],
+            )
             st.rerun()
         st.success("🔒 Private: Insights are only visible to you.")
 
-    # Countdown
     delta = current["next_full_dt"] - now_utc
     d, rem = divmod(int(delta.total_seconds()), 86400)
     h, m_total = divmod(rem, 3600)
@@ -318,17 +320,29 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-    # Personal Insights
-    birth_utc = datetime.combine(st.session_state.birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+    birth_raw = st.session_state.birth_date
+    if hasattr(birth_raw, "date") and not isinstance(birth_raw, datetime):
+        birth_day = birth_raw
+    elif isinstance(birth_raw, datetime):
+        birth_day = birth_raw.date()
+    else:
+        birth_day = birth_raw
+
+    birth_utc = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
     natal = get_celestial_data(birth_utc)
     total_moons = (now_utc - birth_utc).days / 29.53
     diff = (current["moon_lon"] - natal["moon_lon"]) % 360
 
-    if diff < 10 or diff > 350: aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
-    elif 170 < diff < 190: aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
-    elif 80 < diff < 100 or 260 < diff < 280: aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
-    elif 110 < diff < 130 or 230 < diff < 250: aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
-    else: aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
+    if diff < 10 or diff > 350:
+        aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
+    elif 170 < diff < 190:
+        aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
+    elif 80 < diff < 100 or 260 < diff < 280:
+        aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
+    elif 110 < diff < 130 or 230 < diff < 250:
+        aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
+    else:
+        aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
 
     insight = get_ai_insight(natal, current, aspect)
 
@@ -356,7 +370,6 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-    # Stats
     st.markdown(f"""
     <div class="stats-row">
         <div class="stat-card">
@@ -377,7 +390,6 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-    # Moon Vibes & Events
     vcol, ecol = st.columns([1, 1])
     with vcol:
         st.markdown(f"""
@@ -406,10 +418,10 @@ def render_home():
             </div>
             ''', unsafe_allow_html=True)
 
-    # Daily Reflection (Ask AI Anything)
     st.markdown("---")
     st.markdown("### 🧠 Daily Reflection")
     reflection_ui.render_daily_reflection()
+
 
 # ---------------------------------------------------------------------------
 # Render Calendar Tab
@@ -425,11 +437,10 @@ def render_calendar():
     </div>
     """, unsafe_allow_html=True)
 
-    # Month navigation
     now = datetime.now()
-    if 'calendar_month' not in st.session_state:
+    if "calendar_month" not in st.session_state:
         st.session_state.calendar_month = now.month
-    if 'calendar_year' not in st.session_state:
+    if "calendar_year" not in st.session_state:
         st.session_state.calendar_year = now.year
 
     nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
@@ -442,7 +453,10 @@ def render_calendar():
                 st.session_state.calendar_month -= 1
             st.rerun()
     with nav_col2:
-        st.markdown(f"<h3 style='text-align:center; color:#fff;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>", unsafe_allow_html=True)
+        st.markdown(
+            f"<h3 style='text-align:center; color:#fff;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>",
+            unsafe_allow_html=True,
+        )
     with nav_col3:
         if st.button("Next ▶", use_container_width=True):
             if st.session_state.calendar_month == 12:
@@ -452,14 +466,17 @@ def render_calendar():
                 st.session_state.calendar_month += 1
             st.rerun()
 
-    # Calendar grid
     import calendar as cal
+
     month_cal = cal.monthcalendar(st.session_state.calendar_year, st.session_state.calendar_month)
     weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     header_cols = st.columns(7)
     for i, day in enumerate(weekdays):
         with header_cols[i]:
-            st.markdown(f"<div style='text-align:center; color:#8b949e; font-size:0.7rem; font-weight:700;'>{day}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align:center; color:#8b949e; font-size:0.7rem; font-weight:700;'>{day}</div>",
+                unsafe_allow_html=True,
+            )
 
     today = datetime.now()
     for week in month_cal:
@@ -471,8 +488,11 @@ def render_calendar():
                 else:
                     date_obj = datetime(st.session_state.calendar_year, st.session_state.calendar_month, day)
                     day_data = get_celestial_data(date_obj.replace(tzinfo=timezone.utc))
-                    is_today = (day == today.day and st.session_state.calendar_month == today.month and st.session_state.calendar_year == today.year)
-                    today_class = "calendar-today" if is_today else ""
+                    is_today = (
+                        day == today.day
+                        and st.session_state.calendar_month == today.month
+                        and st.session_state.calendar_year == today.year
+                    )
                     st.markdown(f"""
                     <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.5rem; text-align:center; min-height:80px; {'' if not is_today else 'border:2px solid #6e40c9; background:rgba(110,64,201,0.1);'}">
                         <div style="font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">{day}</div>
@@ -480,6 +500,7 @@ def render_calendar():
                         <div style="font-size:0.6rem; color:#8b949e;">{day_data['illum']*100:.0f}%</div>
                     </div>
                     """, unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------------
 # Render Settings Tab
@@ -495,20 +516,20 @@ def render_settings():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Display Name ---
     current_name = st.session_state.get("display_name", "Moon Wanderer")
     display_name = st.text_input("Display Name", value=current_name)
-    
-    # --- Birth Date ---
+
     current_birth_date = st.session_state.get("birth_date", datetime(1990, 1, 1).date())
+    if isinstance(current_birth_date, datetime):
+        current_birth_date = current_birth_date.date()
+
     birth_date = st.date_input(
         "Your Birth Date",
         value=current_birth_date,
         min_value=datetime(1920, 1, 1).date(),
-        max_value=datetime.now().date()
+        max_value=datetime.now().date(),
     )
-    
-    # --- Save Button ---
+
     if st.button("💾 Save Profile", type="primary"):
         if display_name.strip():
             st.session_state.display_name = display_name.strip()
@@ -516,7 +537,13 @@ def render_settings():
             talk_db.set_user_profile(
                 st.session_state.user_hash,
                 display_name.strip(),
-                birth_date.isoformat()
+                birth_date.isoformat(),
+            )
+            # Sync to cosmic cards store so trading works
+            cosmic_cards.save_profile(
+                st.session_state.user_hash,
+                display_name.strip(),
+                birth_date.isoformat(),
             )
             st.success("✅ Profile saved permanently!")
             st.rerun()
@@ -524,8 +551,6 @@ def render_settings():
             st.warning("Please enter a display name.")
 
     st.markdown("---")
-    
-    # --- Privacy & Consent ---
     st.markdown("### 🔒 Privacy & Consent")
     if st.button("Opt in to community sharing"):
         st.success("You have opted in to community sharing.")
@@ -533,15 +558,11 @@ def render_settings():
         st.success("You have opted out of community sharing.")
 
     st.markdown("---")
-    
-    # --- Subscription ---
     st.markdown("### 💎 Subscription")
     tier = st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
     st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
 
     st.markdown("---")
-    
-    # --- Danger Zone ---
     st.markdown("### 🗑️ Danger Zone")
     if st.button("Clear all journal entries", type="secondary"):
         if "journal_entries" in st.session_state:
@@ -551,55 +572,78 @@ def render_settings():
         st.session_state.clear()
         st.success("Preferences reset. Please refresh the page.")
 
+
 # ---------------------------------------------------------------------------
 # Load User Profile from Database
 # ---------------------------------------------------------------------------
 
-# Initialize database for journal and talk modules
 journal_ui.init_db()
 talk_db.init_db()
 talk_db.seed_talk_posts()
+cosmic_cards.init_cards_db()
+boards.init_boards_db()
+chat_room.init_chat_db()
 
-# Set up user hash for privacy
-if "user_hash" not in st.session_state:
+if "user_hash" not in st.session_state or st.session_state.user_hash == "anonymous":
     import hashlib
-    from datetime import datetime
+
     st.session_state.user_hash = hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
 
-# Load user profile from database if it exists
 if "user_hash" in st.session_state:
     profile = talk_db.get_user_profile(st.session_state.user_hash)
     if profile:
         st.session_state.display_name = profile["display_name"]
-        if profile["birth_date"]:
+        if profile.get("birth_date"):
             st.session_state.birth_date = datetime.strptime(profile["birth_date"], "%Y-%m-%d").date()
+            cosmic_cards.save_profile(
+                st.session_state.user_hash,
+                profile["display_name"],
+                profile["birth_date"],
+            )
     else:
         if "display_name" not in st.session_state:
             st.session_state.display_name = "Moon Wanderer"
 
-# Set a default phase for the demo (will be overwritten by real data)
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
 # ---------------------------------------------------------------------------
-# Main App — Bottom Navigation Tabs
+# Main App — Tabs
 # ---------------------------------------------------------------------------
 
-tabs = st.tabs(["🌕 Home", "💬 LunaTick Talk", "📓 Journal", "📅 Calendar", "⚙️ Settings"])
+tabs = st.tabs([
+    "🌕 Home",
+    "💬 Chat",
+    "📋 Boards",
+    "🃏 Cosmic Cards",
+    "💬 LunaTick Talk",
+    "📓 Journal",
+    "📅 Calendar",
+    "⚙️ Settings",
+])
 
 with tabs[0]:
     render_home()
 
 with tabs[1]:
-    talk_ui.render_talk_tab()
+    chat_room.render_chat_tab()
 
 with tabs[2]:
-    journal_ui.render_journal_tab()
+    boards.render_boards_tab()
 
 with tabs[3]:
-    render_calendar()
+    cosmic_cards.render_cosmic_cards_tab()
 
 with tabs[4]:
+    talk_ui.render_talk_tab()
+
+with tabs[5]:
+    journal_ui.render_journal_tab()
+
+with tabs[6]:
+    render_calendar()
+
+with tabs[7]:
     render_settings()
 
 # ---------------------------------------------------------------------------
@@ -612,5 +656,5 @@ st.markdown(
     "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
