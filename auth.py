@@ -1,5 +1,6 @@
 # auth.py
-# Persistent username + password login with long-lived signed session cookies
+# Persistent login — signed token in URL query param + cookie (10-year lifespan)
+# Query params are the reliable path on Streamlit Community Cloud (cookies often blocked).
 
 import streamlit as st
 import sqlite3
@@ -8,6 +9,7 @@ import hmac
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote, unquote
 
 try:
     import extra_streamlit_components as stx
@@ -15,13 +17,19 @@ try:
 except ImportError:
     HAS_COOKIES = False
 
+try:
+    import streamlit.components.v1 as components
+    HAS_COMPONENTS = True
+except ImportError:
+    HAS_COMPONENTS = False
+
 DB = "lunatick.db"
 COOKIE_NAME = "lunatick_session"
-# Browsers do not support true "forever" cookies; 10 years is effectively indefinite.
+QUERY_KEY = "sid"
+# Browsers do not support true forever cookies; 10 years ≈ indefinite.
 SESSION_DAYS = 3650
+SESSION_MAX_AGE = SESSION_DAYS * 86400
 
-# CookieManager must be constructed exactly once per Streamlit script run.
-# Creating it twice with the same key raises StreamlitDuplicateElementKey.
 _cm_instance = None
 _cm_run_id = None
 
@@ -83,19 +91,18 @@ def _current_run_id():
 
 
 def _get_cookie_manager():
-    """Return the single CookieManager for this script run."""
     global _cm_instance, _cm_run_id
     if not HAS_COOKIES:
         return None
     rid = _current_run_id()
     if _cm_instance is None or _cm_run_id != rid:
-        _cm_instance = stx.CookieManager(key="lunatick_cookies_v2")
+        _cm_instance = stx.CookieManager(key="lunatick_cookies_v3")
         _cm_run_id = rid
     return _cm_instance
 
 
 def _make_signed_token(username: str) -> str:
-    exp = int(time.time()) + SESSION_DAYS * 86400
+    exp = int(time.time()) + SESSION_MAX_AGE
     payload = f"{username.strip().lower()}:{exp}"
     sig = hmac.new(
         _session_secret().encode("utf-8"),
@@ -109,7 +116,8 @@ def _parse_signed_token(token: str | None) -> str | None:
     if not token or not isinstance(token, str):
         return None
     try:
-        parts = token.strip().split(":")
+        token = unquote(token.strip())
+        parts = token.split(":")
         if len(parts) != 3:
             return None
         username, exp_s, sig = parts
@@ -187,18 +195,91 @@ def user_from_session_token(token: str | None) -> dict | None:
     return _user_row(username)
 
 
-def set_session_cookie(token: str):
-    cm = _get_cookie_manager()
-    if cm is None:
-        return
-    expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
+def _set_query_token(token: str):
     try:
-        cm.set(COOKIE_NAME, token, expires_at=expires)
+        st.query_params[QUERY_KEY] = token
+    except Exception:
+        try:
+            st.experimental_set_query_params(**{QUERY_KEY: token})
+        except Exception:
+            pass
+
+
+def _clear_query_token():
+    try:
+        if QUERY_KEY in st.query_params:
+            del st.query_params[QUERY_KEY]
+    except Exception:
+        try:
+            st.query_params.clear()
+        except Exception:
+            pass
+
+
+def _read_query_token() -> str | None:
+    try:
+        val = st.query_params.get(QUERY_KEY)
+        if val:
+            if isinstance(val, list):
+                val = val[0] if val else None
+            return str(val).strip() if val else None
+    except Exception:
+        pass
+    return None
+
+
+def _set_local_storage(token: str):
+    """Best-effort browser localStorage write (helps some reopen cases)."""
+    if not HAS_COMPONENTS:
+        return
+    try:
+        safe = quote(token, safe="")
+        components.html(
+            f"""<script>
+            try {{
+              localStorage.setItem("{COOKIE_NAME}", decodeURIComponent("{safe}"));
+            }} catch (e) {{}}
+            </script>""",
+            height=0,
+            width=0,
+        )
     except Exception:
         pass
 
 
+def _clear_local_storage():
+    if not HAS_COMPONENTS:
+        return
+    try:
+        components.html(
+            f"""<script>
+            try {{ localStorage.removeItem("{COOKIE_NAME}"); }} catch (e) {{}}
+            </script>""",
+            height=0,
+            width=0,
+        )
+    except Exception:
+        pass
+
+
+def set_session_cookie(token: str):
+    """Write session to query param, cookie, and localStorage."""
+    _set_query_token(token)
+
+    cm = _get_cookie_manager()
+    if cm is not None:
+        expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
+        try:
+            cm.set(COOKIE_NAME, token, expires_at=expires)
+        except Exception:
+            pass
+
+    _set_local_storage(token)
+
+
 def clear_session_cookie():
+    _clear_query_token()
+    _clear_local_storage()
     cm = _get_cookie_manager()
     if cm is None:
         return
@@ -216,18 +297,29 @@ def clear_session_cookie():
 
 
 def _read_cookie_token() -> str | None:
+    # 1) URL query param — reliable on Streamlit Cloud across refresh
+    token = _read_query_token()
+    if token:
+        return token
+
+    # 2) Native request cookies (works locally; often empty on Cloud)
+    try:
+        token = st.context.cookies.get(COOKIE_NAME)
+        if token:
+            return str(token).strip()
+    except Exception:
+        pass
+
+    # 3) CookieManager component
     cm = _get_cookie_manager()
     if cm is None:
         return None
-
     try:
         cookies = cm.get_all()
     except Exception:
         cookies = None
-
     if cookies is None:
         return None
-
     token = None
     if isinstance(cookies, dict):
         token = cookies.get(COOKIE_NAME)
@@ -245,25 +337,20 @@ def try_restore_from_cookie() -> bool:
     if st.session_state.get("is_authenticated"):
         return True
 
-    if st.session_state.get("_cookie_restore_attempted"):
-        return False
-
     token = _read_cookie_token()
-    if token is None:
-        return False
-
-    st.session_state._cookie_restore_attempted = True
-
     if not token:
         return False
 
     user = user_from_session_token(token)
     if not user:
+        # Token invalid or account missing from DB — clear stale handles
         clear_session_cookie()
         return False
 
     apply_user_to_session(user)
     st.session_state._session_token = token
+    # Keep URL + storage in sync so the next open still has the token
+    set_session_cookie(token)
     return True
 
 
@@ -344,7 +431,6 @@ def complete_login(user: dict):
     apply_user_to_session(user)
     token = create_session_token(user["username"])
     st.session_state._session_token = token
-    st.session_state._cookie_restore_attempted = True
     set_session_cookie(token)
 
 
@@ -374,9 +460,7 @@ def update_user_profile(username: str, display_name: str, birth_date: str | None
 
 
 def logout():
-    token = st.session_state.get("_session_token")
-    if not token and HAS_COOKIES:
-        token = _read_cookie_token()
+    token = st.session_state.get("_session_token") or _read_cookie_token()
     revoke_session_token(token)
     clear_session_cookie()
     for key in [
@@ -408,18 +492,21 @@ def render_login_page():
     """Full-page login / register gate. Returns True if user is logged in."""
     init_auth_db()
 
-    # Mount cookie manager once for this run (singleton)
+    # Mount cookie manager once per run (for environments where cookies work)
     _get_cookie_manager()
 
     if st.session_state.get("is_authenticated"):
+        # Keep query param alive so refresh / reopen-with-history still works
+        tok = st.session_state.get("_session_token")
+        if tok:
+            _set_query_token(tok)
         return True
 
-    # One soft boot cycle so CookieManager can hydrate from the browser
+    # Soft boot: CookieManager often needs one empty cycle to hydrate
     if "_cookie_boot" not in st.session_state:
         st.session_state._cookie_boot = True
         if try_restore_from_cookie():
             st.rerun()
-        # Cookies often empty on first paint — one more pass after hydration
         st.rerun()
 
     if try_restore_from_cookie():
@@ -437,12 +524,6 @@ def render_login_page():
         """,
         unsafe_allow_html=True,
     )
-
-    if not HAS_COOKIES:
-        st.warning(
-            "Install `extra-streamlit-components` for stay-logged-in cookies: "
-            "`pip install extra-streamlit-components`"
-        )
 
     tab_login, tab_register = st.tabs(["Log in", "Create account"])
 
@@ -489,7 +570,7 @@ def render_login_page():
                         st.error(msg)
 
     st.caption(
-        "Passwords are hashed. Session lasts until you log out "
-        "(or clear site data in your browser)."
+        "Passwords are hashed. After login, bookmark the page URL (it includes your session) "
+        "for the most reliable stay-signed-in on Streamlit Cloud."
     )
     return False
