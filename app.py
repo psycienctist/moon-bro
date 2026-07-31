@@ -290,29 +290,18 @@ def render_home():
         st.session_state.birth_date = datetime(1990, 1, 1).date()
 
     with st.sidebar:
-        st.markdown("### 🧬 Personal Cosmic Profile")
-        birth_date_input = st.date_input(
-            "When were you born?",
-            value=st.session_state.birth_date,
-            min_value=datetime(1920, 1, 1),
-            max_value=now_utc,
-        )
-        if birth_date_input != st.session_state.birth_date:
-            st.session_state.birth_date = birth_date_input
-            bd_str = birth_date_input.isoformat() if hasattr(birth_date_input, "isoformat") else str(birth_date_input)
-            bd_str = bd_str[:10]
-            cosmic_cards.save_profile(
-                st.session_state.get("user_hash", "anonymous"),
-                st.session_state.get("display_name", "Moon Wanderer"),
-                bd_str,
+        st.markdown("### 🧬 Birth chart")
+        st.caption("Edit full date · time · place in **Cosmic Cards** or **Settings**.")
+        card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
+        if card and card["natal"].get("has_rising"):
+            n = card["natal"]
+            st.markdown(
+                f"{n['sun_symbol']} **{n['sun_sign']}** · "
+                f"{n['moon_symbol']} **{n['moon_sign']}** · "
+                f"↑ {n['rising_symbol']} **{n['rising_sign']}**"
             )
-            if st.session_state.get("username"):
-                auth.update_user_profile(
-                    st.session_state.username,
-                    st.session_state.get("display_name", "Moon Wanderer"),
-                    bd_str,
-                )
-            st.rerun()
+            if card.get("birth_place"):
+                st.caption(card["birth_place"])
         st.success("🔒 Private: Insights are only visible to you.")
 
     delta = current["next_full_dt"] - now_utc
@@ -333,16 +322,42 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-    birth_raw = st.session_state.birth_date
-    if hasattr(birth_raw, "date") and not isinstance(birth_raw, datetime):
-        birth_day = birth_raw
-    elif isinstance(birth_raw, datetime):
-        birth_day = birth_raw.date()
+    # Prefer full natal card when available
+    full_card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
+    if full_card:
+        natal_data = full_card["natal"]
+        birth_utc = cosmic_cards._local_to_utc(
+            full_card["birth_date"],
+            full_card.get("birth_time"),
+            cosmic_cards.get_or_create_profile(st.session_state.user_hash).get("birth_utc_offset"),
+        )
+        natal = {
+            "sun_sign": natal_data["sun_sign"],
+            "sun_symbol": natal_data["sun_symbol"],
+            "moon_sign": natal_data["moon_sign"],
+            "moon_symbol": natal_data["moon_symbol"],
+            "phase_name": natal_data["phase_name"],
+            "phase_emoji": natal_data["phase_emoji"],
+            "moon_lon": natal_data["moon_lon"],
+        }
+        rising_html = ""
+        if natal_data.get("has_rising"):
+            rising_html = f"""
+            <div><div style="color:#8b949e; font-size:0.5rem;">RISING</div>
+            <div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal_data['rising_symbol']} {natal_data['rising_sign']}</div></div>
+            """
     else:
-        birth_day = birth_raw
+        birth_raw = st.session_state.birth_date
+        if hasattr(birth_raw, "date") and not isinstance(birth_raw, datetime):
+            birth_day = birth_raw
+        elif isinstance(birth_raw, datetime):
+            birth_day = birth_raw.date()
+        else:
+            birth_day = birth_raw
+        birth_utc = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+        natal = get_celestial_data(birth_utc)
+        rising_html = ""
 
-    birth_utc = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
-    natal = get_celestial_data(birth_utc)
     total_moons = (now_utc - birth_utc).days / 29.53
     diff = (current["moon_lon"] - natal["moon_lon"]) % 360
 
@@ -364,9 +379,10 @@ def render_home():
         <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
             YOUR COSMIC CHART
         </div>
-        <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
+        <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem; flex-wrap:wrap;">
             <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
             <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
+            {rising_html}
             <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
             <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
         </div>
@@ -517,50 +533,21 @@ def render_settings():
         ⚙️ Settings
     </div>
     <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Manage your account, privacy, and subscription.
+        Account + full birth chart (date, time, place).
     </div>
     """, unsafe_allow_html=True)
 
     st.info(f"Logged in as **@{st.session_state.get('username', '?')}**")
 
-    current_name = st.session_state.get("display_name", "Moon Wanderer")
-    display_name = st.text_input("Display Name", value=current_name)
-
-    current_birth_date = st.session_state.get("birth_date", datetime(1990, 1, 1).date())
-    if isinstance(current_birth_date, datetime):
-        current_birth_date = current_birth_date.date()
-
-    birth_date = st.date_input(
-        "Your Birth Date",
-        value=current_birth_date,
-        min_value=datetime(1920, 1, 1).date(),
-        max_value=datetime.now().date(),
+    st.markdown("### 🧬 Birth chart data")
+    cosmic_cards.render_profile_form(
+        st.session_state.get("user_hash", "anonymous"),
+        key_prefix="settings",
     )
 
-    if st.button("💾 Save Profile", type="primary"):
-        if display_name.strip():
-            st.session_state.display_name = display_name.strip()
-            st.session_state.birth_date = birth_date
-            talk_db.set_user_profile(
-                st.session_state.user_hash,
-                display_name.strip(),
-                birth_date.isoformat(),
-            )
-            cosmic_cards.save_profile(
-                st.session_state.user_hash,
-                display_name.strip(),
-                birth_date.isoformat(),
-            )
-            if st.session_state.get("username"):
-                auth.update_user_profile(
-                    st.session_state.username,
-                    display_name.strip(),
-                    birth_date.isoformat(),
-                )
-            st.success("✅ Profile saved — it will load every time you log in.")
-            st.rerun()
-        else:
-            st.warning("Please enter a display name.")
+    card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
+    if card:
+        st.markdown(cosmic_cards._card_html(card, "PREVIEW"), unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### 🔒 Privacy & Consent")
@@ -589,7 +576,6 @@ def render_settings():
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
-# Soft seed for talk (safe if already done)
 try:
     talk_db.seed_talk_posts()
 except Exception:
