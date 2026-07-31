@@ -16,6 +16,35 @@ ZODIAC = [
     ("Sagittarius", "♐"), ("Capricorn", "♑"), ("Aquarius", "♒"), ("Pisces", "♓"),
 ]
 
+# Traditional / modern zodiac colors (readable on dark UI)
+ZODIAC_COLORS = {
+    "Aries": "#ff6b6b",
+    "Taurus": "#51cf66",
+    "Gemini": "#ffd43b",
+    "Cancer": "#ced4da",
+    "Leo": "#ff922b",
+    "Virgo": "#94d82d",
+    "Libra": "#f783ac",
+    "Scorpio": "#e03131",
+    "Sagittarius": "#9775fa",
+    "Capricorn": "#adb5bd",
+    "Aquarius": "#4dabf7",
+    "Pisces": "#66d9e8",
+}
+
+
+def sign_color(sign: str | None) -> str:
+    if not sign:
+        return "#ffffff"
+    return ZODIAC_COLORS.get(sign, "#ffffff")
+
+
+def colored_sign(symbol: str, name: str, extra: str = "") -> str:
+    """HTML snippet: colored glyph + name."""
+    c = sign_color(name)
+    label = f"{symbol} {name}" if not extra else f"{symbol} {extra} {name}"
+    return f'<span style="color:{c};font-weight:700;">{label}</span>'
+
 
 def init_cards_db():
     conn = sqlite3.connect(DB)
@@ -28,7 +57,6 @@ def init_cards_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Optional columns for custom charts — safe no-ops if already present
     for col, typ in [
         ("birth_time", "TEXT"),
         ("birth_place", "TEXT"),
@@ -61,7 +89,6 @@ def _sign_from_lon(lon_deg: float):
 
 
 def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None) -> dict:
-    """Natal chart. Rising only when lat/lon provided."""
     obs = ephem.Observer()
     if lat is not None and lon is not None:
         obs.lat = str(lat)
@@ -99,7 +126,6 @@ def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None)
         "rising_sign": None,
         "rising_symbol": None,
     }
-    # Ascendant when location known
     if lat is not None and lon is not None:
         try:
             lst = float(obs.sidereal_time())
@@ -118,7 +144,6 @@ def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None)
 
 
 def _local_to_utc(birth_date: str, birth_time: str | None, utc_offset: float | None) -> datetime:
-    """Combine date + optional HH:MM and offset hours → timezone-aware UTC."""
     d = date.fromisoformat(birth_date[:10])
     if birth_time:
         try:
@@ -131,7 +156,6 @@ def _local_to_utc(birth_date: str, birth_time: str | None, utc_offset: float | N
         t = dtime(12, 0)
     local_naive = datetime.combine(d, t)
     offset = float(utc_offset) if utc_offset is not None else 0.0
-    # local = UTC + offset  →  UTC = local - offset
     utc_naive = local_naive - timedelta(hours=offset)
     return utc_naive.replace(tzinfo=timezone.utc)
 
@@ -178,11 +202,9 @@ def save_profile(
     lon: float | None = None,
     utc_offset: float | None = None,
 ):
-    """Backward-compatible: existing 3-arg callers still work."""
     init_cards_db()
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    # Read existing so partial updates (date-only from Home) don't wipe time/place
     c.execute(
         "SELECT birth_time, birth_place, lat, lon, utc_offset FROM user_profiles WHERE user_hash=?",
         (user_hash,),
@@ -346,7 +368,6 @@ def friends_of(user_hash: str) -> list:
 
 
 def render_profile_form(user_hash: str, key_prefix: str = "cards"):
-    """Full birth profile form (date + time + place). Used by Cosmic Cards & Settings."""
     init_cards_db()
     profile = get_or_create_profile(user_hash)
 
@@ -422,7 +443,6 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
 
     if st.button("💾 Save birth chart", type="primary", key=f"{key_prefix}_save"):
         bt_str = f"{bt.hour:02d}:{bt.minute:02d}"
-        # Only store lat/lon if user set a real place (not both zero with empty place)
         use_loc = place.strip() or (lat != 0.0 or lon != 0.0)
         save_profile(
             user_hash,
@@ -454,23 +474,28 @@ def render_cosmic_cards_tab():
     my_card = build_card(user_hash)
     if my_card:
         n = my_card["natal"]
+        sun_html = colored_sign(n["sun_symbol"], n["sun_sign"])
+        moon_html = colored_sign(n["moon_symbol"], n["moon_sign"])
         rising_html = ""
         if n.get("has_rising"):
-            rising_html = (
-                f" · {n['rising_symbol']} Rising {n['rising_sign']}"
-            )
+            rising_html = " · " + colored_sign(n["rising_symbol"], n["rising_sign"], extra="Rising")
         place_line = ""
         if my_card.get("birth_place"):
-            place_line = f"<div style='color:#8b949e;font-size:0.8rem;margin-top:0.2rem;'>📍 {my_card['birth_place']}</div>"
-        time_line = ""
-        if my_card.get("birth_time"):
-            time_line = f" · {my_card['birth_time']}"
+            place_line = (
+                f"<div style='color:#8b949e;font-size:0.8rem;margin-top:0.2rem;'>"
+                f"📍 {my_card['birth_place']}</div>"
+            )
+        time_line = f" · {my_card['birth_time']}" if my_card.get("birth_time") else ""
+        # Accent border tinted by sun sign
+        border_c = sign_color(n["sun_sign"])
         st.markdown(f"""
-        <div style="background:linear-gradient(135deg,#0d1f3c,#05070a);border:1px solid #1f6feb;
-                    border-radius:16px;padding:1.2rem;margin:1rem 0;">
+        <div style="background:linear-gradient(135deg,#0d1f3c,#05070a);
+                    border:1px solid {border_c};
+                    border-radius:16px;padding:1.2rem;margin:1rem 0;
+                    box-shadow:0 0 24px {border_c}33;">
           <div style="color:#58a6ff;font-size:0.75rem;letter-spacing:2px;">YOUR COSMIC CARD</div>
-          <div style="font-size:1.4rem;font-weight:700;color:#fff;margin:0.4rem 0;">
-            {n['sun_symbol']} {n['sun_sign']} · {n['moon_symbol']} {n['moon_sign']}{rising_html}
+          <div style="font-size:1.4rem;margin:0.4rem 0;">
+            {sun_html} · {moon_html}{rising_html}
           </div>
           <div style="color:#bc8cff;">{n['phase_emoji']} Born under {n['phase_name']}{time_line}</div>
           <div style="color:#8b949e;font-size:0.85rem;margin-top:0.4rem;">{my_card['display_name']}</div>
@@ -524,9 +549,13 @@ def render_cosmic_cards_tab():
         fc = build_card(fh)
         if fc:
             n = fc["natal"]
-            extra = ""
+            parts = [
+                colored_sign(n["sun_symbol"], n["sun_sign"]),
+                colored_sign(n["moon_symbol"], n["moon_sign"]),
+            ]
             if n.get("has_rising"):
-                extra = f" · {n['rising_symbol']} {n['rising_sign']}"
+                parts.append(colored_sign(n["rising_symbol"], n["rising_sign"]))
             st.markdown(
-                f"• **{fc['display_name']}** — {n['sun_symbol']} {n['sun_sign']} · {n['moon_symbol']} {n['moon_sign']}{extra}"
+                f"• **{fc['display_name']}** — " + " · ".join(parts),
+                unsafe_allow_html=True,
             )
