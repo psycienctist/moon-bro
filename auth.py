@@ -1,5 +1,5 @@
 # auth.py
-# Persistent username + password login with 30-day signed session cookies
+# Persistent username + password login with long-lived signed session cookies
 
 import streamlit as st
 import sqlite3
@@ -17,7 +17,8 @@ except ImportError:
 
 DB = "lunatick.db"
 COOKIE_NAME = "lunatick_session"
-SESSION_DAYS = 30
+# Browsers do not support true "forever" cookies; 10 years is effectively indefinite.
+SESSION_DAYS = 3650
 
 # CookieManager must be constructed exactly once per Streamlit script run.
 # Creating it twice with the same key raises StreamlitDuplicateElementKey.
@@ -431,7 +432,7 @@ def render_login_page():
         """
         <div style="text-align:center; margin: 2rem 0 1.5rem 0;">
           <div style="font-family:'Orbitron',sans-serif; font-size:2.4rem; color:#bc8cff; letter-spacing:4px;">🌙 LUNATICK</div>
-          <div style="color:#8b949e; font-size:0.9rem; margin-top:0.4rem;">Sign in once — stay logged in for 30 days.</div>
+          <div style="color:#8b949e; font-size:0.9rem; margin-top:0.4rem;">Sign in once — stay logged in until you log out.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -456,7 +457,7 @@ def render_login_page():
                     complete_login(result)
                     st.success(
                         f"Welcome back, {result['display_name']}! "
-                        f"Staying signed in for {SESSION_DAYS} days."
+                        "You'll stay signed in until you log out."
                     )
                     st.rerun()
                 else:
@@ -480,7 +481,7 @@ def render_login_page():
                         ok2, user = login_user(u, p)
                         if ok2:
                             complete_login(user)
-                            st.success("Account created — you're in for 30 days!")
+                            st.success("Account created — you're signed in until you log out.")
                             st.rerun()
                         else:
                             st.success("Account created. Please log in.")
@@ -488,7 +489,7 @@ def render_login_page():
                         st.error(msg)
 
     st.caption(
-        "Passwords are hashed. Signed session cookie lasts 30 days — "
-        "log out anytime to clear it."
+        "Passwords are hashed. Session lasts until you log out "
+        "(or clear site data in your browser)."
     )
     return False
