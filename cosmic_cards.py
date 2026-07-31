@@ -1,3 +1,12 @@
+Fixed cosmic_cards.py — HTML Now Renders Properly
+
+---
+
+ALLY,
+
+Here is the complete, fixed file. I made one change: replaced st.markdown with st.html inside render_collectible_card(). This ensures the card HTML is rendered correctly and the raw code issue is gone.
+
+```python
 # cosmic_cards.py
 # Collectible birth-chart cosmic cards + trade-as-friend-request
 # Rising, Dominant Planet, Rarity, Full Moons Lived, Birth Phase, zodiac colors, optional HD type
@@ -408,7 +417,8 @@ def render_collectible_card(card: dict):
           <div style="font-size:0.85rem;color:#484f58;">Add time & place</div>
         </div>"""
 
-    st.markdown(f"""
+    # FIXED: Use st.html instead of st.markdown to prevent raw HTML display
+    st.html(f"""
     <div style="
         background: linear-gradient(160deg, #0a0e17 0%, #12101f 40%, #0d1f3c 100%);
         border: 2px solid {sun_c};
@@ -477,7 +487,7 @@ def render_collectible_card(card: dict):
         LUNATICK COLLECTIBLE · TRADE TO CONNECT
       </div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def list_users_with_cards(exclude_hash: str) -> list:
