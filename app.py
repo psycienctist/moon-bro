@@ -14,13 +14,10 @@ import daily_reflection as reflection_ui
 import cosmic_cards
 import boards
 import chat_room
+import auth
 
 
 def init_session_state():
-    """
-    One-shot initialization for all session state keys used across Lunatick.
-    Safe to call on every script run — only sets values if the key is missing.
-    """
     defaults = {
         "user_hash": "anonymous",
         "is_authenticated": False,
@@ -32,7 +29,6 @@ def init_session_state():
         "journal_free_input": "",
         "display_name": "Moon Wanderer",
     }
-
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
@@ -165,6 +161,30 @@ LUNATICK_CSS = """
 st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
+# Init DBs early (needed for auth profiles)
+# ---------------------------------------------------------------------------
+journal_ui.init_db()
+talk_db.init_db()
+cosmic_cards.init_cards_db()
+boards.init_boards_db()
+chat_room.init_chat_db()
+auth.init_auth_db()
+
+# ---------------------------------------------------------------------------
+# AUTH GATE — must log in before using the app
+# ---------------------------------------------------------------------------
+if not auth.render_login_page():
+    st.stop()
+
+# Logged-in sidebar identity + logout
+with st.sidebar:
+    st.markdown(f"**@{st.session_state.get('username', '?')}**")
+    st.caption(st.session_state.get("display_name", ""))
+    if st.button("Log out"):
+        auth.logout()
+        st.rerun()
+
+# ---------------------------------------------------------------------------
 # Logic Functions
 # ---------------------------------------------------------------------------
 
@@ -262,24 +282,12 @@ def get_ai_insight(natal, current, aspect):
         return None
 
 
-# ---------------------------------------------------------------------------
-# Render Home Tab
-# ---------------------------------------------------------------------------
-
 def render_home():
     now_utc = datetime.now(timezone.utc)
     current = get_celestial_data(now_utc)
 
-    query_params = st.query_params
-    initial_date = datetime(1990, 1, 1)
-    if "dob" in query_params:
-        try:
-            initial_date = datetime.strptime(query_params["dob"], "%Y-%m-%d")
-        except Exception:
-            pass
-
     if "birth_date" not in st.session_state:
-        st.session_state.birth_date = initial_date
+        st.session_state.birth_date = datetime(1990, 1, 1).date()
 
     with st.sidebar:
         st.markdown("### 🧬 Personal Cosmic Profile")
@@ -291,14 +299,19 @@ def render_home():
         )
         if birth_date_input != st.session_state.birth_date:
             st.session_state.birth_date = birth_date_input
-            st.query_params["dob"] = birth_date_input.strftime("%Y-%m-%d")
-            # Keep cosmic_cards profile in sync
             bd_str = birth_date_input.isoformat() if hasattr(birth_date_input, "isoformat") else str(birth_date_input)
+            bd_str = bd_str[:10]
             cosmic_cards.save_profile(
                 st.session_state.get("user_hash", "anonymous"),
                 st.session_state.get("display_name", "Moon Wanderer"),
-                bd_str[:10],
+                bd_str,
             )
+            if st.session_state.get("username"):
+                auth.update_user_profile(
+                    st.session_state.username,
+                    st.session_state.get("display_name", "Moon Wanderer"),
+                    bd_str,
+                )
             st.rerun()
         st.success("🔒 Private: Insights are only visible to you.")
 
@@ -423,10 +436,6 @@ def render_home():
     reflection_ui.render_daily_reflection()
 
 
-# ---------------------------------------------------------------------------
-# Render Calendar Tab
-# ---------------------------------------------------------------------------
-
 def render_calendar():
     st.markdown("""
     <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
@@ -502,10 +511,6 @@ def render_calendar():
                     """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
-# Render Settings Tab
-# ---------------------------------------------------------------------------
-
 def render_settings():
     st.markdown("""
     <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
@@ -515,6 +520,8 @@ def render_settings():
         Manage your account, privacy, and subscription.
     </div>
     """, unsafe_allow_html=True)
+
+    st.info(f"Logged in as **@{st.session_state.get('username', '?')}**")
 
     current_name = st.session_state.get("display_name", "Moon Wanderer")
     display_name = st.text_input("Display Name", value=current_name)
@@ -539,13 +546,18 @@ def render_settings():
                 display_name.strip(),
                 birth_date.isoformat(),
             )
-            # Sync to cosmic cards store so trading works
             cosmic_cards.save_profile(
                 st.session_state.user_hash,
                 display_name.strip(),
                 birth_date.isoformat(),
             )
-            st.success("✅ Profile saved permanently!")
+            if st.session_state.get("username"):
+                auth.update_user_profile(
+                    st.session_state.username,
+                    display_name.strip(),
+                    birth_date.isoformat(),
+                )
+            st.success("✅ Profile saved — it will load every time you log in.")
             st.rerun()
         else:
             st.warning("Please enter a display name.")
@@ -559,7 +571,7 @@ def render_settings():
 
     st.markdown("---")
     st.markdown("### 💎 Subscription")
-    tier = st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
+    st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
     st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
 
     st.markdown("---")
@@ -568,44 +580,20 @@ def render_settings():
         if "journal_entries" in st.session_state:
             st.session_state.journal_entries = []
             st.success("Journal entries cleared.")
-    if st.button("Reset all preferences", type="secondary"):
-        st.session_state.clear()
-        st.success("Preferences reset. Please refresh the page.")
+    if st.button("Log out of this account", type="secondary"):
+        auth.logout()
+        st.rerun()
 
 
-# ---------------------------------------------------------------------------
-# Load User Profile from Database
-# ---------------------------------------------------------------------------
-
-journal_ui.init_db()
-talk_db.init_db()
-talk_db.seed_talk_posts()
-cosmic_cards.init_cards_db()
-boards.init_boards_db()
-chat_room.init_chat_db()
-
-if "user_hash" not in st.session_state or st.session_state.user_hash == "anonymous":
-    import hashlib
-
-    st.session_state.user_hash = hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
-
-if "user_hash" in st.session_state:
-    profile = talk_db.get_user_profile(st.session_state.user_hash)
-    if profile:
-        st.session_state.display_name = profile["display_name"]
-        if profile.get("birth_date"):
-            st.session_state.birth_date = datetime.strptime(profile["birth_date"], "%Y-%m-%d").date()
-            cosmic_cards.save_profile(
-                st.session_state.user_hash,
-                profile["display_name"],
-                profile["birth_date"],
-            )
-    else:
-        if "display_name" not in st.session_state:
-            st.session_state.display_name = "Moon Wanderer"
-
+# Sync phase
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
+
+# Soft seed for talk (safe if already done)
+try:
+    talk_db.seed_talk_posts()
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Main App — Tabs
@@ -645,10 +633,6 @@ with tabs[6]:
 
 with tabs[7]:
     render_settings()
-
-# ---------------------------------------------------------------------------
-# Footer
-# ---------------------------------------------------------------------------
 
 st.markdown("---")
 st.markdown(
