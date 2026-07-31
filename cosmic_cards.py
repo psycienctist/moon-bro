@@ -1,12 +1,3 @@
-Fixed cosmic_cards.py — HTML Now Renders Properly
-
----
-
-ALLY,
-
-Here is the complete, fixed file. I made one change: replaced st.markdown with st.html inside render_collectible_card(). This ensures the card HTML is rendered correctly and the raw code issue is gone.
-
-```python
 # cosmic_cards.py
 # Collectible birth-chart cosmic cards + trade-as-friend-request
 # Rising, Dominant Planet, Rarity, Full Moons Lived, Birth Phase, zodiac colors, optional HD type
