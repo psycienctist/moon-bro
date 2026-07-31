@@ -399,7 +399,8 @@ def render_collectible_card(card: dict):
         rising_block = f"""
         <div style="text-align:center;flex:1;">
           <div style="font-size:0.55rem;color:#8b949e;letter-spacing:1px;">RISING</div>
-          <div style="font-size:1.15rem;font-weight:700;color:{rise_c};">{n['rising_symbol']} {n['rising_sign']}</div>
+          <div style="font-size:1.15rem;font-weight:700;color:{rise_c};">{n['rising_symbol']}</div>
+          <div style="font-size:1.15rem;font-weight:700;color:{rise_c};">{n['rising_sign']}</div>
         </div>"""
     else:
         rising_block = """
