@@ -2,11 +2,8 @@ import streamlit as st
 import ephem
 import math
 import requests
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
-# ---------------------------------------------------------------------------
-# Import modules
-# ---------------------------------------------------------------------------
 import journal as journal_ui
 import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
@@ -168,6 +165,31 @@ def get_celestial_data(date_utc):
     }
 
 
+def parse_birth_day(value):
+    """Normalize any birth date representation to a date object."""
+    if value is None:
+        return date(1990, 1, 1)
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except Exception:
+        return date(1990, 1, 1)
+
+
+def full_moons_lived(birth_day):
+    """Count of synodic months lived since birth date (original Lunatick formula)."""
+    birth_day = parse_birth_day(birth_day)
+    birth_utc = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+    now_utc = datetime.now(timezone.utc)
+    days = (now_utc - birth_utc).days
+    if days < 0:
+        return 0
+    return int(days / 29.53)
+
+
 @st.cache_data(ttl=3600)
 def get_ai_insight(natal, current, aspect):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
@@ -207,11 +229,31 @@ def render_home():
     current = get_celestial_data(now_utc)
 
     if "birth_date" not in st.session_state:
-        st.session_state.birth_date = datetime(1990, 1, 1).date()
+        st.session_state.birth_date = date(1990, 1, 1)
 
     with st.sidebar:
         st.markdown("### 🧬 Birth chart")
         st.caption("Edit full date · time · place in **Cosmic Cards** or **Settings**.")
+        # Simple date picker (restores classic behavior)
+        bd_sidebar = st.date_input(
+            "Birth date",
+            value=parse_birth_day(st.session_state.birth_date),
+            min_value=date(1920, 1, 1),
+            max_value=date.today(),
+            key="home_birth_date",
+        )
+        if bd_sidebar != parse_birth_day(st.session_state.birth_date):
+            st.session_state.birth_date = bd_sidebar
+            try:
+                cosmic_cards.save_profile(
+                    st.session_state.get("user_hash", "anonymous"),
+                    st.session_state.get("display_name", "Moon Wanderer"),
+                    bd_sidebar.isoformat(),
+                )
+            except Exception:
+                pass
+            st.rerun()
+
         card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
         if card and card.get("natal"):
             n = card["natal"]
@@ -243,24 +285,15 @@ def render_home():
     </div>
     """.format(d, h, m), unsafe_allow_html=True)
 
-    # Prefer full natal card when available — never call private helpers
+    # Resolve birth day for full-moons count (always from calendar date)
     full_card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
-    rising_html = ""
+    birth_day = parse_birth_day(st.session_state.birth_date)
+    if full_card and full_card.get("birth_date"):
+        birth_day = parse_birth_day(full_card["birth_date"])
 
+    rising_html = ""
     if full_card and full_card.get("natal"):
         natal_data = full_card["natal"]
-        birth_utc = full_card.get("birth_utc")
-        if birth_utc is None:
-            try:
-                birth_utc = cosmic_cards.local_to_utc(
-                    full_card.get("birth_date"),
-                    full_card.get("birth_time"),
-                    cosmic_cards.get_or_create_profile(
-                        st.session_state.get("user_hash", "anonymous")
-                    ).get("birth_utc_offset"),
-                )
-            except Exception:
-                birth_utc = datetime.now(timezone.utc)
         natal = {
             "sun_sign": natal_data["sun_sign"],
             "sun_symbol": natal_data["sun_symbol"],
@@ -276,21 +309,13 @@ def render_home():
                 '<div style="font-size:1.1rem; font-weight:700; color:#fff;">{} {}</div></div>'
             ).format(natal_data["rising_symbol"], natal_data["rising_sign"])
     else:
-        birth_raw = st.session_state.birth_date
-        if isinstance(birth_raw, datetime):
-            birth_day = birth_raw.date()
-        else:
-            birth_day = birth_raw
-        birth_utc = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
-        natal = get_celestial_data(birth_utc)
+        birth_utc_noon = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+        natal = get_celestial_data(birth_utc_noon)
 
-    try:
-        total_moons = (now_utc - birth_utc).days / 29.53
-    except Exception:
-        total_moons = 0
+    # ORIGINAL formula — full moons lived from birth date
+    total_moons = full_moons_lived(birth_day)
 
     diff = (current["moon_lon"] - natal["moon_lon"]) % 360
-
     if diff < 10 or diff > 350:
         aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
     elif 170 < diff < 190:
@@ -303,7 +328,6 @@ def render_home():
         aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
 
     insight = get_ai_insight(natal, current, aspect)
-
     insight_block = ""
     if insight:
         insight_block = (
@@ -336,7 +360,7 @@ def render_home():
         moon_sym=natal["moon_symbol"], moon=natal["moon_sign"],
         rising=rising_html,
         phase_emoji=natal["phase_emoji"], phase=natal["phase_name"],
-        moons=int(total_moons),
+        moons=total_moons,
         aspect=aspect.upper(), guidance=guidance,
         insight_block=insight_block,
     ), unsafe_allow_html=True)
@@ -399,12 +423,8 @@ def render_home():
 
 def render_calendar():
     st.markdown("""
-    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
-        📅 Lunar Calendar
-    </div>
-    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Track moon phases throughout the month.
-    </div>
+    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">📅 Lunar Calendar</div>
+    <div style="font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">Track moon phases throughout the month.</div>
     """, unsafe_allow_html=True)
 
     now = datetime.now()
@@ -467,8 +487,7 @@ def render_calendar():
                     )
                     border = (
                         "border:2px solid #6e40c9; background:rgba(110,64,201,0.1);"
-                        if is_today
-                        else ""
+                        if is_today else ""
                     )
                     st.markdown("""
                     <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.5rem; text-align:center; min-height:80px; {}">
@@ -481,26 +500,63 @@ def render_calendar():
 
 def render_settings():
     st.markdown("""
-    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
-        ⚙️ Settings
-    </div>
-    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Account + full birth chart (date, time, place).
-    </div>
+    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">⚙️ Settings</div>
+    <div style="font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">Account + birth chart.</div>
     """, unsafe_allow_html=True)
 
     st.info("Logged in as **@{}**".format(st.session_state.get("username", "?")))
 
     st.markdown("### 🧬 Birth chart data")
-    cosmic_cards.render_profile_form(
-        st.session_state.get("user_hash", "anonymous"),
-        key_prefix="settings",
-    )
+
+    # Prefer full form if available; otherwise simple fallback (no AttributeError)
+    form_fn = getattr(cosmic_cards, "render_profile_form", None)
+    if callable(form_fn):
+        try:
+            form_fn(st.session_state.get("user_hash", "anonymous"), key_prefix="settings")
+        except Exception as e:
+            st.warning("Full profile form unavailable ({}); using simple form.".format(e))
+            form_fn = None
+
+    if not callable(form_fn):
+        name = st.text_input(
+            "Display name",
+            value=st.session_state.get("display_name", "Moon Wanderer"),
+            key="settings_simple_name",
+        )
+        bd = st.date_input(
+            "Birth date",
+            value=parse_birth_day(st.session_state.get("birth_date")),
+            min_value=date(1920, 1, 1),
+            max_value=date.today(),
+            key="settings_simple_bd",
+        )
+        if st.button("💾 Save Profile", type="primary", key="settings_simple_save"):
+            st.session_state.display_name = name.strip() or "Moon Wanderer"
+            st.session_state.birth_date = bd
+            try:
+                cosmic_cards.save_profile(
+                    st.session_state.get("user_hash", "anonymous"),
+                    st.session_state.display_name,
+                    bd.isoformat(),
+                )
+            except Exception:
+                pass
+            try:
+                if st.session_state.get("username"):
+                    auth.update_user_profile(
+                        st.session_state.username,
+                        st.session_state.display_name,
+                        bd.isoformat(),
+                    )
+            except Exception:
+                pass
+            st.success("Profile saved.")
+            st.rerun()
 
     card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
     if card:
         html_fn = getattr(cosmic_cards, "card_html", None) or getattr(cosmic_cards, "_card_html", None)
-        if html_fn:
+        if callable(html_fn):
             st.markdown(html_fn(card, "PREVIEW"), unsafe_allow_html=True)
 
     st.markdown("---")
