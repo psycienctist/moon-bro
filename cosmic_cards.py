@@ -394,7 +394,7 @@ def render_collectible_card(card: dict):
     time_line = card.get("birth_time") or "—"
     place = card.get("birth_place") or "Location unknown"
 
-    rising_block = ""
+    # --- FIXED: Rising block now matches Sun/Moon vertical alignment ---
     if n.get("has_rising"):
         rising_block = f"""
         <div style="text-align:center;flex:1;">
@@ -407,8 +407,8 @@ def render_collectible_card(card: dict):
           <div style="font-size:0.55rem;color:#8b949e;letter-spacing:1px;">RISING</div>
           <div style="font-size:0.85rem;color:#484f58;">Add time & place</div>
         </div>"""
+    # --- End of fix ---
 
-    # FIXED: Use st.html instead of st.markdown to prevent raw HTML display
     st.html(f"""
     <div style="
         background: linear-gradient(160deg, #0a0e17 0%, #12101f 40%, #0d1f3c 100%);
