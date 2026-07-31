@@ -523,44 +523,12 @@ def render_settings():
 
     st.info(f"Logged in as **@{st.session_state.get('username', '?')}**")
 
-    current_name = st.session_state.get("display_name", "Moon Wanderer")
-    display_name = st.text_input("Display Name", value=current_name)
-
-    current_birth_date = st.session_state.get("birth_date", datetime(1990, 1, 1).date())
-    if isinstance(current_birth_date, datetime):
-        current_birth_date = current_birth_date.date()
-
-    birth_date = st.date_input(
-        "Your Birth Date",
-        value=current_birth_date,
-        min_value=datetime(1920, 1, 1).date(),
-        max_value=datetime.now().date(),
+    st.markdown("### 🧬 Birth chart")
+    st.caption("Date, time, and place power your Cosmic Card (including Rising).")
+    cosmic_cards.render_profile_form(
+        st.session_state.get("user_hash", "anonymous"),
+        key_prefix="settings",
     )
-
-    if st.button("💾 Save Profile", type="primary"):
-        if display_name.strip():
-            st.session_state.display_name = display_name.strip()
-            st.session_state.birth_date = birth_date
-            talk_db.set_user_profile(
-                st.session_state.user_hash,
-                display_name.strip(),
-                birth_date.isoformat(),
-            )
-            cosmic_cards.save_profile(
-                st.session_state.user_hash,
-                display_name.strip(),
-                birth_date.isoformat(),
-            )
-            if st.session_state.get("username"):
-                auth.update_user_profile(
-                    st.session_state.username,
-                    display_name.strip(),
-                    birth_date.isoformat(),
-                )
-            st.success("✅ Profile saved — it will load every time you log in.")
-            st.rerun()
-        else:
-            st.warning("Please enter a display name.")
 
     st.markdown("---")
     st.markdown("### 🔒 Privacy & Consent")
