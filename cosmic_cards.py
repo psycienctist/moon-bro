@@ -1,11 +1,13 @@
 # cosmic_cards.py
 # Birth-chart cosmic cards (date + time + location) + trade-as-friend-request
+from __future__ import annotations
 
 import streamlit as st
 import sqlite3
 import ephem
 import math
 from datetime import datetime, timezone, timedelta, date, time as dtime
+from typing import Optional
 
 DB = "lunatick.db"
 
@@ -32,7 +34,6 @@ def init_cards_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Migrate older DBs that only had display_name + birth_date
     c.execute("PRAGMA table_info(user_profiles)")
     cols = {row[1] for row in c.fetchall()}
     for col, typedef in [
@@ -60,12 +61,12 @@ def init_cards_db():
     conn.close()
 
 
-def _sign_from_lon(lon_deg: float):
+def _sign_from_lon(lon_deg):
     idx = int(lon_deg / 30) % 12
     return ZODIAC[idx][0], ZODIAC[idx][1]
 
 
-def _phase_from_frac(phase_frac: float):
+def _phase_from_frac(phase_frac):
     phases = [
         (0.00, "New Moon", "🌑"), (0.07, "Waxing Crescent", "🌒"),
         (0.25, "First Quarter", "🌓"), (0.43, "Waxing Gibbous", "🌔"),
@@ -79,24 +80,16 @@ def _phase_from_frac(phase_frac: float):
     return "New Moon", "🌑"
 
 
-def _ascendant_lon(lst_hours: float, lat_deg: float, obliquity_deg: float = 23.4367) -> float:
-    """Ecliptic longitude of the Ascendant (degrees 0–360)."""
+def _ascendant_lon(lst_hours, lat_deg, obliquity_deg=23.4367):
     ramc = math.radians((lst_hours * 15.0) % 360.0)
     lat = math.radians(lat_deg)
     eps = math.radians(obliquity_deg)
-    # tan(λ) = cos(RAMC) / (−sin(RAMC)*cos(ε) − tan(φ)*sin(ε))
     y = math.cos(ramc)
     x = -(math.sin(ramc) * math.cos(eps) + math.tan(lat) * math.sin(eps))
-    asc = math.degrees(math.atan2(y, x)) % 360.0
-    return asc
+    return math.degrees(math.atan2(y, x)) % 360.0
 
 
-def natal_chart(
-    dt_utc: datetime,
-    lat: float | None = None,
-    lon: float | None = None,
-) -> dict:
-    """Sun, Moon, phase, and Rising (if lat/lon provided)."""
+def natal_chart(dt_utc, lat=None, lon=None):
     obs = ephem.Observer()
     if lat is not None and lon is not None:
         obs.lat = str(lat)
@@ -137,8 +130,8 @@ def natal_chart(
 
     if lat is not None and lon is not None:
         try:
-            lst = obs.sidereal_time()  # hours as ephem Angle
-            lst_hours = float(lst) * 12.0 / math.pi  # radians → hours
+            lst = obs.sidereal_time()
+            lst_hours = float(lst) * 12.0 / math.pi
             asc_lon = _ascendant_lon(lst_hours, float(lat))
             rising_sign, rising_symbol = _sign_from_lon(asc_lon)
             result["rising_sign"] = rising_sign
@@ -151,42 +144,59 @@ def natal_chart(
     return result
 
 
-def _local_to_utc(
-    birth_date: str,
-    birth_time: str | None,
-    utc_offset: float | None,
-) -> datetime:
-    """Combine date + local time + UTC offset → aware UTC datetime."""
-    d = date.fromisoformat(birth_date)
+def local_to_utc(birth_date, birth_time=None, utc_offset=None):
+    """Public: combine date + local time + UTC offset → aware UTC datetime."""
+    if isinstance(birth_date, date) and not isinstance(birth_date, datetime):
+        d = birth_date
+    else:
+        d = date.fromisoformat(str(birth_date)[:10])
+
     if birth_time:
         try:
-            parts = birth_time.strip().split(":")
-            h, m = int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
+            parts = str(birth_time).strip().split(":")
+            h = int(parts[0])
+            m = int(parts[1]) if len(parts) > 1 else 0
             t = dtime(hour=h % 24, minute=m % 60)
         except Exception:
             t = dtime(12, 0)
     else:
-        t = dtime(12, 0)  # noon local fallback
+        t = dtime(12, 0)
 
     local_naive = datetime.combine(d, t)
-    offset_h = float(utc_offset) if utc_offset is not None else 0.0
-    # local = UTC + offset  →  UTC = local − offset
+    try:
+        offset_h = float(utc_offset) if utc_offset is not None else 0.0
+    except Exception:
+        offset_h = 0.0
     utc_naive = local_naive - timedelta(hours=offset_h)
     return utc_naive.replace(tzinfo=timezone.utc)
 
 
-def get_or_create_profile(user_hash: str) -> dict:
+# Back-compat alias
+_local_to_utc = local_to_utc
+
+
+def get_or_create_profile(user_hash):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    c.execute(
-        """
-        SELECT display_name, birth_date, birth_time, birth_place,
-               birth_lat, birth_lon, birth_utc_offset
-        FROM user_profiles WHERE user_hash=?
-        """,
-        (user_hash,),
-    )
-    row = c.fetchone()
+    try:
+        c.execute(
+            """
+            SELECT display_name, birth_date, birth_time, birth_place,
+                   birth_lat, birth_lon, birth_utc_offset
+            FROM user_profiles WHERE user_hash=?
+            """,
+            (user_hash,),
+        )
+        row = c.fetchone()
+    except sqlite3.OperationalError:
+        # very old schema
+        c.execute(
+            "SELECT display_name, birth_date FROM user_profiles WHERE user_hash=?",
+            (user_hash,),
+        )
+        row = c.fetchone()
+        if row:
+            row = (row[0], row[1], None, None, None, None, 0.0)
     conn.close()
     if row:
         return {
@@ -210,14 +220,14 @@ def get_or_create_profile(user_hash: str) -> dict:
 
 
 def save_profile(
-    user_hash: str,
-    display_name: str,
-    birth_date: str | None,
-    birth_time: str | None = None,
-    birth_place: str | None = None,
-    birth_lat: float | None = None,
-    birth_lon: float | None = None,
-    birth_utc_offset: float | None = 0.0,
+    user_hash,
+    display_name,
+    birth_date,
+    birth_time=None,
+    birth_place=None,
+    birth_lat=None,
+    birth_lon=None,
+    birth_utc_offset=0.0,
 ):
     init_cards_db()
     conn = sqlite3.connect(DB)
@@ -252,12 +262,12 @@ def save_profile(
     conn.close()
 
 
-def build_card(user_hash: str) -> dict | None:
+def build_card(user_hash):
     profile = get_or_create_profile(user_hash)
     if not profile["birth_date"]:
         return None
     try:
-        dt_utc = _local_to_utc(
+        dt_utc = local_to_utc(
             profile["birth_date"],
             profile.get("birth_time"),
             profile.get("birth_utc_offset"),
@@ -274,6 +284,7 @@ def build_card(user_hash: str) -> dict | None:
             "birth_place": profile.get("birth_place"),
             "birth_lat": lat,
             "birth_lon": lon,
+            "birth_utc": dt_utc,
             "natal": natal,
             "now": now,
         }
@@ -281,7 +292,7 @@ def build_card(user_hash: str) -> dict | None:
         return None
 
 
-def list_users_with_cards(exclude_hash: str) -> list:
+def list_users_with_cards(exclude_hash):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute(
@@ -301,7 +312,7 @@ def list_users_with_cards(exclude_hash: str) -> list:
     return out
 
 
-def send_trade(sender: str, receiver: str, message: str = ""):
+def send_trade(sender, receiver, message=""):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute(
@@ -326,7 +337,7 @@ def send_trade(sender: str, receiver: str, message: str = ""):
     return True, "Trade (friend request) sent!"
 
 
-def list_trades(user_hash: str, direction: str = "all") -> list:
+def list_trades(user_hash, direction="all"):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     if direction == "incoming":
@@ -370,7 +381,7 @@ def list_trades(user_hash: str, direction: str = "all") -> list:
     ]
 
 
-def resolve_trade(trade_id: int, user_hash: str, accept: bool):
+def resolve_trade(trade_id, user_hash, accept):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("SELECT receiver_hash, status FROM card_trades WHERE id=?", (trade_id,))
@@ -388,7 +399,7 @@ def resolve_trade(trade_id: int, user_hash: str, accept: bool):
     return True
 
 
-def friends_of(user_hash: str) -> list:
+def friends_of(user_hash):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute(
@@ -405,7 +416,7 @@ def friends_of(user_hash: str) -> list:
     return list(friends)
 
 
-def _card_html(card: dict, title: str = "YOUR COSMIC CARD") -> str:
+def card_html(card, title="YOUR COSMIC CARD"):
     n = card["natal"]
     place = card.get("birth_place") or ""
     btime = card.get("birth_time") or ""
@@ -413,33 +424,43 @@ def _card_html(card: dict, title: str = "YOUR COSMIC CARD") -> str:
     rising_line = ""
     if n.get("has_rising") and n.get("rising_sign"):
         rising_line = (
-            f"<div style='color:#58a6ff;margin-top:0.35rem;'>"
-            f"↑ Rising {n['rising_symbol']} {n['rising_sign']}</div>"
-        )
+            "<div style='color:#58a6ff;margin-top:0.35rem;'>"
+            "↑ Rising {} {}</div>"
+        ).format(n["rising_symbol"], n["rising_sign"])
     meta = " · ".join(x for x in [bdate, btime, place] if x)
-    return f"""
+    return """
     <div style="background:linear-gradient(135deg,#0d1f3c,#05070a);border:1px solid #1f6feb;
                 border-radius:16px;padding:1.2rem;margin:1rem 0;">
-      <div style="color:#58a6ff;font-size:0.75rem;letter-spacing:2px;">{title}</div>
+      <div style="color:#58a6ff;font-size:0.75rem;letter-spacing:2px;">{}</div>
       <div style="font-size:1.35rem;font-weight:700;color:#fff;margin:0.4rem 0;">
-        {n['sun_symbol']} Sun {n['sun_sign']} · {n['moon_symbol']} Moon {n['moon_sign']}
+        {} Sun {} · {} Moon {}
       </div>
-      {rising_line}
-      <div style="color:#bc8cff;margin-top:0.35rem;">{n['phase_emoji']} Born under {n['phase_name']}</div>
-      <div style="color:#8b949e;font-size:0.85rem;margin-top:0.5rem;">{card['display_name']}</div>
-      <div style="color:#484f58;font-size:0.7rem;margin-top:0.25rem;">{meta}</div>
+      {}
+      <div style="color:#bc8cff;margin-top:0.35rem;">{} Born under {}</div>
+      <div style="color:#8b949e;font-size:0.85rem;margin-top:0.5rem;">{}</div>
+      <div style="color:#484f58;font-size:0.7rem;margin-top:0.25rem;">{}</div>
     </div>
-    """
+    """.format(
+        title,
+        n["sun_symbol"], n["sun_sign"], n["moon_symbol"], n["moon_sign"],
+        rising_line,
+        n["phase_emoji"], n["phase_name"],
+        card["display_name"],
+        meta,
+    )
 
 
-def render_profile_form(user_hash: str, key_prefix: str = "cards"):
-    """Shared birth-data form. Returns True if saved this run."""
+# Back-compat
+_card_html = card_html
+
+
+def render_profile_form(user_hash, key_prefix="cards"):
     profile = get_or_create_profile(user_hash)
 
     name = st.text_input(
         "Display name",
         value=profile["display_name"] or "Moon Wanderer",
-        key=f"{key_prefix}_name",
+        key="{}_name".format(key_prefix),
     )
 
     default_bd = (
@@ -452,10 +473,9 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
         value=default_bd,
         min_value=date(1920, 1, 1),
         max_value=date.today(),
-        key=f"{key_prefix}_bd",
+        key="{}_bd".format(key_prefix),
     )
 
-    # Birth time
     default_time = dtime(12, 0)
     if profile.get("birth_time"):
         try:
@@ -463,13 +483,17 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
             default_time = dtime(int(hp), int(mp))
         except Exception:
             pass
-    bt = st.time_input("Birth time (local)", value=default_time, key=f"{key_prefix}_bt")
+    bt = st.time_input(
+        "Birth time (local)",
+        value=default_time,
+        key="{}_bt".format(key_prefix),
+    )
 
     place = st.text_input(
         "Birth place (city, country)",
         value=profile.get("birth_place") or "",
         placeholder="e.g. Austin, Texas",
-        key=f"{key_prefix}_place",
+        key="{}_place".format(key_prefix),
     )
 
     c1, c2, c3 = st.columns(3)
@@ -481,7 +505,7 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
             value=float(profile["birth_lat"]) if profile.get("birth_lat") is not None else 30.27,
             step=0.01,
             format="%.4f",
-            key=f"{key_prefix}_lat",
+            key="{}_lat".format(key_prefix),
             help="Positive = North",
         )
     with c2:
@@ -492,7 +516,7 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
             value=float(profile["birth_lon"]) if profile.get("birth_lon") is not None else -97.74,
             step=0.01,
             format="%.4f",
-            key=f"{key_prefix}_lon",
+            key="{}_lon".format(key_prefix),
             help="Negative = West",
         )
     with c3:
@@ -502,17 +526,17 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
             max_value=14.0,
             value=float(profile["birth_utc_offset"]) if profile.get("birth_utc_offset") is not None else -6.0,
             step=0.5,
-            key=f"{key_prefix}_utc",
+            key="{}_utc".format(key_prefix),
             help="Local time − UTC. EST=-5, CST=-6, PST=-8, GMT=0",
         )
 
     st.caption(
-        "Tip: look up your city’s lat/lon (e.g. Google “Austin coordinates”). "
-        "UTC offset is for your birth time zone — ignore daylight-saving quirks if unsure."
+        "Tip: look up your city’s lat/lon. "
+        "UTC offset is for your birth time zone."
     )
 
-    if st.button("💾 Save birth chart data", type="primary", key=f"{key_prefix}_save"):
-        time_str = f"{bt.hour:02d}:{bt.minute:02d}"
+    if st.button("💾 Save birth chart data", type="primary", key="{}_save".format(key_prefix)):
+        time_str = "{:02d}:{:02d}".format(bt.hour, bt.minute)
         save_profile(
             user_hash,
             name.strip() or "Moon Wanderer",
@@ -525,7 +549,6 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
         )
         st.session_state.display_name = name.strip() or "Moon Wanderer"
         st.session_state.birth_date = bd
-        # Keep auth.users in sync if logged in
         try:
             import auth
 
@@ -553,10 +576,7 @@ def render_cosmic_cards_tab():
     user_hash = st.session_state.get("user_hash", "anonymous")
 
     st.markdown("### 🃏 Cosmic Cards & Friend Trades")
-    st.caption(
-        "Your birth chart card uses date, time, and place. "
-        "Send it as a friend request."
-    )
+    st.caption("Your birth chart card uses date, time, and place. Send it as a friend request.")
 
     profile = get_or_create_profile(user_hash)
     needs_data = not profile.get("birth_date")
@@ -565,9 +585,8 @@ def render_cosmic_cards_tab():
 
     my_card = build_card(user_hash)
     if my_card:
-        st.markdown(_card_html(my_card), unsafe_allow_html=True)
-        n = my_card["natal"]
-        if not n.get("has_rising"):
+        st.markdown(card_html(my_card), unsafe_allow_html=True)
+        if not my_card["natal"].get("has_rising"):
             st.info("Add latitude & longitude above to unlock your Rising sign.")
     else:
         st.info("Add your birth date (and ideally time + place) to unlock your Cosmic Card.")
@@ -581,10 +600,12 @@ def render_cosmic_cards_tab():
         options = {}
         for c in others:
             n = c["natal"]
-            rising = f" · ↑{n['rising_symbol']}{n['rising_sign']}" if n.get("has_rising") else ""
-            label = (
-                f"{c['display_name']} "
-                f"({n['sun_symbol']}{n['sun_sign']} · {n['moon_symbol']}{n['moon_sign']}{rising})"
+            rising = " · ↑{}{}".format(n["rising_symbol"], n["rising_sign"]) if n.get("has_rising") else ""
+            label = "{} ({}{} · {}{}{})".format(
+                c["display_name"],
+                n["sun_symbol"], n["sun_sign"],
+                n["moon_symbol"], n["moon_sign"],
+                rising,
             )
             options[label] = c["user_hash"]
         pick = st.selectbox("Send card to", list(options.keys()))
@@ -604,13 +625,13 @@ def render_cosmic_cards_tab():
         sender_card = build_card(t["sender"])
         label = sender_card["display_name"] if sender_card else t["sender"][:8]
         cols = st.columns([3, 1, 1])
-        cols[0].write(f"**{label}** wants to trade cards. {t['message'] or ''}")
+        cols[0].write("**{}** wants to trade cards. {}".format(label, t["message"] or ""))
         if sender_card:
-            cols[0].markdown(_card_html(sender_card, "THEIR CARD"), unsafe_allow_html=True)
-        if cols[1].button("Accept", key=f"acc_{t['id']}"):
+            cols[0].markdown(card_html(sender_card, "THEIR CARD"), unsafe_allow_html=True)
+        if cols[1].button("Accept", key="acc_{}".format(t["id"])):
             resolve_trade(t["id"], user_hash, True)
             st.rerun()
-        if cols[2].button("Decline", key=f"dec_{t['id']}"):
+        if cols[2].button("Decline", key="dec_{}".format(t["id"])):
             resolve_trade(t["id"], user_hash, False)
             st.rerun()
 
@@ -623,10 +644,13 @@ def render_cosmic_cards_tab():
         fc = build_card(fh)
         if fc:
             n = fc["natal"]
-            rising = f" · ↑ {n['rising_symbol']} {n['rising_sign']}" if n.get("has_rising") else ""
-            place = f" · {fc['birth_place']}" if fc.get("birth_place") else ""
+            rising = " · ↑ {} {}".format(n["rising_symbol"], n["rising_sign"]) if n.get("has_rising") else ""
+            place = " · {}".format(fc["birth_place"]) if fc.get("birth_place") else ""
             st.markdown(
-                f"• **{fc['display_name']}** — "
-                f"{n['sun_symbol']} {n['sun_sign']} · {n['moon_symbol']} {n['moon_sign']}"
-                f"{rising}{place}"
+                "• **{}** — {} {} · {} {}{}{}".format(
+                    fc["display_name"],
+                    n["sun_symbol"], n["sun_sign"],
+                    n["moon_symbol"], n["moon_sign"],
+                    rising, place,
+                )
             )
