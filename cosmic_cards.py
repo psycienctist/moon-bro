@@ -410,6 +410,13 @@ def render_collectible_card(card: dict):
         </div>"""
     # --- End of fix ---
 
+    # Flip button
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        if st.button("🔄 Flip", key=f"flip_{card['user_hash']}"):
+            st.session_state.show_card_back = not st.session_state.get("show_card_back", False)
+            st.rerun()
+
     st.html(f"""
     <div style="
         background: linear-gradient(160deg, #0a0e17 0%, #12101f 40%, #0d1f3c 100%);
@@ -477,6 +484,173 @@ def render_collectible_card(card: dict):
 
       <div style="margin-top:0.9rem;text-align:center;font-size:0.65rem;color:#484f58;letter-spacing:1px;">
         LUNATICK COLLECTIBLE · TRADE TO CONNECT
+      </div>
+    </div>
+    """)
+
+
+def render_card_back(card: dict):
+    """Flip side of the Cosmic Card — detailed insights."""
+    n = card["natal"]
+    sun_c = sign_color(n["sun_sign"])
+    moon_c = sign_color(n["moon_sign"])
+    rise_c = sign_color(n.get("rising_sign")) if n.get("has_rising") else "#8b949e"
+    rarity = card.get("rarity", "Common")
+    r_color, r_label = RARITY_STYLE.get(rarity, RARITY_STYLE["Common"])
+    dom = card.get("dominant") or {"name": "—", "symbol": "✦"}
+    hd = card.get("hd_type", "—")
+    phase = n.get("phase_name", "")
+
+    def get_planet_interpretation(planet: str) -> str:
+        interpretations = {
+            "Sun": "You are driven by self-expression, vitality, and core identity. You lead with your authentic self. Your purpose is to shine and inspire others through your unique light.",
+            "Moon": "Your emotional world and intuition guide you. You find security in nurturing and connection. Your purpose is to feel deeply and create emotional safety for yourself and others.",
+            "Mercury": "Your mind is sharp and quick. Communication, learning, and sharing ideas are central to who you are. Your purpose is to connect, teach, and bridge understanding.",
+            "Venus": "You value harmony, beauty, and love. Relationships and aesthetic pleasure drive your decisions. Your purpose is to create beauty, foster love, and build meaningful connections.",
+            "Mars": "Action, ambition, and courage define you. You are a natural initiator and protector. Your purpose is to act boldly, defend what matters, and pave new paths.",
+            "Jupiter": "Your path is one of expansion, wisdom, and optimism. You are a natural teacher or philosopher. Your purpose is to seek truth, share wisdom, and grow beyond limits.",
+            "Saturn": "You are disciplined, patient, and dedicated. You build slowly but with lasting impact. Your purpose is to master your craft, build structures that endure, and mentor others.",
+            "Uranus": "You are innovative, rebellious, and forward-thinking. You march to the beat of your own drum. Your purpose is to break old patterns, invent new ways, and liberate others.",
+            "Neptune": "You are deeply intuitive, creative, and spiritual. You see the world through a lens of imagination. Your purpose is to inspire, heal, and connect to the unseen.",
+            "Pluto": "You experience transformation and depth like no other. You are drawn to the hidden truths of life. Your purpose is to transform, renew, and help others rise from their ashes.",
+        }
+        return interpretations.get(planet, f"{planet} is a key influence in your chart, shaping your core drives and motivations.")
+
+    def get_hd_interpretation(hd_type: str) -> str:
+        hd_descriptions = {
+            "Manifestor": "You are here to initiate and inspire. Your strength is in starting new things. Your challenge is to inform others of your moves to avoid resistance. You are a force of creation.",
+            "Generator": "You are here to respond and build. Your strength is in sustainable work that brings you satisfaction. Your strategy is to wait for life to ask you before acting. You are a builder of worlds.",
+            "Manifesting Generator": "You are a dynamic blend of response and initiation. You can build and multi-task at speed, but only when following your gut response. You are a multi-dimensional creator.",
+            "Projector": "You are here to guide and advise. Your strength is in seeing others clearly. Your strategy is to wait for the invitation before offering your wisdom. You are a guide and a visionary.",
+            "Reflector": "You are a mirror of the community. Your strength is in your ability to sample and reflect the environment around you. Your strategy is to wait a full lunar cycle before making big decisions. You are a compass for the collective.",
+        }
+        return hd_descriptions.get(hd_type, f"As a {hd_type}, you have a unique energetic design that interacts with the world in a specific way. Your purpose is to live in alignment with your design.")
+
+    def get_element_breakdown(sun: str, moon: str, rising: str | None) -> dict:
+        elements = {
+            "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
+            "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
+            "Gemini": "Air", "Libra": "Air", "Aquarius": "Air",
+            "Cancer": "Water", "Scorpio": "Water", "Pisces": "Water",
+        }
+        signs = [sun, moon]
+        if rising:
+            signs.append(rising)
+        counts = {}
+        for s in signs:
+            if s in elements:
+                e = elements[s]
+                counts[e] = counts.get(e, 0) + 1
+        if not counts:
+            return {"dominant": "Balanced", "description": "Your chart has a harmonious balance of elements, allowing you to adapt and flow through life with grace."}
+        most = max(counts, key=counts.get)
+        elem_descriptions = {
+            "Fire": "You are passionate, energetic, and driven. You inspire others with your enthusiasm and courage. Your path is one of action and inspiration.",
+            "Earth": "You are grounded, practical, and reliable. You build stability and nurture growth. Your path is one of structure, patience, and tangible results.",
+            "Air": "You are intellectual, communicative, and curious. You thrive on ideas, connection, and mental exploration. Your path is one of understanding and connection.",
+            "Water": "You are emotional, intuitive, and deeply feeling. You navigate life through empathy and emotional depth. Your path is one of compassion and healing.",
+        }
+        return {
+            "dominant": most,
+            "description": elem_descriptions.get(most, "Your elements are balanced, offering you a wide range of strengths and perspectives.")
+        }
+
+    def get_rarity_explanation(rarity: str, sun: str, moon: str, rising: str | None, phase: str) -> str:
+        explanations = {
+            "Legendary": f"You are one in a million! Your chart has a rare triple alignment ({sun}, {moon}, and {rising} all aligned) during a {phase} birth. This configuration is exceptionally rare and powerful.",
+            "Epic": f"Your chart is extraordinary. You have a rare triple alignment ({sun}, {moon}, and {rising} aligned) or a powerful Sun-Moon conjunction during a potent {phase}. Your cosmic signature is truly unique.",
+            "Rare": f"Your chart features a notable alignment, such as a Sun-Moon conjunction or a double alignment with your Rising sign, making your cosmic signature distinctive and special.",
+            "Uncommon": f"Your chart has a unique combination or alignment that makes it stand out. You are not ordinary — you have a distinctive cosmic fingerprint.",
+            "Common": f"Your chart has a balanced, harmonious configuration. While not rare, it represents a strong, grounded cosmic signature that is no less unique in its own right. Your strength lies in your stability.",
+        }
+        return explanations.get(rarity, f"This card has a {rarity} rarity, based on the unique alignments in your birth chart.")
+
+    def get_phase_interpretation(phase: str) -> str:
+        phase_meanings = {
+            "New Moon": "You are a seed, full of potential. You are here to begin new cycles, plant intentions, and nurture what is unborn. Your life themes are about initiation and fresh starts.",
+            "Waxing Crescent": "You are a sprout, reaching toward the light. You are here to gather momentum, build confidence, and take the first steps toward your intentions. Your path is about growth and early action.",
+            "First Quarter": "You are a sapling, stretching in all directions. You are here to make decisions, take leaps, and develop your strength. Your growth comes through action and choice.",
+            "Waxing Gibbous": "You are a young tree, establishing your roots. You are here to refine, improve, and perfect your path. Your journey is one of refinement and dedication.",
+            "Full Moon": "You are a full tree, in full bloom. You are here to illuminate, inspire, and lead by example. Your path is one of culmination, expression, and celebration.",
+            "Waning Gibbous": "You are a harvest, sharing your fruits. You are here to share wisdom, give thanks, and guide others. Your life is about giving back and teaching.",
+            "Last Quarter": "You are a season of letting go. You are here to release what no longer serves, break patterns, and prepare for renewal. Your lessons come through surrender and forgiveness.",
+            "Waning Crescent": "You are a seed, returning to the earth. You are here to rest, dream, and renew. Your path is one of quiet reflection and deep dreaming.",
+        }
+        return phase_meanings.get(phase, f"Born under the {phase}, your life's themes are shaped by the energy of that lunar phase.")
+
+    elem = get_element_breakdown(n["sun_sign"], n["moon_sign"], n.get("rising_sign"))
+    phase_meaning = get_phase_interpretation(phase)
+    rarity_explanation = get_rarity_explanation(rarity, n["sun_sign"], n["moon_sign"], n.get("rising_sign"), phase)
+    planet_desc = get_planet_interpretation(dom['name'])
+    hd_desc = get_hd_interpretation(hd)
+
+    # Flip button
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        if st.button("🔄 Flip", key=f"flipback_{card['user_hash']}"):
+            st.session_state.show_card_back = False
+            st.rerun()
+
+    st.html(f"""
+    <div style="
+        background: linear-gradient(160deg, #0a0e17 0%, #12101f 40%, #0d1f3c 100%);
+        border: 2px solid {sun_c};
+        border-radius: 20px;
+        padding: 1.25rem 1.35rem 1.4rem;
+        margin: 0.8rem 0 1.2rem;
+        box-shadow: 0 0 32px {sun_c}44, inset 0 0 40px rgba(0,0,0,0.35);
+        position: relative;
+        overflow: hidden;
+    ">
+      <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
+                  background:radial-gradient(circle,{sun_c}33,transparent 70%);pointer-events:none;"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.7rem;">
+        <div style="font-family:Orbitron,sans-serif;font-size:0.65rem;letter-spacing:3px;color:#58a6ff;">
+          COSMIC BREAKDOWN
+        </div>
+        <div style="
+            font-family:Orbitron,sans-serif;font-size:0.55rem;letter-spacing:2px;
+            color:{r_color};border:1px solid {r_color};border-radius:999px;
+            padding:0.2rem 0.65rem;background:{r_color}22;
+        ">{r_label}</div>
+      </div>
+
+      <div style="font-size:1.35rem;font-weight:700;color:#f0f6fc;margin-bottom:0.15rem;">
+        {card['display_name']}
+      </div>
+      <div style="color:#8b949e;font-size:0.8rem;margin-bottom:0.8rem;">
+        📍 {card.get('birth_place') or 'Location unknown'} · 🕐 {card.get('birth_time') or '—'}
+      </div>
+
+      <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;margin-bottom:0.6rem;border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:0.65rem;color:#8b949e;font-weight:700;letter-spacing:1px;">⭐ DOMINANT PLANET — {dom['symbol']} {dom['name']}</div>
+        <div style="font-size:0.9rem;color:#e6edf3;line-height:1.5;margin-top:0.2rem;">{planet_desc}</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;margin-bottom:0.6rem;border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:0.65rem;color:#8b949e;font-weight:700;letter-spacing:1px;">🧬 HD TYPE · FLAVOR — {hd}</div>
+        <div style="font-size:0.9rem;color:#e6edf3;line-height:1.5;margin-top:0.2rem;">{hd_desc}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
+        <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;border:1px solid rgba(255,255,255,0.06);">
+          <div style="font-size:0.55rem;color:#8b949e;font-weight:700;letter-spacing:1px;">🔥 ELEMENT — {elem['dominant']}</div>
+          <div style="font-size:0.8rem;color:#e6edf3;line-height:1.4;margin-top:0.2rem;">{elem['description']}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;border:1px solid rgba(255,255,255,0.06);">
+          <div style="font-size:0.55rem;color:#8b949e;font-weight:700;letter-spacing:1px;">🌙 BIRTH PHASE — {n['phase_emoji']} {phase}</div>
+          <div style="font-size:0.8rem;color:#e6edf3;line-height:1.4;margin-top:0.2rem;">{phase_meaning}</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;margin-bottom:0.6rem;border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:0.55rem;color:#8b949e;font-weight:700;letter-spacing:1px;">💎 RARITY DECODER — {rarity}</div>
+        <div style="font-size:0.85rem;color:#e6edf3;line-height:1.5;margin-top:0.2rem;">{rarity_explanation}</div>
+      </div>
+
+      <div style="margin-top:0.9rem;text-align:center;font-size:0.65rem;color:#484f58;letter-spacing:1px;">
+        LUNATICK COLLECTIBLE · FLIP TO CONNECT
       </div>
     </div>
     """)
@@ -675,6 +849,10 @@ def render_cosmic_cards_tab():
     init_cards_db()
     user_hash = st.session_state.get("user_hash", "anonymous")
 
+    # Reset flip state when entering the tab
+    if "show_card_back" not in st.session_state:
+        st.session_state.show_card_back = False
+
     st.markdown("### 🃏 Cosmic Cards & Friend Trades")
     st.caption("Your birth-chart card is a collectible identity. Trade it as a friend request.")
 
@@ -684,7 +862,10 @@ def render_cosmic_cards_tab():
 
     my_card = build_card(user_hash)
     if my_card:
-        render_collectible_card(my_card)
+        if st.session_state.get("show_card_back", False):
+            render_card_back(my_card)
+        else:
+            render_collectible_card(my_card)
     else:
         st.info("Add your birth date above to unlock your Cosmic Card.")
 
