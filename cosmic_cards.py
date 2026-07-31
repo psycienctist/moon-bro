@@ -1,12 +1,14 @@
 # cosmic_cards.py
-# Birth-chart cosmic cards + trade-as-friend-request (Moon-lit style)
-# Optional birth time + place improve the card (Rising). Home page is unchanged.
+# Collectible birth-chart cosmic cards + trade-as-friend-request
+# Rising, Dominant Planet, Rarity, Full Moons Lived, Birth Phase, zodiac colors, optional HD type
+# Home page is unchanged.
 
 import streamlit as st
 import sqlite3
 import ephem
 import math
 from datetime import datetime, timezone, timedelta, date, time as dtime
+from collections import Counter
 
 DB = "lunatick.db"
 
@@ -16,20 +18,51 @@ ZODIAC = [
     ("Sagittarius", "♐"), ("Capricorn", "♑"), ("Aquarius", "♒"), ("Pisces", "♓"),
 ]
 
-# Traditional / modern zodiac colors (readable on dark UI)
 ZODIAC_COLORS = {
-    "Aries": "#ff6b6b",
-    "Taurus": "#51cf66",
-    "Gemini": "#ffd43b",
-    "Cancer": "#ced4da",
-    "Leo": "#ff922b",
-    "Virgo": "#94d82d",
-    "Libra": "#f783ac",
-    "Scorpio": "#e03131",
-    "Sagittarius": "#9775fa",
-    "Capricorn": "#adb5bd",
-    "Aquarius": "#4dabf7",
-    "Pisces": "#66d9e8",
+    "Aries": "#ff6b6b", "Taurus": "#51cf66", "Gemini": "#ffd43b",
+    "Cancer": "#ced4da", "Leo": "#ff922b", "Virgo": "#94d82d",
+    "Libra": "#f783ac", "Scorpio": "#e03131", "Sagittarius": "#9775fa",
+    "Capricorn": "#adb5bd", "Aquarius": "#4dabf7", "Pisces": "#66d9e8",
+}
+
+# Classical / modern rulers (Scorpio/Aquarius/Pisces dual-coded with traditional preference first)
+SIGN_RULERS = {
+    "Aries": ("Mars", "♂"),
+    "Taurus": ("Venus", "♀"),
+    "Gemini": ("Mercury", "☿"),
+    "Cancer": ("Moon", "☾"),
+    "Leo": ("Sun", "☉"),
+    "Virgo": ("Mercury", "☿"),
+    "Libra": ("Venus", "♀"),
+    "Scorpio": ("Pluto", "♇"),
+    "Sagittarius": ("Jupiter", "♃"),
+    "Capricorn": ("Saturn", "♄"),
+    "Aquarius": ("Uranus", "♅"),
+    "Pisces": ("Neptune", "♆"),
+}
+
+RARITY_STYLE = {
+    "Common": ("#8b949e", "COMMON"),
+    "Uncommon": ("#3fb950", "UNCOMMON"),
+    "Rare": ("#58a6ff", "RARE"),
+    "Epic": ("#bc8cff", "EPIC"),
+    "Legendary": ("#ffd700", "LEGENDARY"),
+}
+
+# Lightweight Human Design–style flavor (not a full HD bodygraph)
+HD_BY_RISING = {
+    "Aries": "Manifestor",
+    "Taurus": "Generator",
+    "Gemini": "Manifesting Generator",
+    "Cancer": "Generator",
+    "Leo": "Manifestor",
+    "Virgo": "Projector",
+    "Libra": "Projector",
+    "Scorpio": "Manifesting Generator",
+    "Sagittarius": "Manifestor",
+    "Capricorn": "Generator",
+    "Aquarius": "Projector",
+    "Pisces": "Reflector",
 }
 
 
@@ -40,10 +73,73 @@ def sign_color(sign: str | None) -> str:
 
 
 def colored_sign(symbol: str, name: str, extra: str = "") -> str:
-    """HTML snippet: colored glyph + name."""
     c = sign_color(name)
     label = f"{symbol} {name}" if not extra else f"{symbol} {extra} {name}"
     return f'<span style="color:{c};font-weight:700;">{label}</span>'
+
+
+def _dominant_planet(sun: str, moon: str, rising: str | None) -> dict:
+    """Weight Sun 3, Moon 2, Rising 2 — most common ruler wins."""
+    weights: list[str] = []
+    for sign, w in ((sun, 3), (moon, 2), (rising, 2)):
+        if not sign:
+            continue
+        ruler = SIGN_RULERS.get(sign)
+        if ruler:
+            weights.extend([ruler[0]] * w)
+    if not weights:
+        return {"name": "Sun", "symbol": "☉"}
+    name = Counter(weights).most_common(1)[0][0]
+    sym = next((s for n, s in SIGN_RULERS.values() if n == name), "✦")
+    # Prefer symbol from first matching sign ruler entry
+    for sign_name, (rn, rs) in SIGN_RULERS.items():
+        if rn == name:
+            sym = rs
+            break
+    return {"name": name, "symbol": sym}
+
+
+def _rarity(sun: str, moon: str, rising: str | None, phase: str) -> str:
+    """Collectible rarity from chart shape."""
+    signs = [s for s in (sun, moon, rising) if s]
+    unique = len(set(signs))
+    triple = rising and sun == moon == rising
+    double = sun == moon
+    new_or_full = phase in ("New Moon", "Full Moon")
+
+    if triple and new_or_full:
+        return "Legendary"
+    if triple:
+        return "Epic"
+    if double and rising and rising in (sun, moon) and new_or_full:
+        return "Epic"
+    if double and rising:
+        return "Rare"
+    if double or (rising and unique == 2 and new_or_full):
+        return "Rare"
+    if rising and unique == 3 and new_or_full:
+        return "Uncommon"
+    if rising:
+        return "Uncommon"
+    if double:
+        return "Uncommon"
+    return "Common"
+
+
+def _full_moons_lived(birth_date: str) -> int:
+    try:
+        d = date.fromisoformat(birth_date[:10])
+        birth_utc = datetime.combine(d, dtime(0, 0)).replace(tzinfo=timezone.utc)
+        days = (datetime.now(timezone.utc) - birth_utc).days
+        return max(0, int(days / 29.530588))
+    except Exception:
+        return 0
+
+
+def _human_design_type(rising: str | None, sun: str) -> str:
+    if rising and rising in HD_BY_RISING:
+        return HD_BY_RISING[rising]
+    return HD_BY_RISING.get(sun, "Generator")
 
 
 def init_cards_db():
@@ -258,6 +354,15 @@ def build_card(user_hash: str) -> dict | None:
             float(profile["lon"]) if has_loc else None,
         )
         now = _chart(datetime.now(timezone.utc))
+
+        rising = natal.get("rising_sign") if natal.get("has_rising") else None
+        dominant = _dominant_planet(natal["sun_sign"], natal["moon_sign"], rising)
+        rarity = _rarity(
+            natal["sun_sign"], natal["moon_sign"], rising, natal["phase_name"]
+        )
+        full_moons = _full_moons_lived(profile["birth_date"])
+        hd_type = _human_design_type(rising, natal["sun_sign"])
+
         return {
             "user_hash": user_hash,
             "display_name": profile["display_name"],
@@ -266,9 +371,113 @@ def build_card(user_hash: str) -> dict | None:
             "birth_place": profile.get("birth_place"),
             "natal": natal,
             "now": now,
+            "dominant": dominant,
+            "rarity": rarity,
+            "full_moons_lived": full_moons,
+            "hd_type": hd_type,
         }
     except Exception:
         return None
+
+
+def render_collectible_card(card: dict):
+    """Immersive collectible card HTML."""
+    n = card["natal"]
+    sun_c = sign_color(n["sun_sign"])
+    moon_c = sign_color(n["moon_sign"])
+    rise_c = sign_color(n.get("rising_sign")) if n.get("has_rising") else "#8b949e"
+    rarity = card.get("rarity", "Common")
+    r_color, r_label = RARITY_STYLE.get(rarity, RARITY_STYLE["Common"])
+    dom = card.get("dominant") or {"name": "—", "symbol": "✦"}
+    moons = card.get("full_moons_lived", 0)
+    hd = card.get("hd_type", "—")
+    time_line = card.get("birth_time") or "—"
+    place = card.get("birth_place") or "Location unknown"
+
+    rising_block = ""
+    if n.get("has_rising"):
+        rising_block = f"""
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:0.55rem;color:#8b949e;letter-spacing:1px;">RISING</div>
+          <div style="font-size:1.15rem;font-weight:700;color:{rise_c};">{n['rising_symbol']} {n['rising_sign']}</div>
+        </div>"""
+    else:
+        rising_block = """
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:0.55rem;color:#8b949e;letter-spacing:1px;">RISING</div>
+          <div style="font-size:0.85rem;color:#484f58;">Add time & place</div>
+        </div>"""
+
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(160deg, #0a0e17 0%, #12101f 40%, #0d1f3c 100%);
+        border: 2px solid {sun_c};
+        border-radius: 20px;
+        padding: 1.25rem 1.35rem 1.4rem;
+        margin: 0.8rem 0 1.2rem;
+        box-shadow: 0 0 32px {sun_c}44, inset 0 0 40px rgba(0,0,0,0.35);
+        position: relative;
+        overflow: hidden;
+    ">
+      <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
+                  background:radial-gradient(circle,{sun_c}33,transparent 70%);pointer-events:none;"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.7rem;">
+        <div style="font-family:Orbitron,sans-serif;font-size:0.65rem;letter-spacing:3px;color:#58a6ff;">
+          COSMIC CARD
+        </div>
+        <div style="
+            font-family:Orbitron,sans-serif;font-size:0.55rem;letter-spacing:2px;
+            color:{r_color};border:1px solid {r_color};border-radius:999px;
+            padding:0.2rem 0.65rem;background:{r_color}22;
+        ">{r_label}</div>
+      </div>
+
+      <div style="font-size:1.35rem;font-weight:700;color:#f0f6fc;margin-bottom:0.15rem;">
+        {card['display_name']}
+      </div>
+      <div style="color:#8b949e;font-size:0.8rem;margin-bottom:1rem;">
+        📍 {place} · 🕐 {time_line}
+      </div>
+
+      <div style="display:flex;gap:0.4rem;justify-content:space-between;margin-bottom:1rem;
+                  background:rgba(0,0,0,0.35);border-radius:12px;padding:0.75rem 0.5rem;
+                  border:1px solid rgba(255,255,255,0.06);">
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:0.55rem;color:#8b949e;letter-spacing:1px;">SUN</div>
+          <div style="font-size:1.15rem;font-weight:700;color:{sun_c};">{n['sun_symbol']} {n['sun_sign']}</div>
+        </div>
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:0.55rem;color:#8b949e;letter-spacing:1px;">MOON</div>
+          <div style="font-size:1.15rem;font-weight:700;color:{moon_c};">{n['moon_symbol']} {n['moon_sign']}</div>
+        </div>
+        {rising_block}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem;">
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:0.55rem 0.7rem;border:1px solid rgba(255,255,255,0.07);">
+          <div style="font-size:0.5rem;color:#8b949e;letter-spacing:1px;">BIRTH PHASE</div>
+          <div style="font-size:0.95rem;font-weight:600;color:#e6edf3;">{n['phase_emoji']} {n['phase_name']}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:0.55rem 0.7rem;border:1px solid rgba(255,255,255,0.07);">
+          <div style="font-size:0.5rem;color:#8b949e;letter-spacing:1px;">FULL MOONS LIVED</div>
+          <div style="font-size:0.95rem;font-weight:700;color:#bc8cff;">{moons}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:0.55rem 0.7rem;border:1px solid rgba(255,255,255,0.07);">
+          <div style="font-size:0.5rem;color:#8b949e;letter-spacing:1px;">DOMINANT</div>
+          <div style="font-size:0.95rem;font-weight:600;color:#f0f6fc;">{dom['symbol']} {dom['name']}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:0.55rem 0.7rem;border:1px solid rgba(255,255,255,0.07);">
+          <div style="font-size:0.5rem;color:#8b949e;letter-spacing:1px;">HD TYPE · FLAVOR</div>
+          <div style="font-size:0.95rem;font-weight:600;color:#d2a8ff;">{hd}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:0.9rem;text-align:center;font-size:0.65rem;color:#484f58;letter-spacing:1px;">
+        LUNATICK COLLECTIBLE · TRADE TO CONNECT
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def list_users_with_cards(exclude_hash: str) -> list:
@@ -389,7 +598,7 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
         key=f"{key_prefix}_bd",
     )
 
-    st.caption("Optional — unlocks Rising sign on your Cosmic Card")
+    st.caption("Birth time + place unlock Rising, Dominant precision, and higher rarity.")
     c1, c2 = st.columns(2)
     with c1:
         bt_default = profile.get("birth_time") or "12:00"
@@ -465,7 +674,7 @@ def render_cosmic_cards_tab():
     user_hash = st.session_state.get("user_hash", "anonymous")
 
     st.markdown("### 🃏 Cosmic Cards & Friend Trades")
-    st.caption("Your birth-chart card is your identity. Send it as a friend request.")
+    st.caption("Your birth-chart card is a collectible identity. Trade it as a friend request.")
 
     profile = get_or_create_profile(user_hash)
     with st.expander("🧬 Your Cosmic Profile", expanded=not profile["birth_date"]):
@@ -473,35 +682,7 @@ def render_cosmic_cards_tab():
 
     my_card = build_card(user_hash)
     if my_card:
-        n = my_card["natal"]
-        sun_html = colored_sign(n["sun_symbol"], n["sun_sign"])
-        moon_html = colored_sign(n["moon_symbol"], n["moon_sign"])
-        rising_html = ""
-        if n.get("has_rising"):
-            rising_html = " · " + colored_sign(n["rising_symbol"], n["rising_sign"], extra="Rising")
-        place_line = ""
-        if my_card.get("birth_place"):
-            place_line = (
-                f"<div style='color:#8b949e;font-size:0.8rem;margin-top:0.2rem;'>"
-                f"📍 {my_card['birth_place']}</div>"
-            )
-        time_line = f" · {my_card['birth_time']}" if my_card.get("birth_time") else ""
-        # Accent border tinted by sun sign
-        border_c = sign_color(n["sun_sign"])
-        st.markdown(f"""
-        <div style="background:linear-gradient(135deg,#0d1f3c,#05070a);
-                    border:1px solid {border_c};
-                    border-radius:16px;padding:1.2rem;margin:1rem 0;
-                    box-shadow:0 0 24px {border_c}33;">
-          <div style="color:#58a6ff;font-size:0.75rem;letter-spacing:2px;">YOUR COSMIC CARD</div>
-          <div style="font-size:1.4rem;margin:0.4rem 0;">
-            {sun_html} · {moon_html}{rising_html}
-          </div>
-          <div style="color:#bc8cff;">{n['phase_emoji']} Born under {n['phase_name']}{time_line}</div>
-          <div style="color:#8b949e;font-size:0.85rem;margin-top:0.4rem;">{my_card['display_name']}</div>
-          {place_line}
-        </div>
-        """, unsafe_allow_html=True)
+        render_collectible_card(my_card)
     else:
         st.info("Add your birth date above to unlock your Cosmic Card.")
 
@@ -512,7 +693,7 @@ def render_cosmic_cards_tab():
         st.caption("No other cards yet. Share the app so friends can create theirs.")
     else:
         options = {
-            f"{c['display_name']} ({c['natal']['sun_symbol']}{c['natal']['sun_sign']} · {c['natal']['moon_symbol']}{c['natal']['moon_sign']})": c["user_hash"]
+            f"{c['display_name']} ({c['natal']['sun_symbol']}{c['natal']['sun_sign']} · {c['natal']['moon_symbol']}{c['natal']['moon_sign']} · {c.get('rarity', '')})": c["user_hash"]
             for c in others
         }
         pick = st.selectbox("Send card to", list(options.keys()))
@@ -555,7 +736,8 @@ def render_cosmic_cards_tab():
             ]
             if n.get("has_rising"):
                 parts.append(colored_sign(n["rising_symbol"], n["rising_sign"]))
+            rarity = fc.get("rarity", "")
             st.markdown(
-                f"• **{fc['display_name']}** — " + " · ".join(parts),
+                f"• **{fc['display_name']}** — " + " · ".join(parts) + f" · *{rarity}*",
                 unsafe_allow_html=True,
             )
