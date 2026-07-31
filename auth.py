@@ -1,10 +1,12 @@
 # auth.py
-# Persistent username + password login with 30-day session cookies
+# Persistent username + password login with 30-day signed session cookies
 
 import streamlit as st
 import sqlite3
 import hashlib
+import hmac
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -16,6 +18,14 @@ except ImportError:
 DB = "lunatick.db"
 COOKIE_NAME = "lunatick_session"
 SESSION_DAYS = 30
+
+
+def _session_secret() -> str:
+    """Prefer Streamlit secrets; fall back so local/dev still works."""
+    try:
+        return str(st.secrets.get("SESSION_SECRET", "lunatick-default-secret-change-me"))
+    except Exception:
+        return "lunatick-default-secret-change-me"
 
 
 def init_auth_db():
@@ -40,9 +50,12 @@ def init_auth_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Clean expired sessions
+    # Soft cleanup only — signed cookies still work if row is missing
     now = datetime.now(timezone.utc).isoformat()
-    c.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
+    try:
+        c.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -52,74 +65,94 @@ def _hash_password(password: str, salt: str) -> str:
 
 
 def _get_cookie_manager():
-    """One CookieManager per run, keyed so Streamlit keeps the component."""
+    """
+    Always construct with a stable key. Do NOT cache the component instance
+    in session_state — that breaks cookie hydration after browser reopen.
+    """
     if not HAS_COOKIES:
         return None
-    if "_cookie_manager" not in st.session_state:
-        st.session_state._cookie_manager = stx.CookieManager(key="lunatick_cm")
-    return st.session_state._cookie_manager
+    return stx.CookieManager(key="lunatick_cookies_v2")
+
+
+def _make_signed_token(username: str) -> str:
+    """username:expiry_unix:hmac — self-validating, survives DB restarts."""
+    exp = int(time.time()) + SESSION_DAYS * 86400
+    payload = f"{username.strip().lower()}:{exp}"
+    sig = hmac.new(
+        _session_secret().encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:32]
+    return f"{payload}:{sig}"
+
+
+def _parse_signed_token(token: str | None) -> str | None:
+    """Return username if token is valid and not expired, else None."""
+    if not token or not isinstance(token, str):
+        return None
+    try:
+        parts = token.strip().split(":")
+        if len(parts) != 3:
+            return None
+        username, exp_s, sig = parts
+        exp = int(exp_s)
+        if exp < int(time.time()):
+            return None
+        payload = f"{username}:{exp_s}"
+        expected = hmac.new(
+            _session_secret().encode("utf-8"),
+            payload.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()[:32]
+        if not hmac.compare_digest(sig, expected):
+            return None
+        return username.strip().lower()
+    except Exception:
+        return None
 
 
 def create_session_token(username: str) -> str:
-    token = secrets.token_urlsafe(32)
+    token = _make_signed_token(username)
     expires = datetime.now(timezone.utc) + timedelta(days=SESSION_DAYS)
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)",
-        (token, username.strip().lower(), expires.isoformat()),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB)
+        c = conn.cursor()
+        c.execute(
+            "INSERT OR REPLACE INTO sessions (token, username, expires_at) VALUES (?, ?, ?)",
+            (token, username.strip().lower(), expires.isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
     return token
 
 
 def revoke_session_token(token: str | None):
     if not token:
         return
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("DELETE FROM sessions WHERE token=?", (token,))
-    conn.commit()
-    conn.close()
-
-
-def user_from_session_token(token: str | None) -> dict | None:
-    if not token:
-        return None
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        "SELECT username, expires_at FROM sessions WHERE token=?",
-        (token,),
-    )
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return None
-    username, expires_at = row
     try:
-        exp = datetime.fromisoformat(expires_at)
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        if exp < datetime.now(timezone.utc):
-            c.execute("DELETE FROM sessions WHERE token=?", (token,))
-            conn.commit()
-            conn.close()
-            return None
-    except Exception:
+        conn = sqlite3.connect(DB)
+        c = conn.cursor()
+        c.execute("DELETE FROM sessions WHERE token=?", (token,))
+        conn.commit()
         conn.close()
-        return None
+    except Exception:
+        pass
 
+
+def _user_row(username: str) -> dict | None:
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
     c.execute(
         "SELECT username, display_name, birth_date FROM users WHERE username=?",
-        (username,),
+        (username.strip().lower(),),
     )
-    urow = c.fetchone()
+    row = c.fetchone()
     conn.close()
-    if not urow:
+    if not row:
         return None
-    uname, display_name, birth_date = urow
+    uname, display_name, birth_date = row
     user_hash = hashlib.sha256(uname.encode()).hexdigest()[:16]
     return {
         "username": uname,
@@ -129,12 +162,34 @@ def user_from_session_token(token: str | None) -> dict | None:
     }
 
 
+def user_from_session_token(token: str | None) -> dict | None:
+    """Validate signed cookie first; DB session row is optional."""
+    username = _parse_signed_token(token)
+    if not username:
+        return None
+    return _user_row(username)
+
+
 def set_session_cookie(token: str):
     cm = _get_cookie_manager()
     if cm is None:
         return
-    expires = datetime.now() + timedelta(days=SESSION_DAYS)
-    cm.set(COOKIE_NAME, token, expires_at=expires)
+    expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
+    try:
+        cm.set(
+            COOKIE_NAME,
+            token,
+            expires_at=expires,
+            key="lunatick_set_session",
+        )
+    except TypeError:
+        # Older extra_streamlit_components may not accept key=
+        try:
+            cm.set(COOKIE_NAME, token, expires_at=expires)
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 def clear_session_cookie():
@@ -144,34 +199,66 @@ def clear_session_cookie():
     try:
         cm.delete(COOKIE_NAME)
     except Exception:
-        # Fallback: overwrite with empty short-lived cookie
         try:
-            cm.set(COOKIE_NAME, "", expires_at=datetime.now() - timedelta(days=1))
+            cm.set(
+                COOKIE_NAME,
+                "",
+                expires_at=datetime.utcnow() - timedelta(days=1),
+            )
         except Exception:
             pass
 
 
+def _read_cookie_token() -> str | None:
+    cm = _get_cookie_manager()
+    if cm is None:
+        return None
+
+    # Prefer get_all (hydrates component); fall back to get
+    try:
+        cookies = cm.get_all()
+    except Exception:
+        cookies = None
+
+    if cookies is None:
+        # Component not ready yet this run
+        return None
+
+    token = None
+    if isinstance(cookies, dict):
+        token = cookies.get(COOKIE_NAME)
+    if not token:
+        try:
+            token = cm.get(COOKIE_NAME)
+        except Exception:
+            token = None
+    if token is not None:
+        token = str(token).strip()
+    return token or None
+
+
 def try_restore_from_cookie() -> bool:
-    """If a valid session cookie exists, restore session. Returns True if logged in."""
+    """If a valid signed session cookie exists, restore session."""
     if st.session_state.get("is_authenticated"):
         return True
 
-    cm = _get_cookie_manager()
-    if cm is None:
+    # Avoid infinite restore loops
+    if st.session_state.get("_cookie_restore_attempted"):
         return False
 
-    # CookieManager needs a moment on first render to hydrate
-    cookies = cm.get_all()
-    if cookies is None:
-        # Component still loading — stop this run; next run will have cookies
+    token = _read_cookie_token()
+    if token is None:
+        # CookieManager still loading — mark nothing; caller may rerun next paint
         return False
 
-    token = cookies.get(COOKIE_NAME) or cm.get(COOKIE_NAME)
+    st.session_state._cookie_restore_attempted = True
+
     if not token:
         return False
 
     user = user_from_session_token(token)
     if not user:
+        # Invalid / expired / user deleted — clear bad cookie
         clear_session_cookie()
         return False
 
@@ -205,13 +292,16 @@ def register_user(username: str, password: str, display_name: str = "") -> tuple
             """,
             (username, pw_hash, salt, display_name),
         )
-        c.execute(
-            """
-            INSERT OR IGNORE INTO user_profiles (user_hash, display_name, birth_date)
-            VALUES (?, ?, NULL)
-            """,
-            (user_hash, display_name),
-        )
+        try:
+            c.execute(
+                """
+                INSERT OR IGNORE INTO user_profiles (user_hash, display_name, birth_date)
+                VALUES (?, ?, NULL)
+                """,
+                (user_hash, display_name),
+            )
+        except Exception:
+            pass
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
@@ -251,10 +341,11 @@ def login_user(username: str, password: str) -> tuple[bool, str | dict]:
 
 
 def complete_login(user: dict):
-    """Apply session + issue 30-day cookie."""
+    """Apply session + issue 30-day signed cookie."""
     apply_user_to_session(user)
     token = create_session_token(user["username"])
     st.session_state._session_token = token
+    st.session_state._cookie_restore_attempted = True
     set_session_cookie(token)
 
 
@@ -266,16 +357,19 @@ def update_user_profile(username: str, display_name: str, birth_date: str | None
         (display_name, birth_date, username.strip().lower()),
     )
     user_hash = hashlib.sha256(username.strip().lower().encode()).hexdigest()[:16]
-    c.execute(
-        """
-        INSERT INTO user_profiles (user_hash, display_name, birth_date)
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_hash) DO UPDATE SET
-            display_name=excluded.display_name,
-            birth_date=excluded.birth_date
-        """,
-        (user_hash, display_name, birth_date),
-    )
+    try:
+        c.execute(
+            """
+            INSERT INTO user_profiles (user_hash, display_name, birth_date)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_hash) DO UPDATE SET
+                display_name=excluded.display_name,
+                birth_date=excluded.birth_date
+            """,
+            (user_hash, display_name, birth_date),
+        )
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -283,17 +377,13 @@ def update_user_profile(username: str, display_name: str, birth_date: str | None
 def logout():
     token = st.session_state.get("_session_token")
     if not token and HAS_COOKIES:
-        cm = _get_cookie_manager()
-        if cm is not None:
-            try:
-                token = cm.get(COOKIE_NAME)
-            except Exception:
-                token = None
+        token = _read_cookie_token()
     revoke_session_token(token)
     clear_session_cookie()
     for key in [
         "is_authenticated", "user_hash", "username",
         "display_name", "birth_date", "_session_token",
+        "_cookie_restore_attempted",
     ]:
         if key in st.session_state:
             del st.session_state[key]
@@ -308,7 +398,9 @@ def apply_user_to_session(user: dict):
     st.session_state.display_name = user["display_name"]
     if user.get("birth_date"):
         try:
-            st.session_state.birth_date = datetime.strptime(user["birth_date"], "%Y-%m-%d").date()
+            st.session_state.birth_date = datetime.strptime(
+                user["birth_date"], "%Y-%m-%d"
+            ).date()
         except Exception:
             st.session_state.birth_date = user["birth_date"]
 
@@ -317,13 +409,22 @@ def render_login_page():
     """Full-page login / register gate. Returns True if user is logged in."""
     init_auth_db()
 
-    # Always mount cookie manager early so it can hydrate
+    # Mount cookie manager every run so the browser cookie can hydrate
     _get_cookie_manager()
 
     if st.session_state.get("is_authenticated"):
         return True
 
-    # Try restore from 30-day cookie
+    # First paint often has empty cookies — wait one cycle without flashing form
+    if "_cookie_boot" not in st.session_state:
+        st.session_state._cookie_boot = True
+        # Give CookieManager a chance; try restore then soft rerun once
+        if try_restore_from_cookie():
+            st.rerun()
+        # If cookies not ready, rerun once more before showing form
+        if _read_cookie_token() is None and HAS_COOKIES:
+            st.rerun()
+
     if try_restore_from_cookie():
         st.rerun()
 
@@ -357,7 +458,10 @@ def render_login_page():
                 ok, result = login_user(u, p)
                 if ok:
                     complete_login(result)
-                    st.success(f"Welcome back, {result['display_name']}! Staying signed in for {SESSION_DAYS} days.")
+                    st.success(
+                        f"Welcome back, {result['display_name']}! "
+                        f"Staying signed in for {SESSION_DAYS} days."
+                    )
                     st.rerun()
                 else:
                     st.error(result)
@@ -368,12 +472,14 @@ def render_login_page():
             d = st.text_input("Display name (optional)")
             p = st.text_input("Password", type="password", help="At least 6 characters")
             p2 = st.text_input("Confirm password", type="password")
-            submitted = st.form_submit_button("Create account", type="primary", use_container_width=True)
+            submitted = st.form_submit_button(
+                "Create account", type="primary", use_container_width=True
+            )
             if submitted:
                 if p != p2:
                     st.error("Passwords do not match.")
                 else:
-                    ok, _ = register_user(u, p, d)
+                    ok, msg = register_user(u, p, d)
                     if ok:
                         ok2, user = login_user(u, p)
                         if ok2:
@@ -383,10 +489,10 @@ def render_login_page():
                         else:
                             st.success("Account created. Please log in.")
                     else:
-                        st.error(_)
+                        st.error(msg)
 
     st.caption(
-        "Passwords are hashed. Session cookie lasts 30 days — "
+        "Passwords are hashed. Signed session cookie lasts 30 days — "
         "log out anytime to clear it."
     )
     return False
