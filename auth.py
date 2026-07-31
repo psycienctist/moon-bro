@@ -29,9 +29,26 @@ def init_auth_db():
             salt TEXT NOT NULL,
             display_name TEXT,
             birth_date TEXT,
+            birth_time TEXT,
+            birth_place TEXT,
+            birth_lat REAL,
+            birth_lon REAL,
+            birth_utc_offset REAL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    c.execute("PRAGMA table_info(users)")
+    cols = {row[1] for row in c.fetchall()}
+    for col, typedef in [
+        ("birth_time", "TEXT"),
+        ("birth_place", "TEXT"),
+        ("birth_lat", "REAL"),
+        ("birth_lon", "REAL"),
+        ("birth_utc_offset", "REAL"),
+    ]:
+        if col not in cols:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
@@ -40,7 +57,6 @@ def init_auth_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Clean expired sessions
     now = datetime.now(timezone.utc).isoformat()
     c.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
     conn.commit()
@@ -52,7 +68,6 @@ def _hash_password(password: str, salt: str) -> str:
 
 
 def _get_cookie_manager():
-    """One CookieManager per run, keyed so Streamlit keeps the component."""
     if not HAS_COOKIES:
         return None
     if "_cookie_manager" not in st.session_state:
@@ -89,10 +104,7 @@ def user_from_session_token(token: str | None) -> dict | None:
         return None
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    c.execute(
-        "SELECT username, expires_at FROM sessions WHERE token=?",
-        (token,),
-    )
+    c.execute("SELECT username, expires_at FROM sessions WHERE token=?", (token,))
     row = c.fetchone()
     if not row:
         conn.close()
@@ -112,20 +124,29 @@ def user_from_session_token(token: str | None) -> dict | None:
         return None
 
     c.execute(
-        "SELECT username, display_name, birth_date FROM users WHERE username=?",
+        """
+        SELECT username, display_name, birth_date, birth_time, birth_place,
+               birth_lat, birth_lon, birth_utc_offset
+        FROM users WHERE username=?
+        """,
         (username,),
     )
     urow = c.fetchone()
     conn.close()
     if not urow:
         return None
-    uname, display_name, birth_date = urow
+    uname, display_name, birth_date, birth_time, birth_place, blat, blon, boff = urow
     user_hash = hashlib.sha256(uname.encode()).hexdigest()[:16]
     return {
         "username": uname,
         "user_hash": user_hash,
         "display_name": display_name or uname,
         "birth_date": birth_date,
+        "birth_time": birth_time,
+        "birth_place": birth_place,
+        "birth_lat": blat,
+        "birth_lon": blon,
+        "birth_utc_offset": boff,
     }
 
 
@@ -144,7 +165,6 @@ def clear_session_cookie():
     try:
         cm.delete(COOKIE_NAME)
     except Exception:
-        # Fallback: overwrite with empty short-lived cookie
         try:
             cm.set(COOKIE_NAME, "", expires_at=datetime.now() - timedelta(days=1))
         except Exception:
@@ -152,29 +172,21 @@ def clear_session_cookie():
 
 
 def try_restore_from_cookie() -> bool:
-    """If a valid session cookie exists, restore session. Returns True if logged in."""
     if st.session_state.get("is_authenticated"):
         return True
-
     cm = _get_cookie_manager()
     if cm is None:
         return False
-
-    # CookieManager needs a moment on first render to hydrate
     cookies = cm.get_all()
     if cookies is None:
-        # Component still loading — stop this run; next run will have cookies
         return False
-
     token = cookies.get(COOKIE_NAME) or cm.get(COOKIE_NAME)
     if not token:
         return False
-
     user = user_from_session_token(token)
     if not user:
         clear_session_cookie()
         return False
-
     apply_user_to_session(user)
     st.session_state._session_token = token
     return True
@@ -228,7 +240,11 @@ def login_user(username: str, password: str) -> tuple[bool, str | dict]:
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute(
-        "SELECT username, password_hash, salt, display_name, birth_date FROM users WHERE username=?",
+        """
+        SELECT username, password_hash, salt, display_name, birth_date,
+               birth_time, birth_place, birth_lat, birth_lon, birth_utc_offset
+        FROM users WHERE username=?
+        """,
         (username,),
     )
     row = c.fetchone()
@@ -237,7 +253,7 @@ def login_user(username: str, password: str) -> tuple[bool, str | dict]:
     if not row:
         return False, "Invalid username or password."
 
-    uname, stored_hash, salt, display_name, birth_date = row
+    uname, stored_hash, salt, display_name, birth_date, btime, bplace, blat, blon, boff = row
     if _hash_password(password, salt) != stored_hash:
         return False, "Invalid username or password."
 
@@ -247,34 +263,99 @@ def login_user(username: str, password: str) -> tuple[bool, str | dict]:
         "user_hash": user_hash,
         "display_name": display_name or uname,
         "birth_date": birth_date,
+        "birth_time": btime,
+        "birth_place": bplace,
+        "birth_lat": blat,
+        "birth_lon": blon,
+        "birth_utc_offset": boff,
     }
 
 
 def complete_login(user: dict):
-    """Apply session + issue 30-day cookie."""
     apply_user_to_session(user)
     token = create_session_token(user["username"])
     st.session_state._session_token = token
     set_session_cookie(token)
+    # Mirror full profile into cosmic cards store
+    try:
+        import cosmic_cards
+
+        if user.get("birth_date"):
+            cosmic_cards.save_profile(
+                user["user_hash"],
+                user.get("display_name") or user["username"],
+                user.get("birth_date"),
+                birth_time=user.get("birth_time"),
+                birth_place=user.get("birth_place"),
+                birth_lat=user.get("birth_lat"),
+                birth_lon=user.get("birth_lon"),
+                birth_utc_offset=user.get("birth_utc_offset"),
+            )
+    except Exception:
+        pass
 
 
-def update_user_profile(username: str, display_name: str, birth_date: str | None):
+def update_user_profile(
+    username: str,
+    display_name: str,
+    birth_date: str | None,
+    birth_time: str | None = None,
+    birth_place: str | None = None,
+    birth_lat: float | None = None,
+    birth_lon: float | None = None,
+    birth_utc_offset: float | None = None,
+):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute(
-        "UPDATE users SET display_name=?, birth_date=? WHERE username=?",
-        (display_name, birth_date, username.strip().lower()),
+        """
+        UPDATE users SET
+            display_name=?,
+            birth_date=?,
+            birth_time=?,
+            birth_place=?,
+            birth_lat=?,
+            birth_lon=?,
+            birth_utc_offset=?
+        WHERE username=?
+        """,
+        (
+            display_name,
+            birth_date,
+            birth_time,
+            birth_place,
+            birth_lat,
+            birth_lon,
+            birth_utc_offset,
+            username.strip().lower(),
+        ),
     )
     user_hash = hashlib.sha256(username.strip().lower().encode()).hexdigest()[:16]
     c.execute(
         """
-        INSERT INTO user_profiles (user_hash, display_name, birth_date)
-        VALUES (?, ?, ?)
+        INSERT INTO user_profiles (
+            user_hash, display_name, birth_date, birth_time,
+            birth_place, birth_lat, birth_lon, birth_utc_offset
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_hash) DO UPDATE SET
             display_name=excluded.display_name,
-            birth_date=excluded.birth_date
+            birth_date=excluded.birth_date,
+            birth_time=excluded.birth_time,
+            birth_place=excluded.birth_place,
+            birth_lat=excluded.birth_lat,
+            birth_lon=excluded.birth_lon,
+            birth_utc_offset=excluded.birth_utc_offset
         """,
-        (user_hash, display_name, birth_date),
+        (
+            user_hash,
+            display_name,
+            birth_date,
+            birth_time,
+            birth_place,
+            birth_lat,
+            birth_lon,
+            birth_utc_offset,
+        ),
     )
     conn.commit()
     conn.close()
@@ -314,16 +395,12 @@ def apply_user_to_session(user: dict):
 
 
 def render_login_page():
-    """Full-page login / register gate. Returns True if user is logged in."""
     init_auth_db()
-
-    # Always mount cookie manager early so it can hydrate
     _get_cookie_manager()
 
     if st.session_state.get("is_authenticated"):
         return True
 
-    # Try restore from 30-day cookie
     if try_restore_from_cookie():
         st.rerun()
 
@@ -357,7 +434,10 @@ def render_login_page():
                 ok, result = login_user(u, p)
                 if ok:
                     complete_login(result)
-                    st.success(f"Welcome back, {result['display_name']}! Staying signed in for {SESSION_DAYS} days.")
+                    st.success(
+                        f"Welcome back, {result['display_name']}! "
+                        f"Staying signed in for {SESSION_DAYS} days."
+                    )
                     st.rerun()
                 else:
                     st.error(result)
@@ -373,7 +453,7 @@ def render_login_page():
                 if p != p2:
                     st.error("Passwords do not match.")
                 else:
-                    ok, _ = register_user(u, p, d)
+                    ok, err = register_user(u, p, d)
                     if ok:
                         ok2, user = login_user(u, p)
                         if ok2:
@@ -383,10 +463,9 @@ def render_login_page():
                         else:
                             st.success("Account created. Please log in.")
                     else:
-                        st.error(_)
+                        st.error(err)
 
     st.caption(
-        "Passwords are hashed. Session cookie lasts 30 days — "
-        "log out anytime to clear it."
+        "Passwords are hashed. Session cookie lasts 30 days — log out anytime to clear it."
     )
     return False
