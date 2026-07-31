@@ -359,14 +359,18 @@ def render_home():
 
     insight = get_ai_insight(natal, current, aspect)
 
+    sun_c = cosmic_cards.sign_color(natal["sun_sign"])
+    moon_c = cosmic_cards.sign_color(natal["moon_sign"])
+    cur_moon_c = cosmic_cards.sign_color(current["moon_sign"])
+
     st.markdown(f"""
     <div class="personal-card">
         <div style="color:#58a6ff; font-size:0.85rem; font-weight:700; text-align:center; margin-bottom:0.8rem; letter-spacing:2px; font-family:'Orbitron', sans-serif;">
             YOUR COSMIC CHART
         </div>
         <div style="display:flex; justify-content:space-around; text-align:center; gap:0.5rem;">
-            <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
-            <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
+            <div><div style="color:#8b949e; font-size:0.5rem;">SUN SIGN</div><div style="font-size:1.1rem; font-weight:700; color:{sun_c};">{natal['sun_symbol']} {natal['sun_sign']}</div></div>
+            <div><div style="color:#8b949e; font-size:0.5rem;">MOON SIGN</div><div style="font-size:1.1rem; font-weight:700; color:{moon_c};">{natal['moon_symbol']} {natal['moon_sign']}</div></div>
             <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
             <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
         </div>
@@ -408,7 +412,7 @@ def render_home():
         st.markdown(f"""
         <div class="vibe-card">
             <div class="vibe-tag">ENERGY</div>
-            <h3 style="color:#fff; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
+            <h3 style="color:{cur_moon_c}; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
             <p style="font-size:0.9rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
         </div>
         """, unsafe_allow_html=True)
