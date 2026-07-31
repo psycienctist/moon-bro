@@ -6,8 +6,6 @@ import streamlit as st
 import sqlite3
 import ephem
 import math
-import re
-import requests
 from datetime import datetime, timezone, timedelta, date, time as dtime
 
 DB = "lunatick.db"
@@ -18,86 +16,20 @@ ZODIAC = [
     ("Sagittarius", "♐"), ("Capricorn", "♑"), ("Aquarius", "♒"), ("Pisces", "♓"),
 ]
 
+# Traditional / modern zodiac colors (readable on dark UI)
 ZODIAC_COLORS = {
-    "Aries": "#ff6b6b", "Taurus": "#51cf66", "Gemini": "#ffd43b",
-    "Cancer": "#ced4da", "Leo": "#ff922b", "Virgo": "#94d82d",
-    "Libra": "#f783ac", "Scorpio": "#e03131", "Sagittarius": "#9775fa",
-    "Capricorn": "#adb5bd", "Aquarius": "#4dabf7", "Pisces": "#66d9e8",
-}
-
-# Common US area codes → (city label, lat, lon, standard UTC offset hours)
-# Offset is standard time (no DST); good enough for natal charts.
-US_AREA_CODES = {
-    "212": ("New York, NY", 40.7128, -74.0060, -5),
-    "646": ("New York, NY", 40.7128, -74.0060, -5),
-    "917": ("New York, NY", 40.7128, -74.0060, -5),
-    "718": ("Brooklyn, NY", 40.6782, -73.9442, -5),
-    "347": ("Brooklyn, NY", 40.6782, -73.9442, -5),
-    "213": ("Los Angeles, CA", 34.0522, -118.2437, -8),
-    "323": ("Los Angeles, CA", 34.0522, -118.2437, -8),
-    "310": ("Los Angeles, CA", 34.0522, -118.2437, -8),
-    "424": ("Los Angeles, CA", 34.0522, -118.2437, -8),
-    "415": ("San Francisco, CA", 37.7749, -122.4194, -8),
-    "628": ("San Francisco, CA", 37.7749, -122.4194, -8),
-    "510": ("Oakland, CA", 37.8044, -122.2712, -8),
-    "408": ("San Jose, CA", 37.3382, -121.8863, -8),
-    "650": ("Palo Alto, CA", 37.4419, -122.1430, -8),
-    "312": ("Chicago, IL", 41.8781, -87.6298, -6),
-    "773": ("Chicago, IL", 41.8781, -87.6298, -6),
-    "872": ("Chicago, IL", 41.8781, -87.6298, -6),
-    "214": ("Dallas, TX", 32.7767, -96.7970, -6),
-    "469": ("Dallas, TX", 32.7767, -96.7970, -6),
-    "972": ("Dallas, TX", 32.7767, -96.7970, -6),
-    "713": ("Houston, TX", 29.7604, -95.3698, -6),
-    "281": ("Houston, TX", 29.7604, -95.3698, -6),
-    "832": ("Houston, TX", 29.7604, -95.3698, -6),
-    "305": ("Miami, FL", 25.7617, -80.1918, -5),
-    "786": ("Miami, FL", 25.7617, -80.1918, -5),
-    "404": ("Atlanta, GA", 33.7490, -84.3880, -5),
-    "678": ("Atlanta, GA", 33.7490, -84.3880, -5),
-    "470": ("Atlanta, GA", 33.7490, -84.3880, -5),
-    "202": ("Washington, DC", 38.9072, -77.0369, -5),
-    "215": ("Philadelphia, PA", 39.9526, -75.1652, -5),
-    "267": ("Philadelphia, PA", 39.9526, -75.1652, -5),
-    "617": ("Boston, MA", 42.3601, -71.0589, -5),
-    "857": ("Boston, MA", 42.3601, -71.0589, -5),
-    "206": ("Seattle, WA", 47.6062, -122.3321, -8),
-    "253": ("Tacoma, WA", 47.2529, -122.4443, -8),
-    "425": ("Bellevue, WA", 47.6101, -122.2015, -8),
-    "303": ("Denver, CO", 39.7392, -104.9903, -7),
-    "720": ("Denver, CO", 39.7392, -104.9903, -7),
-    "602": ("Phoenix, AZ", 33.4484, -112.0740, -7),
-    "480": ("Phoenix, AZ", 33.4484, -112.0740, -7),
-    "623": ("Phoenix, AZ", 33.4484, -112.0740, -7),
-    "702": ("Las Vegas, NV", 36.1699, -115.1398, -8),
-    "725": ("Las Vegas, NV", 36.1699, -115.1398, -8),
-    "504": ("New Orleans, LA", 29.9511, -90.0715, -6),
-    "615": ("Nashville, TN", 36.1627, -86.7816, -6),
-    "901": ("Memphis, TN", 35.1495, -90.0490, -6),
-    "816": ("Kansas City, MO", 39.0997, -94.5786, -6),
-    "314": ("St. Louis, MO", 38.6270, -90.1994, -6),
-    "612": ("Minneapolis, MN", 44.9778, -93.2650, -6),
-    "651": ("St. Paul, MN", 44.9537, -93.0900, -6),
-    "216": ("Cleveland, OH", 41.4993, -81.6944, -5),
-    "614": ("Columbus, OH", 39.9612, -82.9988, -5),
-    "513": ("Cincinnati, OH", 39.1031, -84.5120, -5),
-    "313": ("Detroit, MI", 42.3314, -83.0458, -5),
-    "248": ("Detroit, MI", 42.3314, -83.0458, -5),
-    "412": ("Pittsburgh, PA", 40.4406, -79.9959, -5),
-    "704": ("Charlotte, NC", 35.2271, -80.8431, -5),
-    "980": ("Charlotte, NC", 35.2271, -80.8431, -5),
-    "919": ("Raleigh, NC", 35.7796, -78.6382, -5),
-    "503": ("Portland, OR", 45.5152, -122.6784, -8),
-    "971": ("Portland, OR", 45.5152, -122.6784, -8),
-    "808": ("Honolulu, HI", 21.3069, -157.8583, -10),
-    "907": ("Anchorage, AK", 61.2181, -149.9003, -9),
-    "512": ("Austin, TX", 30.2672, -97.7431, -6),
-    "210": ("San Antonio, TX", 29.4241, -98.4936, -6),
-    "619": ("San Diego, CA", 32.7157, -117.1611, -8),
-    "858": ("San Diego, CA", 32.7157, -117.1611, -8),
-    "916": ("Sacramento, CA", 38.5816, -121.4944, -8),
-    "801": ("Salt Lake City, UT", 40.7608, -111.8910, -7),
-    "385": ("Salt Lake City, UT", 40.7608, -111.8910, -7),
+    "Aries": "#ff6b6b",
+    "Taurus": "#51cf66",
+    "Gemini": "#ffd43b",
+    "Cancer": "#ced4da",
+    "Leo": "#ff922b",
+    "Virgo": "#94d82d",
+    "Libra": "#f783ac",
+    "Scorpio": "#e03131",
+    "Sagittarius": "#9775fa",
+    "Capricorn": "#adb5bd",
+    "Aquarius": "#4dabf7",
+    "Pisces": "#66d9e8",
 }
 
 
@@ -108,99 +40,10 @@ def sign_color(sign: str | None) -> str:
 
 
 def colored_sign(symbol: str, name: str, extra: str = "") -> str:
+    """HTML snippet: colored glyph + name."""
     c = sign_color(name)
     label = f"{symbol} {name}" if not extra else f"{symbol} {extra} {name}"
     return f'<span style="color:{c};font-weight:700;">{label}</span>'
-
-
-def _offset_from_lon(lon: float) -> float:
-    """Rough standard-time offset from longitude (15° ≈ 1 hour)."""
-    return round(lon / 15.0 * 2) / 2  # nearest half-hour
-
-
-def _offset_from_coords(lat: float, lon: float) -> float:
-    """Prefer online timezone API; fall back to longitude estimate."""
-    try:
-        r = requests.get(
-            "https://timeapi.io/api/TimeZone/coordinate",
-            params={"latitude": lat, "longitude": lon},
-            timeout=6,
-        )
-        if r.ok:
-            data = r.json()
-            # currentUtcOffset.seconds or standardUtcOffset
-            for key in ("currentUtcOffset", "standardUtcOffset"):
-                block = data.get(key) or {}
-                secs = block.get("seconds")
-                if secs is not None:
-                    return round(secs / 3600.0 * 2) / 2
-            raw = data.get("currentUtcOffset")
-            if isinstance(raw, (int, float)):
-                return float(raw)
-    except Exception:
-        pass
-    return _offset_from_lon(lon)
-
-
-def _geocode_city(query: str) -> dict | None:
-    """OpenStreetMap Nominatim geocode → label, lat, lon, utc_offset."""
-    try:
-        r = requests.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={
-                "q": query,
-                "format": "json",
-                "limit": 1,
-                "addressdetails": 0,
-            },
-            headers={"User-Agent": "LunatickApp/1.0 (birth-chart geocoder)"},
-            timeout=8,
-        )
-        if not r.ok:
-            return None
-        results = r.json()
-        if not results:
-            return None
-        hit = results[0]
-        lat = float(hit["lat"])
-        lon = float(hit["lon"])
-        label = hit.get("display_name") or query
-        # Shorten very long Nominatim labels
-        if len(label) > 80:
-            label = ", ".join(label.split(", ")[:3])
-        offset = _offset_from_coords(lat, lon)
-        return {"label": label, "lat": lat, "lon": lon, "utc_offset": offset}
-    except Exception:
-        return None
-
-
-def lookup_location(query: str) -> tuple[bool, str, dict | None]:
-    """
-    Resolve city name or US area code → (ok, message, data).
-    data keys: label, lat, lon, utc_offset
-    """
-    q = (query or "").strip()
-    if not q:
-        return False, "Enter a city or 3-digit US area code.", None
-
-    # Area code path
-    digits = re.sub(r"\D", "", q)
-    if len(digits) == 3 and digits in US_AREA_CODES:
-        label, lat, lon, off = US_AREA_CODES[digits]
-        return True, f"Area code {digits} → {label}", {
-            "label": label,
-            "lat": lat,
-            "lon": lon,
-            "utc_offset": float(off),
-        }
-    if len(digits) == 3:
-        # Unknown area code — still try as city search fallback
-        pass
-
-    geo = _geocode_city(q)
-    if geo:
-        return True, f"Found: {geo['label']}", geo
-    return False, "Could not find that place. Try ‘City, Country’ or a US area code.", None
 
 
 def init_cards_db():
@@ -528,30 +371,11 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
     init_cards_db()
     profile = get_or_create_profile(user_hash)
 
-    # Seed widget session keys once from saved profile
-    def _seed(key, value):
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-    _seed(f"{key_prefix}_name", profile["display_name"] or "Moon Wanderer")
-    _seed(
-        f"{key_prefix}_place",
-        profile.get("birth_place") or "",
+    name = st.text_input(
+        "Display name",
+        value=profile["display_name"] or "Moon Wanderer",
+        key=f"{key_prefix}_name",
     )
-    _seed(
-        f"{key_prefix}_lat",
-        float(profile["lat"]) if profile.get("lat") is not None else 0.0,
-    )
-    _seed(
-        f"{key_prefix}_lon",
-        float(profile["lon"]) if profile.get("lon") is not None else 0.0,
-    )
-    _seed(
-        f"{key_prefix}_off",
-        float(profile["utc_offset"]) if profile.get("utc_offset") is not None else 0.0,
-    )
-
-    name = st.text_input("Display name", key=f"{key_prefix}_name")
     default_bd = (
         date.fromisoformat(profile["birth_date"])
         if profile["birth_date"]
@@ -574,58 +398,44 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
             t_val = dtime(hh % 24, mm % 60)
         except Exception:
             t_val = dtime(12, 0)
-        if f"{key_prefix}_bt" not in st.session_state:
-            st.session_state[f"{key_prefix}_bt"] = t_val
-        bt = st.time_input("Birth time (local)", key=f"{key_prefix}_bt")
+        bt = st.time_input("Birth time (local)", value=t_val, key=f"{key_prefix}_bt")
     with c2:
+        off_default = float(profile["utc_offset"]) if profile.get("utc_offset") is not None else 0.0
         utc_off = st.number_input(
             "UTC offset (hours)",
             min_value=-12.0,
             max_value=14.0,
+            value=off_default,
             step=0.5,
-            help="Auto-filled by location lookup — or set manually",
+            help="e.g. -5 for US Eastern, +1 for Central Europe",
             key=f"{key_prefix}_off",
         )
 
-    st.markdown("**Birth place** — city name *or* 3-digit US area code")
-    pc1, pc2 = st.columns([3, 1])
-    with pc1:
-        place = st.text_input(
-            "City or area code",
-            placeholder="e.g. Paris, France  or  212",
-            key=f"{key_prefix}_place",
-            label_visibility="collapsed",
-        )
-    with pc2:
-        do_lookup = st.button("📍 Lookup", key=f"{key_prefix}_lookup", use_container_width=True)
-
-    if do_lookup:
-        ok, msg, data = lookup_location(place)
-        if ok and data:
-            st.session_state[f"{key_prefix}_place"] = data["label"]
-            st.session_state[f"{key_prefix}_lat"] = round(float(data["lat"]), 4)
-            st.session_state[f"{key_prefix}_lon"] = round(float(data["lon"]), 4)
-            st.session_state[f"{key_prefix}_off"] = float(data["utc_offset"])
-            st.success(msg)
-            st.rerun()
-        else:
-            st.warning(msg)
-
+    place = st.text_input(
+        "Birth place (city / label)",
+        value=profile.get("birth_place") or "",
+        placeholder="e.g. New York, NY",
+        key=f"{key_prefix}_place",
+    )
     c3, c4 = st.columns(2)
     with c3:
+        lat_default = float(profile["lat"]) if profile.get("lat") is not None else 0.0
         lat = st.number_input(
             "Latitude",
             min_value=-90.0,
             max_value=90.0,
+            value=lat_default,
             step=0.0001,
             format="%.4f",
             key=f"{key_prefix}_lat",
         )
     with c4:
+        lon_default = float(profile["lon"]) if profile.get("lon") is not None else 0.0
         lon = st.number_input(
             "Longitude",
             min_value=-180.0,
             max_value=180.0,
+            value=lon_default,
             step=0.0001,
             format="%.4f",
             key=f"{key_prefix}_lon",
@@ -633,19 +443,18 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards"):
 
     if st.button("💾 Save birth chart", type="primary", key=f"{key_prefix}_save"):
         bt_str = f"{bt.hour:02d}:{bt.minute:02d}"
-        place_val = (st.session_state.get(f"{key_prefix}_place") or "").strip()
-        use_loc = place_val or (lat != 0.0 or lon != 0.0)
+        use_loc = place.strip() or (lat != 0.0 or lon != 0.0)
         save_profile(
             user_hash,
-            (name or "").strip() or "Moon Wanderer",
+            name.strip() or "Moon Wanderer",
             bd.isoformat(),
             birth_time=bt_str,
-            birth_place=place_val or None,
+            birth_place=place.strip() or None,
             lat=float(lat) if use_loc else None,
             lon=float(lon) if use_loc else None,
             utc_offset=float(utc_off),
         )
-        st.session_state.display_name = (name or "").strip() or "Moon Wanderer"
+        st.session_state.display_name = name.strip() or "Moon Wanderer"
         st.session_state.birth_date = bd
         st.success("Birth chart saved — Cosmic Card updated.")
         st.rerun()
@@ -677,6 +486,7 @@ def render_cosmic_cards_tab():
                 f"📍 {my_card['birth_place']}</div>"
             )
         time_line = f" · {my_card['birth_time']}" if my_card.get("birth_time") else ""
+        # Accent border tinted by sun sign
         border_c = sign_color(n["sun_sign"])
         st.markdown(f"""
         <div style="background:linear-gradient(135deg,#0d1f3c,#05070a);
