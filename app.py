@@ -28,6 +28,10 @@ def init_session_state():
         "journal_chart_input": "",
         "journal_free_input": "",
         "display_name": "Moon Wanderer",
+        # Navigation
+        "nav_view": "home",
+        "nav_popup": None,
+        "show_profile_menu": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -37,7 +41,7 @@ def init_session_state():
 init_session_state()
 
 # ---------------------------------------------------------------------------
-# Page config & Lunatick Theme
+# Page config & Lunatick Theme (+ bottom nav / chrome)
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
 
@@ -155,7 +159,63 @@ LUNATICK_CSS = """
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
 
+    /* ---- App chrome: leave room for fixed bottom nav ---- */
+    .main .block-container {
+        padding-bottom: 7.5rem !important;
+        max-width: 900px;
+        padding-top: 1rem;
+    }
+
+    .nav-popup-panel {
+        background: #0d1117;
+        border: 1px solid #6e40c9;
+        border-radius: 14px;
+        padding: 0.75rem 0.9rem;
+        margin: 0.4rem 0 0.6rem 0;
+        box-shadow: 0 0 24px rgba(110, 64, 201, 0.25);
+    }
+    .nav-popup-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.65rem;
+        letter-spacing: 2px;
+        color: #bc8cff;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+
+    .profile-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        background: rgba(110, 64, 201, 0.2);
+        border: 1px solid #6e40c9;
+        border-radius: 999px;
+        padding: 0.25rem 0.75rem 0.25rem 0.3rem;
+        color: #e6edf3;
+        font-size: 0.85rem;
+    }
+    .profile-avatar {
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6e40c9, #58a6ff);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem; font-weight: 700; color: #fff;
+    }
+
+    /* Bottom nav styling helpers */
+    .bottom-nav-hint {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.55rem;
+        letter-spacing: 1px;
+        color: #8b949e;
+        text-align: center;
+        margin-top: 0.15rem;
+    }
+
     ::-webkit-scrollbar { width: 6px; }
+
+    /* Hide default Streamlit footer clutter */
+    footer { visibility: hidden; }
 </style>
 """
 st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
@@ -176,16 +236,8 @@ auth.init_auth_db()
 if not auth.render_login_page():
     st.stop()
 
-# Logged-in sidebar identity + logout
-with st.sidebar:
-    st.markdown(f"**@{st.session_state.get('username', '?')}**")
-    st.caption(st.session_state.get("display_name", ""))
-    if st.button("Log out"):
-        auth.logout()
-        st.rerun()
-
 # ---------------------------------------------------------------------------
-# Logic Functions
+# Logic Functions (unchanged)
 # ---------------------------------------------------------------------------
 
 ZODIAC_SIGNS = [
@@ -283,6 +335,7 @@ def get_ai_insight(natal, current, aspect):
 
 
 def render_home():
+    """Home dashboard — DO NOT change content, layout, or styling."""
     now_utc = datetime.now(timezone.utc)
     current = get_celestial_data(now_utc)
 
@@ -536,81 +589,294 @@ def render_settings():
 
     st.markdown("---")
     st.markdown("### 🔒 Privacy & Consent")
-    if st.button("Opt in to community sharing"):
+    if st.button("Opt in to community sharing", key="set_opt_in"):
         st.success("You have opted in to community sharing.")
-    if st.button("Opt out of community sharing"):
+    if st.button("Opt out of community sharing", key="set_opt_out"):
         st.success("You have opted out of community sharing.")
 
     st.markdown("---")
     st.markdown("### 💎 Subscription")
-    st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
+    st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"], key="set_tier")
     st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
 
     st.markdown("---")
     st.markdown("### 🗑️ Danger Zone")
-    if st.button("Clear all journal entries", type="secondary"):
+    if st.button("Clear all journal entries", type="secondary", key="set_clear_j"):
         if "journal_entries" in st.session_state:
             st.session_state.journal_entries = []
             st.success("Journal entries cleared.")
-    if st.button("Log out of this account", type="secondary"):
+    if st.button("Log out of this account", type="secondary", key="set_logout"):
         auth.logout()
         st.rerun()
 
 
-# Sync phase
+def render_privacy():
+    st.markdown("### 🔒 Privacy")
+    st.caption("Control how your presence appears in the community.")
+    st.info(f"Signed in as **@{st.session_state.get('username', '?')}**")
+    if st.button("Opt in to community sharing", key="priv_in"):
+        st.success("You have opted in to community sharing.")
+    if st.button("Opt out of community sharing", key="priv_out"):
+        st.success("You have opted out of community sharing.")
+    st.markdown(
+        "Your journal is private. Cosmic card trades are only visible to people you connect with."
+    )
+
+
+def render_my_profile():
+    st.markdown("### 👤 My Profile")
+    name = st.session_state.get("display_name", "Moon Wanderer")
+    uname = st.session_state.get("username", "?")
+    st.markdown(f"**{name}** · @{uname}")
+
+    card = cosmic_cards.build_card(st.session_state.get("user_hash", "anonymous"))
+    if card:
+        n = card["natal"]
+        parts = [f"{n['sun_symbol']} {n['sun_sign']}", f"{n['moon_symbol']} {n['moon_sign']}"]
+        if n.get("has_rising"):
+            parts.append(f"{n['rising_symbol']} Rising {n['rising_sign']}")
+        st.markdown(" · ".join(parts))
+        if card.get("birth_place"):
+            st.caption(f"📍 {card['birth_place']}")
+    else:
+        st.caption("Add your birth data under Reflect → Birth Chart to unlock your card.")
+
+    st.markdown("---")
+    st.markdown("#### 🤝 Friends")
+    friends = cosmic_cards.friends_of(st.session_state.get("user_hash", "anonymous"))
+    if not friends:
+        st.caption("No friends yet — trade cosmic cards to connect.")
+    for fh in friends:
+        fc = cosmic_cards.build_card(fh)
+        if fc:
+            nn = fc["natal"]
+            st.markdown(
+                f"• **{fc['display_name']}** — "
+                f"{nn['sun_symbol']}{nn['sun_sign']} · {nn['moon_symbol']}{nn['moon_sign']}"
+            )
+
+    st.markdown("---")
+    st.markdown("#### 🃏 Your Cosmic Card")
+    if card:
+        cosmic_cards.render_cosmic_cards_tab()
+    else:
+        st.info("Create your chart to collect and trade cards.")
+
+
+def render_birth_chart():
+    st.markdown("### 🧬 Birth Chart")
+    st.caption("Date, time, and place power Rising and your Cosmic Card.")
+    cosmic_cards.render_profile_form(
+        st.session_state.get("user_hash", "anonymous"),
+        key_prefix="birth",
+    )
+
+
+def render_human_design():
+    st.markdown("### 🔮 Human Design")
+    st.info("Human Design is coming soon — your chart space is reserved under Reflect.")
+
+
+def render_entry_history():
+    st.markdown("### 📜 Entry History")
+    st.caption("Recent sealed journal reflections.")
+    recent = journal_ui.get_recent_entries(limit=20)
+    if not recent:
+        st.info("No entries yet. Write one under Recollect → Journal.")
+        return
+    for phase, prompt_type, content, created_at in recent:
+        label = journal_ui.PROMPTS.get(prompt_type, {}).get("label", prompt_type)
+        st.markdown(f"**{phase}** · {label} · `{str(created_at)[:16]}`")
+        st.markdown(f"> {content}")
+        st.markdown("---")
+
+
+def go_view(view: str):
+    st.session_state.nav_view = view
+    st.session_state.nav_popup = None
+    st.rerun()
+
+
+def toggle_popup(name: str):
+    if st.session_state.get("nav_popup") == name:
+        st.session_state.nav_popup = None
+    else:
+        st.session_state.nav_popup = name
+    st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# Sync phase + seed
+# ---------------------------------------------------------------------------
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
-# Soft seed for talk (safe if already done)
 try:
     talk_db.seed_talk_posts()
 except Exception:
     pass
 
 # ---------------------------------------------------------------------------
-# Main App — Tabs
+# TOP BAR — profile avatar (top-right)
 # ---------------------------------------------------------------------------
+top_l, top_r = st.columns([4, 1])
+with top_r:
+    initial = (st.session_state.get("display_name") or st.session_state.get("username") or "M")[:1].upper()
+    try:
+        with st.popover(f"👤 {initial}", use_container_width=True):
+            st.caption(f"@{st.session_state.get('username', '?')}")
+            if st.button("My Profile", use_container_width=True, key="pop_profile"):
+                go_view("my_profile")
+            if st.button("Settings", use_container_width=True, key="pop_settings"):
+                go_view("settings")
+            if st.button("Log out", use_container_width=True, key="pop_logout"):
+                auth.logout()
+                st.rerun()
+    except Exception:
+        # Older Streamlit without popover
+        if st.button(f"👤 {initial}", key="avatar_fallback"):
+            st.session_state.show_profile_menu = not st.session_state.get("show_profile_menu", False)
+            st.rerun()
+        if st.session_state.get("show_profile_menu"):
+            if st.button("My Profile", key="fb_profile"):
+                go_view("my_profile")
+            if st.button("Settings", key="fb_settings"):
+                go_view("settings")
+            if st.button("Log out", key="fb_logout"):
+                auth.logout()
+                st.rerun()
 
-tabs = st.tabs([
-    "🌕 Home",
-    "💬 Chat",
-    "📋 Boards",
-    "🃏 Cosmic Cards",
-    "💬 LunaTick Talk",
-    "📓 Journal",
-    "📅 Calendar",
-    "⚙️ Settings",
-])
+# ---------------------------------------------------------------------------
+# MAIN CONTENT — by nav_view (Home unchanged)
+# ---------------------------------------------------------------------------
+view = st.session_state.get("nav_view", "home")
 
-with tabs[0]:
+if view == "home":
+    render_home()
+elif view == "chat":
+    chat_room.render_chat_tab()
+elif view == "boards":
+    boards.render_boards_tab()
+elif view == "talk":
+    talk_ui.render_talk_tab()
+elif view == "cosmic_cards":
+    cosmic_cards.render_cosmic_cards_tab()
+elif view == "birth_chart":
+    render_birth_chart()
+elif view == "human_design":
+    render_human_design()
+elif view == "journal":
+    journal_ui.render_journal_tab()
+elif view == "daily_reflection":
+    reflection_ui.render_daily_reflection()
+elif view == "entry_history":
+    render_entry_history()
+elif view == "settings":
+    render_settings()
+elif view == "privacy":
+    render_privacy()
+elif view == "my_profile":
+    render_my_profile()
+elif view == "calendar":
+    render_calendar()
+else:
     render_home()
 
-with tabs[1]:
-    chat_room.render_chat_tab()
+# ---------------------------------------------------------------------------
+# SUB-MENU POPUP (above bottom nav)
+# ---------------------------------------------------------------------------
+popup = st.session_state.get("nav_popup")
 
-with tabs[2]:
-    boards.render_boards_tab()
+if popup == "connect":
+    st.markdown('<div class="nav-popup-panel"><div class="nav-popup-title">Connect</div></div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("💬 Chat", use_container_width=True, key="sub_chat"):
+            go_view("chat")
+    with c2:
+        if st.button("📋 Boards", use_container_width=True, key="sub_boards"):
+            go_view("boards")
+    with c3:
+        if st.button("🗣 Talk", use_container_width=True, key="sub_talk"):
+            go_view("talk")
 
-with tabs[3]:
-    cosmic_cards.render_cosmic_cards_tab()
+elif popup == "reflect":
+    st.markdown('<div class="nav-popup-panel"><div class="nav-popup-title">Reflect</div></div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("🃏 Cards", use_container_width=True, key="sub_cards"):
+            go_view("cosmic_cards")
+    with c2:
+        if st.button("🧬 Birth Chart", use_container_width=True, key="sub_birth"):
+            go_view("birth_chart")
+    with c3:
+        if st.button("🔮 Human Design", use_container_width=True, key="sub_hd"):
+            go_view("human_design")
 
-with tabs[4]:
-    talk_ui.render_talk_tab()
+elif popup == "recollect":
+    st.markdown('<div class="nav-popup-panel"><div class="nav-popup-title">Recollect</div></div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("📓 Journal", use_container_width=True, key="sub_journal"):
+            go_view("journal")
+    with c2:
+        if st.button("🌙 Daily Reflection", use_container_width=True, key="sub_daily"):
+            go_view("daily_reflection")
+    with c3:
+        if st.button("📜 History", use_container_width=True, key="sub_history"):
+            go_view("entry_history")
 
-with tabs[5]:
-    journal_ui.render_journal_tab()
+elif popup == "reset":
+    st.markdown('<div class="nav-popup-panel"><div class="nav-popup-title">Reset</div></div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("⚙️ Settings", use_container_width=True, key="sub_settings"):
+            go_view("settings")
+    with c2:
+        if st.button("🔒 Privacy", use_container_width=True, key="sub_privacy"):
+            go_view("privacy")
+    with c3:
+        if st.button("🚪 Logout", use_container_width=True, key="sub_logout"):
+            auth.logout()
+            st.rerun()
 
-with tabs[6]:
-    render_calendar()
-
-with tabs[7]:
-    render_settings()
-
+# ---------------------------------------------------------------------------
+# BOTTOM NAV — logo (Home) + 4 main sections (always visible)
+# ---------------------------------------------------------------------------
 st.markdown("---")
+
+nav_home, nav1, nav2, nav3, nav4 = st.columns([1.1, 1, 1, 1, 1])
+
+with nav_home:
+    if st.button("🌙\nHome", use_container_width=True, key="nav_logo_home",
+                 type="primary" if view == "home" else "secondary"):
+        go_view("home")
+
+with nav1:
+    active = popup == "connect" or view in ("chat", "boards", "talk")
+    if st.button("🔗\nConnect", use_container_width=True, key="nav_connect",
+                 type="primary" if active else "secondary"):
+        toggle_popup("connect")
+
+with nav2:
+    active = popup == "reflect" or view in ("cosmic_cards", "birth_chart", "human_design")
+    if st.button("✨\nReflect", use_container_width=True, key="nav_reflect",
+                 type="primary" if active else "secondary"):
+        toggle_popup("reflect")
+
+with nav3:
+    active = popup == "recollect" or view in ("journal", "daily_reflection", "entry_history")
+    if st.button("📔\nRecollect", use_container_width=True, key="nav_recollect",
+                 type="primary" if active else "secondary"):
+        toggle_popup("recollect")
+
+with nav4:
+    active = popup == "reset" or view in ("settings", "privacy")
+    if st.button("↺\nReset", use_container_width=True, key="nav_reset",
+                 type="primary" if active else "secondary"):
+        toggle_popup("reset")
+
 st.markdown(
-    "<p style='text-align:center; color:#484f58; font-size:0.65rem; font-family:'Orbitron', sans-serif;'>"
-    "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
-    "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
-    "</p>",
+    "<p class='bottom-nav-hint'>TAP A SECTION · LOGO RETURNS HOME</p>",
     unsafe_allow_html=True,
 )
