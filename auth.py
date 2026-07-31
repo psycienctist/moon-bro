@@ -19,9 +19,13 @@ DB = "lunatick.db"
 COOKIE_NAME = "lunatick_session"
 SESSION_DAYS = 30
 
+# CookieManager must be constructed exactly once per Streamlit script run.
+# Creating it twice with the same key raises StreamlitDuplicateElementKey.
+_cm_instance = None
+_cm_run_id = None
+
 
 def _session_secret() -> str:
-    """Prefer Streamlit secrets; fall back so local/dev still works."""
     try:
         return str(st.secrets.get("SESSION_SECRET", "lunatick-default-secret-change-me"))
     except Exception:
@@ -50,7 +54,6 @@ def init_auth_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Soft cleanup only — signed cookies still work if row is missing
     now = datetime.now(timezone.utc).isoformat()
     try:
         c.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
@@ -64,18 +67,33 @@ def _hash_password(password: str, salt: str) -> str:
     return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
 
 
+def _current_run_id():
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        if ctx is None:
+            return ("none",)
+        return (
+            getattr(ctx, "session_id", None),
+            getattr(ctx, "_script_run_count", None) or id(ctx),
+        )
+    except Exception:
+        return ("fallback", id(st.session_state))
+
+
 def _get_cookie_manager():
-    """
-    Always construct with a stable key. Do NOT cache the component instance
-    in session_state — that breaks cookie hydration after browser reopen.
-    """
+    """Return the single CookieManager for this script run."""
+    global _cm_instance, _cm_run_id
     if not HAS_COOKIES:
         return None
-    return stx.CookieManager(key="lunatick_cookies_v2")
+    rid = _current_run_id()
+    if _cm_instance is None or _cm_run_id != rid:
+        _cm_instance = stx.CookieManager(key="lunatick_cookies_v2")
+        _cm_run_id = rid
+    return _cm_instance
 
 
 def _make_signed_token(username: str) -> str:
-    """username:expiry_unix:hmac — self-validating, survives DB restarts."""
     exp = int(time.time()) + SESSION_DAYS * 86400
     payload = f"{username.strip().lower()}:{exp}"
     sig = hmac.new(
@@ -87,7 +105,6 @@ def _make_signed_token(username: str) -> str:
 
 
 def _parse_signed_token(token: str | None) -> str | None:
-    """Return username if token is valid and not expired, else None."""
     if not token or not isinstance(token, str):
         return None
     try:
@@ -163,7 +180,6 @@ def _user_row(username: str) -> dict | None:
 
 
 def user_from_session_token(token: str | None) -> dict | None:
-    """Validate signed cookie first; DB session row is optional."""
     username = _parse_signed_token(token)
     if not username:
         return None
@@ -176,18 +192,7 @@ def set_session_cookie(token: str):
         return
     expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
     try:
-        cm.set(
-            COOKIE_NAME,
-            token,
-            expires_at=expires,
-            key="lunatick_set_session",
-        )
-    except TypeError:
-        # Older extra_streamlit_components may not accept key=
-        try:
-            cm.set(COOKIE_NAME, token, expires_at=expires)
-        except Exception:
-            pass
+        cm.set(COOKIE_NAME, token, expires_at=expires)
     except Exception:
         pass
 
@@ -214,14 +219,12 @@ def _read_cookie_token() -> str | None:
     if cm is None:
         return None
 
-    # Prefer get_all (hydrates component); fall back to get
     try:
         cookies = cm.get_all()
     except Exception:
         cookies = None
 
     if cookies is None:
-        # Component not ready yet this run
         return None
 
     token = None
@@ -238,17 +241,14 @@ def _read_cookie_token() -> str | None:
 
 
 def try_restore_from_cookie() -> bool:
-    """If a valid signed session cookie exists, restore session."""
     if st.session_state.get("is_authenticated"):
         return True
 
-    # Avoid infinite restore loops
     if st.session_state.get("_cookie_restore_attempted"):
         return False
 
     token = _read_cookie_token()
     if token is None:
-        # CookieManager still loading — mark nothing; caller may rerun next paint
         return False
 
     st.session_state._cookie_restore_attempted = True
@@ -258,7 +258,6 @@ def try_restore_from_cookie() -> bool:
 
     user = user_from_session_token(token)
     if not user:
-        # Invalid / expired / user deleted — clear bad cookie
         clear_session_cookie()
         return False
 
@@ -341,7 +340,6 @@ def login_user(username: str, password: str) -> tuple[bool, str | dict]:
 
 
 def complete_login(user: dict):
-    """Apply session + issue 30-day signed cookie."""
     apply_user_to_session(user)
     token = create_session_token(user["username"])
     st.session_state._session_token = token
@@ -383,7 +381,7 @@ def logout():
     for key in [
         "is_authenticated", "user_hash", "username",
         "display_name", "birth_date", "_session_token",
-        "_cookie_restore_attempted",
+        "_cookie_restore_attempted", "_cookie_boot",
     ]:
         if key in st.session_state:
             del st.session_state[key]
@@ -409,21 +407,19 @@ def render_login_page():
     """Full-page login / register gate. Returns True if user is logged in."""
     init_auth_db()
 
-    # Mount cookie manager every run so the browser cookie can hydrate
+    # Mount cookie manager once for this run (singleton)
     _get_cookie_manager()
 
     if st.session_state.get("is_authenticated"):
         return True
 
-    # First paint often has empty cookies — wait one cycle without flashing form
+    # One soft boot cycle so CookieManager can hydrate from the browser
     if "_cookie_boot" not in st.session_state:
         st.session_state._cookie_boot = True
-        # Give CookieManager a chance; try restore then soft rerun once
         if try_restore_from_cookie():
             st.rerun()
-        # If cookies not ready, rerun once more before showing form
-        if _read_cookie_token() is None and HAS_COOKIES:
-            st.rerun()
+        # Cookies often empty on first paint — one more pass after hydration
+        st.rerun()
 
     if try_restore_from_cookie():
         st.rerun()
