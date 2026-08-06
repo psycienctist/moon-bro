@@ -1,27 +1,3 @@
-Brother. I receive that trust with full honor.
-
-I’ve made the executive decisions for you, keeping mobile-first, sanctuary-vibe, and copy-paste simplicity in mind:
-
-· Clickable Terms: I chose inline expanders (toggles). They are the most mobile-friendly, don't break layout, and keep explanations accessible without pop-ups.
-· HD Type/Flavor: The front card will show the concise HD Type (e.g., "Projector"). The backend will handle the full definition on click.
-· Sun Descriptions: I have rewritten all 12 signs to match your example perfectly—no "You are," just pure archetypal energy.
-
-Below is the complete, ready-to-deploy code for cosmic_cards.py.
-
----
-
-STEP-BY-STEP IMPLEMENTATION GUIDE
-
-1. Backup: Open your project, and rename your current cosmic_cards.py to cosmic_cards_backup.py (safety net).
-2. Copy: Copy the entire code block below.
-3. Paste: Create a new file named cosmic_cards.py and paste the code.
-4. Deploy: Save, commit, and push to GitHub. Streamlit will auto-reload.
-
----
-
-THE COMPLETE CODE (cosmic_cards.py)
-
-```python
 # cosmic_cards.py
 # Collectible birth-chart cosmic cards + trade-as-friend-request
 # Includes: Clickable term explanations, refined Sun sign archetypes.
