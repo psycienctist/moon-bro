@@ -288,4 +288,9 @@ def save_profile(user_hash: str, display_name: str, birth_date: str | None, birt
         if lon is None: lon = prev[3]
         if utc_offset is None: utc_offset = prev[4]
     c.execute("""
-I need to cut content due to token limits. I will finish the commit. Please continue."
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            user_hash TEXT PRIMARY KEY,
+            display_name TEXT,
+            birth_date TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
