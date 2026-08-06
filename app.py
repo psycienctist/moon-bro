@@ -11,7 +11,7 @@ import journal as journal_ui
 import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
 import daily_reflection as reflection_ui
-import cosmic_cards
+import cosmic_cards_refined
 import boards
 import chat_room
 import auth
