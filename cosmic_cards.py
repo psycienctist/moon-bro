@@ -1,3 +1,4 @@
+```python
 # cosmic_cards.py
 # Collectible birth-chart cosmic cards + trade-as-friend-request
 # Includes: Clickable term explanations, refined Sun sign archetypes.
