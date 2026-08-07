@@ -287,6 +287,9 @@ def save_profile(user_hash: str, display_name: str, birth_date: str | None, birt
         if lat is None: lat = prev[2]
         if lon is None: lon = prev[3]
         if utc_offset is None: utc_offset = prev[4]
+    def init_cards_db():
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS user_profiles (
             user_hash TEXT PRIMARY KEY,
@@ -294,3 +297,20 @@ def save_profile(user_hash: str, display_name: str, birth_date: str | None, birt
             birth_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    """)
+    for col, typ in [("birth_time", "TEXT"), ("birth_place", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("utc_offset", "REAL")]:
+        try: c.execute(f"ALTER TABLE user_profiles ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError: pass
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS card_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_hash TEXT,
+            receiver_hash TEXT,
+            message TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
