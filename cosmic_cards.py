@@ -299,8 +299,10 @@ def save_profile(user_hash: str, display_name: str, birth_date: str | None, birt
         )
     """)
     for col, typ in [("birth_time", "TEXT"), ("birth_place", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("utc_offset", "REAL")]:
-        try: c.execute(f"ALTER TABLE user_profiles ADD COLUMN {col} {typ}")
-        except sqlite3.OperationalError: pass
+        try:
+            c.execute(f"ALTER TABLE user_profiles ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError:
+            pass
     c.execute("""
         CREATE TABLE IF NOT EXISTS card_trades (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
