@@ -49,6 +49,29 @@ HD_FLAVOR_MAPPING = {
     "Reflector": "Wait a Lunar Cycle",
 }
 
+# Simplified, deterministic Human Design-style lookups for the Cosmic Card.
+# These are a Lunatick card heuristic based on the natal Sun and Moon signs,
+# not a replacement for a full Human Design bodygraph calculation.
+HD_PROFILE_LINE_BY_SUN = {
+    "Aries": 1, "Taurus": 2, "Gemini": 3, "Cancer": 4,
+    "Leo": 5, "Virgo": 6, "Libra": 1, "Scorpio": 2,
+    "Sagittarius": 3, "Capricorn": 4, "Aquarius": 5, "Pisces": 6,
+}
+
+HD_PROFILE_LINE_BY_MOON = {
+    "Aries": 3, "Taurus": 4, "Gemini": 5, "Cancer": 6,
+    "Leo": 1, "Virgo": 2, "Libra": 3, "Scorpio": 4,
+    "Sagittarius": 5, "Capricorn": 6, "Aquarius": 1, "Pisces": 2,
+}
+
+HD_AUTHORITY_BY_TYPE = {
+    "Manifestor": "Emotional Authority",
+    "Generator": "Sacral Authority",
+    "Manifesting Generator": "Sacral Authority",
+    "Projector": "Emotional Authority",
+    "Reflector": "Lunar Authority",
+}
+
 SUN_SIGN_DESCRIPTIONS = {
     "Aries": "Fiery, pioneering, and fiercely independent, you charge headfirst into new horizons with unstoppable courage. Primary purposes include ignite fresh initiatives, blaze trails for others, and champion bold new ideas.",
     "Taurus": "Disciplined, patient, and dedicated, you build slowly but with lasting impact. Primary purposes include master your craft, build enduring structures, and mentor others.",
@@ -96,7 +119,11 @@ def init_cards_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    for col, typ in [("birth_time", "TEXT"), ("birth_place", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("utc_offset", "REAL")]:
+    for col, typ in [
+        ("birth_time", "TEXT"), ("birth_place", "TEXT"), ("lat", "REAL"),
+        ("lon", "REAL"), ("utc_offset", "REAL"), ("hd_profile", "TEXT"),
+        ("hd_authority", "TEXT"),
+    ]:
         try:
             c.execute(f"ALTER TABLE user_profiles ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
@@ -190,17 +217,23 @@ def get_or_create_profile(user_hash):
     init_cards_db()
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    c.execute("SELECT display_name, birth_date, birth_time, birth_place, lat, lon, utc_offset FROM user_profiles WHERE user_hash=?", (user_hash,))
+    c.execute("""
+        SELECT display_name, birth_date, birth_time, birth_place, lat, lon,
+               utc_offset, hd_profile, hd_authority
+        FROM user_profiles WHERE user_hash=?
+    """, (user_hash,))
     row = c.fetchone()
     conn.close()
     if row:
         return {
             "display_name": row[0], "birth_date": row[1], "birth_time": row[2],
-            "birth_place": row[3], "lat": row[4], "lon": row[5], "utc_offset": row[6]
+            "birth_place": row[3], "lat": row[4], "lon": row[5], "utc_offset": row[6],
+            "hd_profile": row[7], "hd_authority": row[8],
         }
     return {
         "display_name": "Moon Wanderer", "birth_date": None, "birth_time": None,
-        "birth_place": None, "lat": None, "lon": None, "utc_offset": None
+        "birth_place": None, "lat": None, "lon": None, "utc_offset": None,
+        "hd_profile": None, "hd_authority": None,
     }
 
 def save_profile(user_hash, display_name, birth_date, birth_time=None, birth_place=None, lat=None, lon=None, utc_offset=None):
@@ -238,11 +271,19 @@ def build_card(user_hash):
         rarity = _rarity(natal["sun_sign"], natal["moon_sign"], rising, natal["phase_name"])
         full_moons = _full_moons_lived(profile["birth_date"])
         hd_type = _human_design_type(rising, natal["sun_sign"])
+        hd_profile = _human_design_profile(natal["sun_sign"], natal["moon_sign"])
+        hd_authority = _human_design_authority(hd_type)
+
+        # Persist the computed card attributes. Existing databases are upgraded
+        # by init_cards_db() before this function reaches the update.
+        _save_hd_details(user_hash, hd_profile, hd_authority)
+
         return {
             "user_hash": user_hash, "display_name": profile["display_name"],
             "birth_date": profile["birth_date"], "birth_time": profile.get("birth_time"),
             "birth_place": profile.get("birth_place"), "natal": natal, "dominant": dominant,
             "rarity": rarity, "full_moons_lived": full_moons, "hd_type": hd_type,
+            "hd_profile": hd_profile, "hd_authority": hd_authority,
         }
     except Exception:
         return None
@@ -294,6 +335,30 @@ def _human_design_type(rising, sun):
     if rising and rising in HD_BY_RISING:
         return HD_BY_RISING[rising]
     return HD_BY_RISING.get(sun, "Generator")
+
+def _human_design_profile(sun, moon):
+    """Return a simplified six-line profile from natal Sun and Moon signs."""
+    sun_line = HD_PROFILE_LINE_BY_SUN.get(sun, 1)
+    moon_line = HD_PROFILE_LINE_BY_MOON.get(moon, 4)
+    return f"{sun_line}/{moon_line}"
+
+
+def _human_design_authority(hd_type):
+    """Return the card's simplified authority from its computed HD Type."""
+    return HD_AUTHORITY_BY_TYPE.get(hd_type, "Sacral Authority")
+
+
+def _save_hd_details(user_hash, hd_profile, hd_authority):
+    """Persist the computed simplified HD details for the user's card."""
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE user_profiles SET hd_profile=?, hd_authority=? WHERE user_hash=?",
+        (hd_profile, hd_authority, user_hash),
+    )
+    conn.commit()
+    conn.close()
+
 
 def show_term_explanation(term_key):
     info = TERM_EXPLANATIONS.get(term_key)
@@ -390,6 +455,8 @@ def render_card_back(card):
     r_color, r_label = RARITY_STYLE.get(rarity, RARITY_STYLE["Common"])
     dom = card.get("dominant") or {"name": "—", "symbol": "✦"}
     hd = card.get("hd_type", "—")
+    hd_profile = card.get("hd_profile", "—")
+    hd_authority = card.get("hd_authority", "—")
     phase = n.get("phase_name", "")
 
     col1, col2 = st.columns([4, 1])
@@ -414,6 +481,16 @@ def render_card_back(card):
       <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;margin-bottom:0.6rem;border:1px solid rgba(255,255,255,0.06);">
         <div style="font-size:0.65rem;color:#8b949e;font-weight:700;letter-spacing:1px;">🧬 HD TYPE — {hd}</div>
         <div style="font-size:0.9rem;color:#e6edf3;line-height:1.5;margin-top:0.2rem;">You operate best by following your HD strategy.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
+        <div style="background:rgba(188,140,255,0.09);border-radius:12px;padding:0.7rem;border:1px solid rgba(188,140,255,0.24);">
+          <div style="font-size:0.55rem;color:#8b949e;font-weight:700;letter-spacing:1px;">◈ HD PROFILE</div>
+          <div style="font-size:1.05rem;font-weight:700;color:#d2a8ff;line-height:1.35;margin-top:0.2rem;">{hd_profile}</div>
+        </div>
+        <div style="background:rgba(88,166,255,0.08);border-radius:12px;padding:0.7rem;border:1px solid rgba(88,166,255,0.23);">
+          <div style="font-size:0.55rem;color:#8b949e;font-weight:700;letter-spacing:1px;">✦ HD AUTHORITY</div>
+          <div style="font-size:0.85rem;font-weight:700;color:#a8d3ff;line-height:1.35;margin-top:0.2rem;">{hd_authority}</div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
         <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:0.7rem;border:1px solid rgba(255,255,255,0.06);">
