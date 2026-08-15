@@ -192,40 +192,65 @@ LUNATICK_CSS = """
         margin-right: auto;
     }
 
+    /* The navigation is deliberately one horizontal thumb rail. Streamlit
+       normally stacks columns on small screens, so the scoped grid/flex
+       declarations below override that behavior only for this bar. */
+    .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.35rem !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        padding: 0.05rem 0.1rem 0.15rem;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"]::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Use fixed, compact columns so labels remain readable. On small screens,
+       the rail can be swiped horizontally rather than becoming a vertical list. */
+    .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
+        flex: 0 0 5.15rem !important;
+        min-width: 5.15rem !important;
+        width: 5.15rem !important;
+    }
+
     /* These rules are deliberately scoped to the navigation, leaving every
        other Lunatick button unchanged. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
-        min-height: 2.55rem;
-        padding: 0.35rem 0.25rem;
+        min-height: 2.7rem;
+        padding: 0.35rem 0.35rem;
         border-radius: 0.7rem;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         line-height: 1.15;
         white-space: nowrap;
     }
 
-    .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
-        gap: 0.4rem;
-    }
-
-    .st-key-lunatick-bottom-nav [data-testid="stVerticalBlock"] {
-        gap: 0.4rem;
-    }
-
-    /* Keep four targets per row readable and comfortably tappable on phones. */
     @media (max-width: 480px) {
+        /* The fixed rail is only one button high, so less clearance is needed. */
         [data-testid="stMainBlockContainer"] {
-            padding-bottom: 9.4rem;
+            padding-bottom: 5.8rem;
         }
 
         .st-key-lunatick-bottom-nav {
-            padding-left: 0.4rem;
-            padding-right: 0.4rem;
+            padding: 0.4rem 0.35rem calc(0.4rem + env(safe-area-inset-bottom));
+        }
+
+        .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
+            flex-basis: 4.45rem !important;
+            min-width: 4.45rem !important;
+            width: 4.45rem !important;
         }
 
         .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
-            min-height: 2.45rem;
-            padding: 0.3rem 0.1rem;
-            font-size: 0.62rem;
+            min-height: 2.55rem;
+            padding: 0.3rem 0.2rem;
+            font-size: 0.63rem;
         }
     }
 
@@ -680,8 +705,8 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# Keep the page metadata in one place. Two rows of four preserve legible,
-# touch-friendly targets on narrow devices while retaining `st.columns`.
+# Keep the navigation metadata in one place. The single eight-item row becomes
+# a horizontally swipeable thumb rail on a phone instead of a vertical list.
 NAV_ITEMS = [
     ("Home", "🌕", "Home"),
     ("Chat", "💬", "Chat"),
@@ -694,23 +719,22 @@ NAV_ITEMS = [
 ]
 
 # `key` gives this container the `.st-key-lunatick-bottom-nav` class. The
-# scoped CSS above makes it sticky at the bottom of the viewport from launch.
+# scoped CSS above keeps this one `st.columns` row horizontal on mobile and
+# makes it fixed at the bottom of the viewport from launch.
 with st.container(key="lunatick-bottom-nav"):
-    for row_start in range(0, len(NAV_ITEMS), 4):
-        row_items = NAV_ITEMS[row_start : row_start + 4]
-        nav_columns = st.columns(4, gap="small")
+    nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
-        for column, (page_name, icon, compact_label) in zip(nav_columns, row_items):
-            with column:
-                st.button(
-                    f"{icon} {compact_label}",
-                    key=f"bottom_nav_{page_name.lower().replace(' ', '_')}",
-                    type="primary" if st.session_state.nav_page == page_name else "secondary",
-                    use_container_width=True,
-                    help=f"Open {page_name}",
-                    on_click=set_nav_page,
-                    args=(page_name,),
-                )
+    for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
+        with column:
+            st.button(
+                f"{icon} {compact_label}",
+                key=f"bottom_nav_{page_name.lower().replace(' ', '_')}",
+                type="primary" if st.session_state.nav_page == page_name else "secondary",
+                use_container_width=True,
+                help=f"Open {page_name}",
+                on_click=set_nav_page,
+                args=(page_name,),
+            )
 
 # The footer remains in normal document flow. The main-container bottom padding
 # added in CSS keeps it fully scrollable above the persistent navigation.
