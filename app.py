@@ -302,15 +302,14 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
-        /* Lift the custom rail above the hosted platform's bottom-right
-           management overlay. The rail buttons and their horizontal layout
-           remain unchanged. */
+        /* Midpoint lift above the hosted platform's bottom-right management
+           overlay. The rail buttons and their horizontal layout are unchanged. */
         [data-testid="stMainBlockContainer"] {
-            padding-bottom: calc(11.05rem + env(safe-area-inset-bottom));
+            padding-bottom: calc(8.425rem + env(safe-area-inset-bottom));
         }
 
         .st-key-lunatick-bottom-nav {
-            bottom: calc(5.25rem + env(safe-area-inset-bottom));
+            bottom: calc(2.625rem + env(safe-area-inset-bottom));
             padding: 0.4rem 0.35rem calc(0.4rem + env(safe-area-inset-bottom));
         }
 
