@@ -244,7 +244,7 @@ LUNATICK_CSS = """
         left: 0 !important;
         bottom: 0 !important;
         width: 50vw !important;
-        height: 4.1rem !important;
+        height: 2.5rem !important;
         margin: 0 !important;
         padding: 0 !important;
         display: block !important;
@@ -264,18 +264,53 @@ LUNATICK_CSS = """
         border: 1px solid rgba(188, 140, 255, 0.62);
         border-radius: 0 1rem 0 0;
         box-shadow: 0 0 18px rgba(110, 64, 201, 0.25), inset 0 0 12px rgba(255, 255, 255, 0.04);
-        color: #d2a8ff;
+        color: transparent;
         display: flex;
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(0.9rem, 2.5vw, 1.35rem);
+        font-size: 0;
         font-weight: 700;
         justify-content: center;
         letter-spacing: 0.12em;
         min-height: 0;
-        padding: 0.75rem;
+        overflow: hidden;
+        padding: 0.25rem;
         pointer-events: auto;
+        position: relative;
         transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
         white-space: nowrap;
+    }
+
+    /* The visible text is layered over the accessible Streamlit button label,
+       preserving the existing Home callback while giving the two lines their
+       own sizes. */
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button::before {
+        color: #d2a8ff;
+        content: "🌙 LUNATICK";
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.76rem, 2.1vw, 1.05rem);
+        font-weight: 700;
+        left: 0;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        position: absolute;
+        right: 0;
+        text-align: center;
+        top: 0.32rem;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button::after {
+        bottom: 0.28rem;
+        color: #8b949e;
+        content: "YOUR COSMIC CONNECTION";
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(0.38rem, 1.05vw, 0.54rem);
+        font-weight: 600;
+        left: 0;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        position: absolute;
+        right: 0;
+        text-align: center;
     }
 
     .st-key-lunatick-home-logo [data-testid="stButton"] > button:hover,
@@ -290,15 +325,24 @@ LUNATICK_CSS = """
     @media (max-width: 480px) {
         .st-key-lunatick-home-logo [data-testid="stButton"] {
             width: 50vw !important;
-            height: calc(6rem + env(safe-area-inset-bottom)) !important;
+            height: 2.5rem !important;
             bottom: 0 !important;
             left: 0 !important;
         }
 
         .st-key-lunatick-home-logo [data-testid="stButton"] > button {
             border-radius: 0 0.9rem 0 0;
-            font-size: clamp(0.78rem, 3.6vw, 1rem);
-            padding: 0.45rem;
+            padding: 0.2rem;
+        }
+
+        .st-key-lunatick-home-logo [data-testid="stButton"] > button::before {
+            font-size: clamp(0.62rem, 3.4vw, 0.86rem);
+            top: 0.28rem;
+        }
+
+        .st-key-lunatick-home-logo [data-testid="stButton"] > button::after {
+            bottom: 0.23rem;
+            font-size: clamp(0.32rem, 1.9vw, 0.46rem);
         }
     }
 
