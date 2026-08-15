@@ -226,6 +226,58 @@ LUNATICK_CSS = """
     }
 
     /* ---------------------------------------------------------------------
+       Persistent lower-left Lunatick home logo
+       ---------------------------------------------------------------------
+       This is a separate fixed button and does not modify the navigation rail. */
+    .st-key-lunatick-home-logo {
+        position: fixed;
+        z-index: 1001;
+        left: clamp(0.75rem, 2vw, 1.4rem);
+        bottom: 0.55rem;
+        margin: 0;
+        pointer-events: none;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+        background: linear-gradient(135deg, rgba(13, 31, 60, 0.96), rgba(45, 27, 105, 0.96));
+        border: 1px solid rgba(188, 140, 255, 0.62);
+        border-radius: 999px;
+        box-shadow: 0 0 18px rgba(110, 64, 201, 0.25), inset 0 0 12px rgba(255, 255, 255, 0.04);
+        color: #d2a8ff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        min-height: 2.35rem;
+        padding: 0.42rem 0.9rem;
+        pointer-events: auto;
+        transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        white-space: nowrap;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button:hover,
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button:focus-visible {
+        border-color: #bc8cff;
+        box-shadow: 0 0 24px rgba(188, 140, 255, 0.42), inset 0 0 14px rgba(255, 255, 255, 0.06);
+        color: #f0e6ff;
+        outline: none;
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 480px) {
+        .st-key-lunatick-home-logo {
+            bottom: calc(0.35rem + env(safe-area-inset-bottom));
+            left: 0.6rem;
+        }
+
+        .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+            font-size: 0.58rem;
+            min-height: 2.1rem;
+            padding: 0.34rem 0.7rem;
+        }
+    }
+
+    /* ---------------------------------------------------------------------
        Fixed bottom navigation
        ---------------------------------------------------------------------
        The keyed container at the end of this file receives the documented
@@ -1297,6 +1349,17 @@ with st.container(key="lunatick-bottom-nav"):
 
 # The footer remains in normal document flow. The main-container bottom padding
 # added in CSS keeps it fully scrollable above the persistent navigation.
+# This separate control is a permanent, lower-left Home shortcut. It uses the
+# existing navigation callback but does not add or alter any NAV_ITEMS entry.
+with st.container(key="lunatick-home-logo"):
+    st.button(
+        "🌙 LUNATICK",
+        key="lunatick_home_logo_button",
+        help="Return to Home",
+        on_click=set_nav_page,
+        args=("Home",),
+    )
+
 st.markdown(
     "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
     "font-family:Orbitron, sans-serif;'>"
