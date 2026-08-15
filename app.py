@@ -64,7 +64,21 @@ LUNATICK_CSS = """
         padding: 0.8rem 1rem;
         margin-bottom: 0.5rem;
         box-shadow: 0 0 30px rgba(110, 64, 201, 0.15);
+        position: relative;
         text-align: center;
+        animation: lunatick-glow-pulse 8s ease-in-out infinite;
+    }
+
+    /* A deliberately slow, low-contrast ambient glow for the Home monitor. */
+    @keyframes lunatick-glow-pulse {
+        0%, 100% {
+            border-color: rgba(110, 64, 201, 0.72);
+            box-shadow: 0 0 26px rgba(110, 64, 201, 0.14), 0 0 44px rgba(31, 111, 235, 0.04);
+        }
+        50% {
+            border-color: rgba(188, 140, 255, 0.94);
+            box-shadow: 0 0 38px rgba(188, 140, 255, 0.24), 0 0 64px rgba(31, 111, 235, 0.10);
+        }
     }
 
     .countdown-display, .stats-row {
@@ -154,6 +168,58 @@ LUNATICK_CSS = """
     .etitle { color: #fff; font-weight: 600; font-size: 0.9rem; }
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
+
+    /* Fluid visual feedback for Streamlit expanders, including Cosmic Card
+       term explanations. The opening panel fades/slides in without changing
+       the existing expander content or behavior. */
+    [data-testid="stExpander"],
+    [data-testid="stExpander"] details {
+        border-color: rgba(188, 140, 255, 0.22);
+        transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+    }
+
+    [data-testid="stExpander"]:has(details[open]),
+    [data-testid="stExpander"][open] {
+        border-color: rgba(188, 140, 255, 0.52);
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.10);
+    }
+
+    [data-testid="stExpander"] summary svg,
+    [data-testid="stExpander"] details summary svg {
+        transition: transform 220ms ease;
+    }
+
+    [data-testid="stExpander"] details[open] > div,
+    [data-testid="stExpander"][open] > div {
+        animation: lunatick-expander-reveal 260ms ease-out both;
+    }
+
+    @keyframes lunatick-expander-reveal {
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Remove Streamlit chrome so the application reads as a focused native
+       experience. App content and the custom Lunatick navigation are intact. */
+    #MainMenu,
+    [data-testid="stDeployButton"],
+    .stDeployButton,
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+
+    [data-testid="stHeader"] {
+        background: transparent;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .glow-container,
+        [data-testid="stExpander"],
+        [data-testid="stExpander"] * {
+            animation: none !important;
+            transition: none !important;
+        }
+    }
 
     /* ---------------------------------------------------------------------
        Fixed bottom navigation
