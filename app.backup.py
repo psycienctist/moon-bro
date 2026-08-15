@@ -226,6 +226,127 @@ LUNATICK_CSS = """
     }
 
     /* ---------------------------------------------------------------------
+       Persistent lower-left Lunatick home logo
+       ---------------------------------------------------------------------
+       This is a separate fixed button and does not modify the navigation rail. */
+    /* Keep the keyed Streamlit wrapper out of layout flow; pin the actual
+       button widget so its visibility does not depend on wrapper height. */
+    .st-key-lunatick-home-logo {
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] {
+        position: fixed !important;
+        z-index: 999 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 50vw !important;
+        height: 2.5rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+        height: 100%;
+        width: 100%;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
+        border: 1px solid rgba(188, 140, 255, 0.62);
+        border-radius: 0 1rem 0 0;
+        box-shadow: 0 0 18px rgba(110, 64, 201, 0.25), inset 0 0 12px rgba(255, 255, 255, 0.04);
+        color: transparent;
+        display: flex;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0;
+        font-weight: 700;
+        justify-content: center;
+        letter-spacing: 0.12em;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0.25rem;
+        pointer-events: auto;
+        position: relative;
+        transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        white-space: nowrap;
+    }
+
+    /* The visible text is layered over the accessible Streamlit button label,
+       preserving the existing Home callback while giving the two lines their
+       own sizes. */
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button::before {
+        color: #d2a8ff;
+        content: "🌙 LUNATICK";
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.76rem, 2.1vw, 1.05rem);
+        font-weight: 700;
+        left: 0;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        position: absolute;
+        right: 0;
+        text-align: center;
+        top: 0.32rem;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button::after {
+        bottom: 0.28rem;
+        color: #8b949e;
+        content: "YOUR COSMIC CONNECTION";
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(0.38rem, 1.05vw, 0.54rem);
+        font-weight: 600;
+        left: 0;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        position: absolute;
+        right: 0;
+        text-align: center;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button:hover,
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button:focus-visible {
+        border-color: #bc8cff;
+        box-shadow: 0 0 24px rgba(188, 140, 255, 0.42), inset 0 0 14px rgba(255, 255, 255, 0.06);
+        color: #f0e6ff;
+        outline: none;
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 480px) {
+        .st-key-lunatick-home-logo [data-testid="stButton"] {
+            width: 50vw !important;
+            height: 2.5rem !important;
+            bottom: 0 !important;
+            left: 0 !important;
+        }
+
+        .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+            border-radius: 0 0.9rem 0 0;
+            padding: 0.2rem;
+        }
+
+        .st-key-lunatick-home-logo [data-testid="stButton"] > button::before {
+            font-size: clamp(0.62rem, 3.4vw, 0.86rem);
+            top: 0.28rem;
+        }
+
+        .st-key-lunatick-home-logo [data-testid="stButton"] > button::after {
+            bottom: 0.23rem;
+            font-size: clamp(0.32rem, 1.9vw, 0.46rem);
+        }
+    }
+
+    /* ---------------------------------------------------------------------
        Fixed bottom navigation
        ---------------------------------------------------------------------
        The keyed container at the end of this file receives the documented
@@ -1297,6 +1418,17 @@ with st.container(key="lunatick-bottom-nav"):
 
 # The footer remains in normal document flow. The main-container bottom padding
 # added in CSS keeps it fully scrollable above the persistent navigation.
+# This separate control is a permanent, lower-left Home shortcut. It uses the
+# existing navigation callback but does not add or alter any NAV_ITEMS entry.
+with st.container(key="lunatick-home-logo"):
+    st.button(
+        "🌙 LUNATICK",
+        key="lunatick_home_logo_button",
+        help="Return to Home",
+        on_click=set_nav_page,
+        args=("Home",),
+    )
+
 st.markdown(
     "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
     "font-family:Orbitron, sans-serif;'>"
