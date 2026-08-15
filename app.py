@@ -231,25 +231,37 @@ LUNATICK_CSS = """
        This is a separate fixed button and does not modify the navigation rail. */
     .st-key-lunatick-home-logo {
         position: fixed;
-        z-index: 1001;
-        left: clamp(0.75rem, 2vw, 1.4rem);
-        bottom: 0.55rem;
+        z-index: 999;
+        left: 0;
+        bottom: 0;
+        width: 50vw;
+        height: 4.1rem;
         margin: 0;
         pointer-events: none;
     }
 
+    .st-key-lunatick-home-logo > div,
+    .st-key-lunatick-home-logo [data-testid="stButton"],
     .st-key-lunatick-home-logo [data-testid="stButton"] > button {
-        background: linear-gradient(135deg, rgba(13, 31, 60, 0.96), rgba(45, 27, 105, 0.96));
+        height: 100%;
+        width: 100%;
+    }
+
+    .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
         border: 1px solid rgba(188, 140, 255, 0.62);
-        border-radius: 999px;
+        border-radius: 0 1rem 0 0;
         box-shadow: 0 0 18px rgba(110, 64, 201, 0.25), inset 0 0 12px rgba(255, 255, 255, 0.04);
         color: #d2a8ff;
+        display: flex;
         font-family: 'Orbitron', sans-serif;
-        font-size: 0.7rem;
+        font-size: clamp(0.9rem, 2.5vw, 1.35rem);
         font-weight: 700;
+        justify-content: center;
         letter-spacing: 0.12em;
-        min-height: 2.35rem;
-        padding: 0.42rem 0.9rem;
+        min-height: 0;
+        padding: 0.75rem;
         pointer-events: auto;
         transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
         white-space: nowrap;
@@ -266,14 +278,16 @@ LUNATICK_CSS = """
 
     @media (max-width: 480px) {
         .st-key-lunatick-home-logo {
-            bottom: calc(0.35rem + env(safe-area-inset-bottom));
-            left: 0.6rem;
+            width: 50vw;
+            height: calc(6rem + env(safe-area-inset-bottom));
+            bottom: 0;
+            left: 0;
         }
 
         .st-key-lunatick-home-logo [data-testid="stButton"] > button {
-            font-size: 0.58rem;
-            min-height: 2.1rem;
-            padding: 0.34rem 0.7rem;
+            border-radius: 0 0.9rem 0 0;
+            font-size: clamp(0.78rem, 3.6vw, 1rem);
+            padding: 0.45rem;
         }
     }
 
