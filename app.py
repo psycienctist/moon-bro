@@ -567,46 +567,15 @@ try:
 except Exception:
     pass
 
-# ---------------------------------------------------------
-# Bottom Navigation (PERSISTENT / STICKY)
-# ---------------------------------------------------------
-st.markdown("""
-<style>
-    .sticky-nav {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background: #05070a;
-        border-top: 1px solid #30363d;
-        padding: 0.4rem 0.2rem 0.6rem 0.2rem;
-        z-index: 999;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.7);
-    }
-    .sticky-nav .stButton button {
-        min-height: 2.6rem;
-        font-size: 0.65rem;
-        padding: 0.1rem 0.2rem;
-        border-radius: 8px;
-        width: 100%;
-        margin: 0 auto;
-        line-height: 1.1;
-        border: 1px solid transparent;
-    }
-    .sticky-nav .stButton button[data-baseweb="button"] {
-        background: transparent !important;
-    }
-    /* Ensure the footer doesn't overlap the sticky nav */
-    .footer-spacer {
-        height: 5rem;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# -------- NAV LOGIC --------
+# ---------------------------------------------------------------------------
+# Main App — Bottom Navigation
+# ---------------------------------------------------------------------------
+# Persist the active destination between Streamlit reruns. "Home" is the
+# first-run default, so existing users land on the same screen as before.
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
 
+# Render exactly one destination above the navigation bar.
 current_page = st.session_state.nav_page
 
 if current_page == "Home":
@@ -626,12 +595,14 @@ elif current_page == "Calendar":
 elif current_page == "Settings":
     render_settings()
 else:
+    # Defensive fallback if an old or unexpected session value exists.
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# -------- STICKY NAVBAR --------
-st.markdown('<div class="sticky-nav">', unsafe_allow_html=True)
+# The separator makes the control area visually distinct from the page body.
+st.markdown("---")
 
+# Keep the navigation metadata in one place. The order matches the old tabs.
 NAV_ITEMS = [
     ("Home", "🌕", "Home"),
     ("Chat", "💬", "Chat"),
@@ -643,6 +614,8 @@ NAV_ITEMS = [
     ("Settings", "⚙️", "Settings"),
 ]
 
+# This is intentionally at the end of the page. `st.columns` produces the
+# requested bottom navigation bar without adding a third-party dependency.
 nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
     with column:
@@ -657,12 +630,6 @@ for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
             st.session_state.nav_page = page_name
             st.rerun()
 
-st.markdown('</div>', unsafe_allow_html=True)
-
-# -------- SPACER (Prevents content from being hidden behind nav) --------
-st.markdown('<div class="footer-spacer"></div>', unsafe_allow_html=True)
-
-# -------- FOOTER (Original Text) --------
 st.markdown(
     "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
     "font-family:Orbitron, sans-serif;'>"
