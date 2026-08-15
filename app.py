@@ -539,6 +539,490 @@ def render_home():
     reflection_ui.render_daily_reflection()
 
 
+def render_tones():
+    """Render Lunatick's client-side, user-controlled Web Audio tone space."""
+    # This local import deliberately leaves the existing top-level imports
+    # untouched. The component runs in an isolated browser iframe, so no audio
+    # or listening data is sent to the server.
+    import streamlit.components.v1 as components
+
+    tone_generator_html = r"""
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        :root {
+          color-scheme: dark;
+          --ink: #05070a;
+          --panel: #0d111b;
+          --panel-raised: #151b2a;
+          --line: rgba(188, 140, 255, 0.32);
+          --line-soft: rgba(255, 255, 255, 0.10);
+          --text: #edf2ff;
+          --muted: #99a4bb;
+          --violet: #bc8cff;
+          --violet-light: #ddc8ff;
+          --blue: #58a6ff;
+          --mint: #92e4bb;
+          --rose: #ff8aa8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+          background: transparent;
+          color: var(--text);
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          margin: 0;
+        }
+
+        .tone-space {
+          background:
+            radial-gradient(circle at 92% 6%, rgba(88, 166, 255, 0.18), transparent 25rem),
+            radial-gradient(circle at 8% 94%, rgba(188, 140, 255, 0.16), transparent 20rem),
+            linear-gradient(145deg, #10182a 0%, #090d16 58%, #17102a 100%);
+          border: 1px solid var(--line);
+          border-radius: 1.2rem;
+          box-shadow: 0 0 32px rgba(110, 64, 201, 0.18), inset 0 0 28px rgba(0, 0, 0, 0.20);
+          overflow: hidden;
+          padding: clamp(1rem, 4vw, 1.45rem);
+        }
+
+        .eyebrow {
+          color: var(--violet);
+          font-size: 0.67rem;
+          font-weight: 800;
+          letter-spacing: 0.18em;
+          margin-bottom: 0.35rem;
+          text-transform: uppercase;
+        }
+
+        h1 {
+          font-family: Orbitron, Inter, sans-serif;
+          font-size: clamp(1.22rem, 4vw, 1.55rem);
+          letter-spacing: 0.07em;
+          margin: 0;
+          text-transform: uppercase;
+        }
+
+        .intro {
+          color: var(--muted);
+          font-size: 0.88rem;
+          line-height: 1.5;
+          margin: 0.55rem 0 1.15rem;
+        }
+
+        .section-label {
+          color: var(--muted);
+          display: block;
+          font-size: 0.66rem;
+          font-weight: 800;
+          letter-spacing: 0.10em;
+          margin-bottom: 0.48rem;
+          text-transform: uppercase;
+        }
+
+        .presets {
+          display: grid;
+          gap: 0.5rem;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          margin-bottom: 1rem;
+        }
+
+        button, input, select { font: inherit; }
+
+        .preset,
+        .action {
+          border: 1px solid var(--line-soft);
+          border-radius: 0.75rem;
+          color: var(--text);
+          cursor: pointer;
+          transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+        }
+
+        .preset {
+          background: rgba(255, 255, 255, 0.045);
+          min-height: 3.45rem;
+          padding: 0.55rem 0.65rem;
+          text-align: left;
+        }
+
+        .preset:hover,
+        .preset:focus-visible {
+          border-color: var(--violet);
+          outline: none;
+          transform: translateY(-1px);
+        }
+
+        .preset[aria-pressed="true"] {
+          background: rgba(188, 140, 255, 0.17);
+          border-color: var(--violet);
+        }
+
+        .preset-name {
+          display: block;
+          font-size: 0.78rem;
+          font-weight: 750;
+        }
+
+        .preset-frequency {
+          color: var(--muted);
+          display: block;
+          font-size: 0.66rem;
+          margin-top: 0.14rem;
+        }
+
+        .controls {
+          display: grid;
+          gap: 0.85rem;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          margin: 0.7rem 0 1rem;
+        }
+
+        .control { min-width: 0; }
+
+        select,
+        input[type="number"] {
+          background: var(--panel-raised);
+          border: 1px solid var(--line-soft);
+          border-radius: 0.62rem;
+          color: var(--text);
+          min-height: 2.45rem;
+          padding: 0.35rem 0.55rem;
+          width: 100%;
+        }
+
+        input[type="range"] {
+          accent-color: var(--violet);
+          cursor: pointer;
+          width: 100%;
+        }
+
+        .volume-line {
+          align-items: center;
+          display: flex;
+          gap: 0.45rem;
+        }
+
+        output {
+          color: var(--violet-light);
+          font-size: 0.75rem;
+          font-variant-numeric: tabular-nums;
+          min-width: 2.6rem;
+          text-align: right;
+        }
+
+        .actions {
+          display: grid;
+          gap: 0.65rem;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .action {
+          font-size: 0.86rem;
+          font-weight: 800;
+          min-height: 2.7rem;
+          padding: 0.55rem 0.7rem;
+        }
+
+        .start {
+          background: linear-gradient(135deg, #7841c7, #aa70f0);
+          border-color: var(--violet);
+        }
+
+        .start:hover,
+        .start:focus-visible {
+          background: linear-gradient(135deg, #8e5cde, #c18bff);
+          outline: none;
+        }
+
+        .stop {
+          background: rgba(255, 138, 168, 0.08);
+          border-color: rgba(255, 138, 168, 0.38);
+        }
+
+        .stop:hover:not(:disabled),
+        .stop:focus-visible:not(:disabled) {
+          background: rgba(255, 138, 168, 0.16);
+          outline: none;
+        }
+
+        button:disabled {
+          cursor: not-allowed;
+          opacity: 0.48;
+        }
+
+        .status {
+          color: var(--muted);
+          font-size: 0.78rem;
+          line-height: 1.45;
+          margin: 0.85rem 0 0;
+          min-height: 1.15rem;
+        }
+
+        .status[data-state="playing"] { color: var(--mint); }
+        .status[data-state="error"] { color: var(--rose); }
+
+        .note {
+          color: #72809b;
+          font-size: 0.67rem;
+          line-height: 1.42;
+          margin: 0.45rem 0 0;
+        }
+
+        @media (max-width: 360px) {
+          .controls { grid-template-columns: 1fr; }
+        }
+      </style>
+    </head>
+    <body>
+      <main class="tone-space" aria-labelledby="tones-title">
+        <div class="eyebrow">Lunatick sound space</div>
+        <h1 id="tones-title">Healing tones</h1>
+        <p class="intro">Choose a tone, set a gentle listening level, and take a moment for yourself.</p>
+
+        <span class="section-label">Tone presets</span>
+        <div class="presets" aria-label="Tone presets">
+          <button class="preset" type="button" data-frequency="174" aria-pressed="false">
+            <span class="preset-name">Earth</span><span class="preset-frequency">174 Hz</span>
+          </button>
+          <button class="preset" type="button" data-frequency="285" aria-pressed="false">
+            <span class="preset-name">Tide</span><span class="preset-frequency">285 Hz</span>
+          </button>
+          <button class="preset" type="button" data-frequency="432" aria-pressed="true">
+            <span class="preset-name">Moon</span><span class="preset-frequency">432 Hz</span>
+          </button>
+          <button class="preset" type="button" data-frequency="528" aria-pressed="false">
+            <span class="preset-name">Starlight</span><span class="preset-frequency">528 Hz</span>
+          </button>
+          <button class="preset" type="button" data-frequency="639" aria-pressed="false">
+            <span class="preset-name">Heart</span><span class="preset-frequency">639 Hz</span>
+          </button>
+          <button class="preset" type="button" data-frequency="741" aria-pressed="false">
+            <span class="preset-name">Clear</span><span class="preset-frequency">741 Hz</span>
+          </button>
+        </div>
+
+        <div class="controls">
+          <div class="control">
+            <label class="section-label" for="frequency">Custom frequency</label>
+            <input id="frequency" type="number" min="100" max="1000" step="1" value="432" inputmode="numeric">
+          </div>
+          <div class="control">
+            <label class="section-label" for="waveform">Waveform</label>
+            <select id="waveform">
+              <option value="sine">Sine — soft</option>
+              <option value="triangle">Triangle — warm</option>
+              <option value="sawtooth">Sawtooth — bright</option>
+            </select>
+          </div>
+          <div class="control">
+            <label class="section-label" for="volume">Listening volume</label>
+            <div class="volume-line">
+              <input id="volume" type="range" min="0" max="18" value="6" step="1" aria-describedby="volume-value">
+              <output id="volume-value" for="volume">6%</output>
+            </div>
+          </div>
+          <div class="control">
+            <span class="section-label">Sound safety</span>
+            <div style="color:var(--muted);font-size:0.75rem;line-height:1.35;padding-top:0.15rem;">Begin softly, especially with headphones.</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="start" class="action start" type="button">Start tone</button>
+          <button id="stop" class="action stop" type="button" disabled>Stop tone</button>
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite" data-state="idle">Ready — Moon is selected at 432 Hz.</p>
+        <p class="note">For personal relaxation only. This feature is not medical treatment or a substitute for professional care.</p>
+      </main>
+
+      <script>
+        (() => {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          const presetButtons = [...document.querySelectorAll(".preset")];
+          const frequencyInput = document.getElementById("frequency");
+          const waveform = document.getElementById("waveform");
+          const volume = document.getElementById("volume");
+          const volumeValue = document.getElementById("volume-value");
+          const startButton = document.getElementById("start");
+          const stopButton = document.getElementById("stop");
+          const status = document.getElementById("status");
+
+          let audioContext = null;
+          let oscillator = null;
+          let outputGain = null;
+          let selectedFrequency = 432;
+
+          function setStatus(message, state = "idle") {
+            status.textContent = message;
+            status.dataset.state = state;
+          }
+
+          function selectedPresetName() {
+            const selected = presetButtons.find(button => button.getAttribute("aria-pressed") === "true");
+            return selected ? selected.querySelector(".preset-name").textContent : "Custom";
+          }
+
+          function currentGain() {
+            return Number(volume.value) / 100;
+          }
+
+          function setPlayingUI(isPlaying) {
+            startButton.disabled = isPlaying;
+            stopButton.disabled = !isPlaying;
+          }
+
+          function updateVolumeLabel() {
+            volumeValue.textContent = `${volume.value}%`;
+          }
+
+          function updateActiveFrequency() {
+            const rawValue = Number(frequencyInput.value);
+            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
+            frequencyInput.value = selectedFrequency;
+
+            if (oscillator && audioContext) {
+              oscillator.frequency.cancelScheduledValues(audioContext.currentTime);
+              oscillator.frequency.setTargetAtTime(selectedFrequency, audioContext.currentTime, 0.03);
+              setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
+            } else {
+              setStatus(`Ready — ${selectedPresetName()} is selected at ${selectedFrequency} Hz.`);
+            }
+          }
+
+          function clearPresetSelection() {
+            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
+          }
+
+          function stopTone() {
+            if (!oscillator || !audioContext || !outputGain) {
+              setPlayingUI(false);
+              return;
+            }
+
+            const source = oscillator;
+            const now = audioContext.currentTime;
+            oscillator = null;
+            outputGain.gain.cancelScheduledValues(now);
+            outputGain.gain.setValueAtTime(Math.max(outputGain.gain.value, 0), now);
+            outputGain.gain.linearRampToValueAtTime(0, now + 0.10);
+            source.stop(now + 0.11);
+            setPlayingUI(false);
+            setStatus("Tone stopped. Ready when you are.");
+          }
+
+          async function startTone() {
+            if (!AudioContextClass) {
+              setStatus("This browser does not support the Web Audio API.", "error");
+              return;
+            }
+
+            try {
+              // Create or resume audio only from a user click, respecting
+              // browser autoplay policies. Reuse one context for the session.
+              if (!audioContext || audioContext.state === "closed") {
+                audioContext = new AudioContextClass();
+              }
+              if (audioContext.state === "suspended") {
+                await audioContext.resume();
+              }
+
+              if (oscillator) {
+                stopTone();
+              }
+
+              const source = audioContext.createOscillator();
+              const gain = audioContext.createGain();
+              source.type = waveform.value;
+              source.frequency.setValueAtTime(selectedFrequency, audioContext.currentTime);
+              gain.gain.setValueAtTime(0, audioContext.currentTime);
+              gain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
+              source.connect(gain);
+              gain.connect(audioContext.destination);
+              source.start();
+
+              oscillator = source;
+              outputGain = gain;
+              source.onended = () => {
+                if (oscillator === source) {
+                  oscillator = null;
+                  setPlayingUI(false);
+                }
+              };
+
+              setPlayingUI(true);
+              setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
+            } catch (error) {
+              console.error("Unable to start tone", error);
+              oscillator = null;
+              setPlayingUI(false);
+              setStatus("The tone could not start. Check browser audio permissions and try again.", "error");
+            }
+          }
+
+          presetButtons.forEach(button => {
+            button.addEventListener("click", () => {
+              selectedFrequency = Number(button.dataset.frequency);
+              frequencyInput.value = selectedFrequency;
+              presetButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+
+              if (oscillator && audioContext) {
+                oscillator.frequency.cancelScheduledValues(audioContext.currentTime);
+                oscillator.frequency.setTargetAtTime(selectedFrequency, audioContext.currentTime, 0.03);
+                setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
+              } else {
+                setStatus(`Ready — ${selectedPresetName()} is selected at ${selectedFrequency} Hz.`);
+              }
+            });
+          });
+
+          frequencyInput.addEventListener("change", () => {
+            clearPresetSelection();
+            updateActiveFrequency();
+          });
+
+          waveform.addEventListener("change", () => {
+            if (oscillator) {
+              oscillator.type = waveform.value;
+            }
+          });
+
+          volume.addEventListener("input", () => {
+            updateVolumeLabel();
+            if (outputGain && audioContext && oscillator) {
+              const now = audioContext.currentTime;
+              outputGain.gain.cancelScheduledValues(now);
+              outputGain.gain.setTargetAtTime(currentGain(), now, 0.025);
+            }
+          });
+
+          startButton.addEventListener("click", startTone);
+          stopButton.addEventListener("click", stopTone);
+
+          // Stop and release browser audio resources if Streamlit unmounts this
+          // component during navigation or a rerun.
+          window.addEventListener("pagehide", () => {
+            if (oscillator) {
+              try { oscillator.stop(); } catch (_) { /* already stopped */ }
+            }
+            if (audioContext && audioContext.state !== "closed") {
+              audioContext.close();
+            }
+          });
+        })();
+      </script>
+    </body>
+    </html>
+    """
+
+    components.html(tone_generator_html, height=620, scrolling=False)
+
+
+
 def render_calendar():
     st.markdown("""
     <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
@@ -698,6 +1182,8 @@ elif current_page == "Journal":
     journal_ui.render_journal_tab()
 elif current_page == "Calendar":
     render_calendar()
+elif current_page == "Tones":
+    render_tones()
 elif current_page == "Settings":
     render_settings()
 else:
@@ -709,6 +1195,7 @@ else:
 # a horizontally swipeable thumb rail on a phone instead of a vertical list.
 NAV_ITEMS = [
     ("Home", "🌕", "Home"),
+    ("Tones", "🎵", "Tones"),
     ("Chat", "💬", "Chat"),
     ("Boards", "📋", "Boards"),
     ("Cosmic Cards", "🃏", "Cards"),
