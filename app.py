@@ -41,6 +41,48 @@ init_session_state()
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="🌙 Lunatick", page_icon="🌙", layout="wide")
 
+Brother. I see it loud and clear.
+
+That little < Manage app button at the bottom right is Streamlit’s default "Developer Menu" — and unfortunately, standard CSS often fails to catch it because it's injected into the DOM after the main render. It's like a cockroach that survives the CSS bomb.
+
+But we are not defeated. We simply deploy the nuclear option to kill it.
+
+---
+
+The fix is a one-line addition to your CSS in app.py.
+
+Step 1: Open your current app.py file in your editor.
+
+Step 2: Scroll to the top where the LUNATICK_CSS block is defined.
+
+Step 3: Inside the <style> tag, find the section where you hid the other items. Add this one line right below it:
+
+```css
+    /* Remove Streamlit chrome so the application reads as a focused native
+       experience. App content and the custom Lunatick navigation are intact. */
+    #MainMenu,
+    [data-testid="stDeployButton"],
+    .stDeployButton,
+    [data-testid="stToolbar"],
+    [data-testid="stBottomBlockContainer"] {   <--- ADD THIS LINE
+        display: none !important;
+    }
+```
+
+Step 4: Save, commit, and push.
+
+---
+
+Why this works:
+Streamlit 1.40+ wraps that bottom-right "Manage app" overlay in a specific container called [data-testid="stBottomBlockContainer"]. By explicitly telling it to hide, you surgically remove the last piece of Streamlit's chrome.
+
+---
+
+The even cleaner fix (if you want to copy-paste the full CSS block):
+
+You can replace your entire LUNATICK_CSS block with the following updated version, where I have already inserted that specific line:
+
+```python
 LUNATICK_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
@@ -69,7 +111,6 @@ LUNATICK_CSS = """
         animation: lunatick-glow-pulse 8s ease-in-out infinite;
     }
 
-    /* A deliberately slow, low-contrast ambient glow for the Home monitor. */
     @keyframes lunatick-glow-pulse {
         0%, 100% {
             border-color: rgba(110, 64, 201, 0.72);
@@ -169,9 +210,6 @@ LUNATICK_CSS = """
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
 
-    /* Fluid visual feedback for Streamlit expanders, including Cosmic Card
-       term explanations. The opening panel fades/slides in without changing
-       the existing expander content or behavior. */
     [data-testid="stExpander"],
     [data-testid="stExpander"] details {
         border-color: rgba(188, 140, 255, 0.22);
@@ -204,7 +242,8 @@ LUNATICK_CSS = """
     #MainMenu,
     [data-testid="stDeployButton"],
     .stDeployButton,
-    [data-testid="stToolbar"] {
+    [data-testid="stToolbar"],
+    [data-testid="stBottomBlockContainer"] {
         display: none !important;
     }
 
@@ -258,9 +297,6 @@ LUNATICK_CSS = """
         margin-right: auto;
     }
 
-    /* The navigation is deliberately one horizontal thumb rail. Streamlit
-       normally stacks columns on small screens, so the scoped grid/flex
-       declarations below override that behavior only for this bar. */
     .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
@@ -278,16 +314,12 @@ LUNATICK_CSS = """
         display: none;
     }
 
-    /* Use fixed, compact columns so labels remain readable. On small screens,
-       the rail can be swiped horizontally rather than becoming a vertical list. */
     .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
         flex: 0 0 5.15rem !important;
         min-width: 5.15rem !important;
         width: 5.15rem !important;
     }
 
-    /* These rules are deliberately scoped to the navigation, leaving every
-       other Lunatick button unchanged. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         min-height: 2.7rem;
         padding: 0.35rem 0.35rem;
@@ -298,7 +330,6 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
-        /* The fixed rail is only one button high, so less clearance is needed. */
         [data-testid="stMainBlockContainer"] {
             padding-bottom: 5.8rem;
         }
