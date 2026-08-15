@@ -155,6 +155,80 @@ LUNATICK_CSS = """
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
 
+    /* ---------------------------------------------------------------------
+       Fixed bottom navigation
+       ---------------------------------------------------------------------
+       The keyed container at the end of this file receives the documented
+       `.st-key-lunatick-bottom-nav` class in Streamlit 1.40+.
+    */
+
+    /* Keep the page's final card, form control, and footer above the fixed
+       navigation bar. */
+    [data-testid="stMainBlockContainer"] {
+        padding-bottom: 9rem;
+    }
+
+    /* Pin only the dedicated navigation container to the viewport. */
+    .st-key-lunatick-bottom-nav {
+        position: fixed;
+        z-index: 1000;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0.55rem clamp(0.6rem, 2vw, 1.5rem) calc(0.55rem + env(safe-area-inset-bottom));
+        background: rgba(10, 14, 23, 0.96);
+        border-top: 1px solid rgba(188, 140, 255, 0.36);
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.38);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+
+    /* Centre the contents on wide displays while the bar spans the viewport. */
+    .st-key-lunatick-bottom-nav > div {
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* These rules are deliberately scoped to the navigation, leaving every
+       other Lunatick button unchanged. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
+        min-height: 2.55rem;
+        padding: 0.35rem 0.25rem;
+        border-radius: 0.7rem;
+        font-size: 0.72rem;
+        line-height: 1.15;
+        white-space: nowrap;
+    }
+
+    .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
+        gap: 0.4rem;
+    }
+
+    .st-key-lunatick-bottom-nav [data-testid="stVerticalBlock"] {
+        gap: 0.4rem;
+    }
+
+    /* Keep four targets per row readable and comfortably tappable on phones. */
+    @media (max-width: 480px) {
+        [data-testid="stMainBlockContainer"] {
+            padding-bottom: 9.4rem;
+        }
+
+        .st-key-lunatick-bottom-nav {
+            padding-left: 0.4rem;
+            padding-right: 0.4rem;
+        }
+
+        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
+            min-height: 2.45rem;
+            padding: 0.3rem 0.1rem;
+            font-size: 0.62rem;
+        }
+    }
+
     ::-webkit-scrollbar { width: 6px; }
 </style>
 """
@@ -568,14 +642,21 @@ except Exception:
     pass
 
 # ---------------------------------------------------------------------------
-# Main App — Bottom Navigation
+# Main App — Fixed Bottom Navigation
 # ---------------------------------------------------------------------------
-# Persist the active destination between Streamlit reruns. "Home" is the
-# first-run default, so existing users land on the same screen as before.
+# Persist the selected destination across Streamlit reruns. Home remains the
+# first-run default.
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
 
-# Render exactly one destination above the navigation bar.
+
+def set_nav_page(page_name: str) -> None:
+    """Switch destinations before the next normal Streamlit script run."""
+    st.session_state.nav_page = page_name
+
+
+# Render one destination in the normal page body. The navigation itself is
+# emitted after this content, but the CSS above fixes it to the viewport.
 current_page = st.session_state.nav_page
 
 if current_page == "Home":
@@ -595,14 +676,12 @@ elif current_page == "Calendar":
 elif current_page == "Settings":
     render_settings()
 else:
-    # Defensive fallback if an old or unexpected session value exists.
+    # Defensive fallback for an old or unexpected session value.
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# The separator makes the control area visually distinct from the page body.
-st.markdown("---")
-
-# Keep the navigation metadata in one place. The order matches the old tabs.
+# Keep the page metadata in one place. Two rows of four preserve legible,
+# touch-friendly targets on narrow devices while retaining `st.columns`.
 NAV_ITEMS = [
     ("Home", "🌕", "Home"),
     ("Chat", "💬", "Chat"),
@@ -614,22 +693,27 @@ NAV_ITEMS = [
     ("Settings", "⚙️", "Settings"),
 ]
 
-# This is intentionally at the end of the page. `st.columns` produces the
-# requested bottom navigation bar without adding a third-party dependency.
-nav_columns = st.columns(len(NAV_ITEMS), gap="small")
-for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-    with column:
-        is_active = st.session_state.nav_page == page_name
-        if st.button(
-            f"{icon}\n{compact_label}",
-            key=f"bottom_nav_{page_name.lower().replace(' ', '_')}",
-            type="primary" if is_active else "secondary",
-            use_container_width=True,
-            help=f"Open {page_name}",
-        ):
-            st.session_state.nav_page = page_name
-            st.rerun()
+# `key` gives this container the `.st-key-lunatick-bottom-nav` class. The
+# scoped CSS above makes it sticky at the bottom of the viewport from launch.
+with st.container(key="lunatick-bottom-nav"):
+    for row_start in range(0, len(NAV_ITEMS), 4):
+        row_items = NAV_ITEMS[row_start : row_start + 4]
+        nav_columns = st.columns(4, gap="small")
 
+        for column, (page_name, icon, compact_label) in zip(nav_columns, row_items):
+            with column:
+                st.button(
+                    f"{icon} {compact_label}",
+                    key=f"bottom_nav_{page_name.lower().replace(' ', '_')}",
+                    type="primary" if st.session_state.nav_page == page_name else "secondary",
+                    use_container_width=True,
+                    help=f"Open {page_name}",
+                    on_click=set_nav_page,
+                    args=(page_name,),
+                )
+
+# The footer remains in normal document flow. The main-container bottom padding
+# added in CSS keeps it fully scrollable above the persistent navigation.
 st.markdown(
     "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
     "font-family:Orbitron, sans-serif;'>"
