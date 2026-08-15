@@ -302,12 +302,15 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
-        /* The fixed rail is only one button high, so less clearance is needed. */
+        /* Lift the custom rail above the hosted platform's bottom-right
+           management overlay. The rail buttons and their horizontal layout
+           remain unchanged. */
         [data-testid="stMainBlockContainer"] {
-            padding-bottom: 5.8rem;
+            padding-bottom: calc(11.05rem + env(safe-area-inset-bottom));
         }
 
         .st-key-lunatick-bottom-nav {
+            bottom: calc(5.25rem + env(safe-area-inset-bottom));
             padding: 0.4rem 0.35rem calc(0.4rem + env(safe-area-inset-bottom));
         }
 
