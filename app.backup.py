@@ -204,7 +204,11 @@ LUNATICK_CSS = """
     #MainMenu,
     [data-testid="stDeployButton"],
     .stDeployButton,
-    [data-testid="stToolbar"] {
+    [data-testid="stToolbar"],
+    [data-testid="stAppFooter"],
+    [data-testid="stManageApp"],
+    [data-testid="stManageAppButton"],
+    footer {
         display: none !important;
     }
 
@@ -298,12 +302,14 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
-        /* The fixed rail is only one button high, so less clearance is needed. */
+        /* Midpoint lift above the hosted platform's bottom-right management
+           overlay. The rail buttons and their horizontal layout are unchanged. */
         [data-testid="stMainBlockContainer"] {
-            padding-bottom: 5.8rem;
+            padding-bottom: calc(8.425rem + env(safe-area-inset-bottom));
         }
 
         .st-key-lunatick-bottom-nav {
+            bottom: calc(2.625rem + env(safe-area-inset-bottom));
             padding: 0.4rem 0.35rem calc(0.4rem + env(safe-area-inset-bottom));
         }
 
@@ -1298,3 +1304,4 @@ st.markdown(
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
     unsafe_allow_html=True,
+)
