@@ -568,47 +568,71 @@ except Exception:
     pass
 
 # ---------------------------------------------------------------------------
-# Main App — Tabs
+# Main App — Bottom Navigation
 # ---------------------------------------------------------------------------
+# Persist the active destination between Streamlit reruns. "Home" is the
+# first-run default, so existing users land on the same screen as before.
+if "nav_page" not in st.session_state:
+    st.session_state.nav_page = "Home"
 
-tabs = st.tabs([
-    "🌕 Home",
-    "💬 Chat",
-    "📋 Boards",
-    "🃏 Cosmic Cards",
-    "💬 LunaTick Talk",
-    "📓 Journal",
-    "📅 Calendar",
-    "⚙️ Settings",
-])
+# Render exactly one destination above the navigation bar.
+current_page = st.session_state.nav_page
 
-with tabs[0]:
+if current_page == "Home":
     render_home()
-
-with tabs[1]:
+elif current_page == "Chat":
     chat_room.render_chat_tab()
-
-with tabs[2]:
+elif current_page == "Boards":
     boards.render_boards_tab()
-
-with tabs[3]:
+elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
-
-with tabs[4]:
+elif current_page == "LunaTick Talk":
     talk_ui.render_talk_tab()
-
-with tabs[5]:
+elif current_page == "Journal":
     journal_ui.render_journal_tab()
-
-with tabs[6]:
+elif current_page == "Calendar":
     render_calendar()
-
-with tabs[7]:
+elif current_page == "Settings":
     render_settings()
+else:
+    # Defensive fallback if an old or unexpected session value exists.
+    st.session_state.nav_page = "Home"
+    st.rerun()
 
+# The separator makes the control area visually distinct from the page body.
 st.markdown("---")
+
+# Keep the navigation metadata in one place. The order matches the old tabs.
+NAV_ITEMS = [
+    ("Home", "🌕", "Home"),
+    ("Chat", "💬", "Chat"),
+    ("Boards", "📋", "Boards"),
+    ("Cosmic Cards", "🃏", "Cards"),
+    ("LunaTick Talk", "🗣️", "Talk"),
+    ("Journal", "📓", "Journal"),
+    ("Calendar", "📅", "Calendar"),
+    ("Settings", "⚙️", "Settings"),
+]
+
+# This is intentionally at the end of the page. `st.columns` produces the
+# requested bottom navigation bar without adding a third-party dependency.
+nav_columns = st.columns(len(NAV_ITEMS), gap="small")
+for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
+    with column:
+        is_active = st.session_state.nav_page == page_name
+        if st.button(
+            f"{icon}\n{compact_label}",
+            key=f"bottom_nav_{page_name.lower().replace(' ', '_')}",
+            type="primary" if is_active else "secondary",
+            use_container_width=True,
+            help=f"Open {page_name}",
+        ):
+            st.session_state.nav_page = page_name
+            st.rerun()
+
 st.markdown(
-    "<p style='text-align:center; color:#484f58; font-size:0.65rem; font-family:'Orbitron', sans-serif;'>"
+    "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
+    "font-family:Orbitron, sans-serif;'>"
     "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
