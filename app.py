@@ -229,19 +229,30 @@ LUNATICK_CSS = """
        Persistent lower-left Lunatick home logo
        ---------------------------------------------------------------------
        This is a separate fixed button and does not modify the navigation rail. */
+    /* Keep the keyed Streamlit wrapper out of layout flow; pin the actual
+       button widget so its visibility does not depend on wrapper height. */
     .st-key-lunatick-home-logo {
-        position: fixed;
-        z-index: 999;
-        left: 0;
-        bottom: 0;
-        width: 50vw;
-        height: 4.1rem;
-        margin: 0;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
         pointer-events: none;
     }
 
-    .st-key-lunatick-home-logo > div,
-    .st-key-lunatick-home-logo [data-testid="stButton"],
+    .st-key-lunatick-home-logo [data-testid="stButton"] {
+        position: fixed !important;
+        z-index: 999 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 50vw !important;
+        height: 4.1rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto;
+    }
+
     .st-key-lunatick-home-logo [data-testid="stButton"] > button {
         height: 100%;
         width: 100%;
@@ -277,11 +288,11 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
-        .st-key-lunatick-home-logo {
-            width: 50vw;
-            height: calc(6rem + env(safe-area-inset-bottom));
-            bottom: 0;
-            left: 0;
+        .st-key-lunatick-home-logo [data-testid="stButton"] {
+            width: 50vw !important;
+            height: calc(6rem + env(safe-area-inset-bottom)) !important;
+            bottom: 0 !important;
+            left: 0 !important;
         }
 
         .st-key-lunatick-home-logo [data-testid="stButton"] > button {
