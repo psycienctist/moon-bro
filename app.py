@@ -204,7 +204,11 @@ LUNATICK_CSS = """
     #MainMenu,
     [data-testid="stDeployButton"],
     .stDeployButton,
-    [data-testid="stToolbar"] {
+    [data-testid="stToolbar"],
+    [data-testid="stAppFooter"],
+    [data-testid="stManageApp"],
+    [data-testid="stManageAppButton"],
+    footer {
         display: none !important;
     }
 
