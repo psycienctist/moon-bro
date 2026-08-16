@@ -709,3 +709,4 @@ def render_home():
             <div class="stat-label">Age</div>
             <div class="stat-val">{current["age_days"]:.1f}d</div>
             <div class="stat-label" style="font-size:0
+```
