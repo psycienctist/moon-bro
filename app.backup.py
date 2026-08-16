@@ -244,7 +244,7 @@ LUNATICK_CSS = """
         left: 0 !important;
         bottom: 0 !important;
         width: 50vw !important;
-        height: 2.5rem !important;
+        height: 5rem !important;
         margin: 0 !important;
         padding: 0 !important;
         display: block !important;
@@ -325,7 +325,7 @@ LUNATICK_CSS = """
     @media (max-width: 480px) {
         .st-key-lunatick-home-logo [data-testid="stButton"] {
             width: 50vw !important;
-            height: 2.5rem !important;
+            height: 5rem !important;
             bottom: 0 !important;
             left: 0 !important;
         }
@@ -1435,3 +1435,5 @@ st.markdown(
     "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
+    unsafe_allow_html=True,
+)
