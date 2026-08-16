@@ -1431,3 +1431,6 @@ with st.container(key="lunatick-home-logo"):
 
 st.markdown(
     "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
+    "font-family:Orbitron, sans-serif;'>"
+    "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
+    "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
