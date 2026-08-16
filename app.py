@@ -541,37 +541,46 @@ def get_celestial_data(date_utc: datetime):
     }
 
 
-@st.cache_data(ttl=3600)
-def get_ai_insight(natal, current, aspect):
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        return None
-
-    prompt = f"""
-    As a cosmic guide, provide a short, poetic, and encouraging astrology insight (max 3 sentences).
-    User Natal: Sun in {natal['sun_sign']}, Moon in {natal['moon_sign']}.
-    Current Sky: Moon in {current['moon_sign']} ({current['phase_name']}).
-    Natal-Current Aspect: {aspect}.
-    Tone: Mystical, empowering, and modern.
-    """
-
-    try:
-        response = requests.post(
-            "https://api.deepseek.com/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": "You are a mystical cosmic guide for the Lunatick app."},
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
-            },
-            timeout=10,
-        )
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception:
-        return None
+# ---------------------------------------------------------------------------
+# FALLBACK: No-API, cost-free poetic insight generator
+# ---------------------------------------------------------------------------
+def get_ai_insight_fallback(natal, current, aspect):
+    """Local, poetic insight generator — no API calls, no cost, keeps the vibe."""
+    moon_poetry = {
+        "Aries": "Your heart is a bonfire. Today, let your feelings lead — they know the way before your mind does.",
+        "Taurus": "Your emotions are rooted like an ancient oak. Ground yourself in what feels real and steady.",
+        "Gemini": "Your feelings flicker like fireflies. Write them down, share them, let them dance.",
+        "Cancer": "Your heart is a tide pool — deep, protected, full of life. Nurture yourself today.",
+        "Leo": "Your emotions are a golden sunrise. Let them warm you, and let them be seen.",
+        "Virgo": "Your feelings are a finely tuned instrument. Listen closely — they're telling you exactly what needs care.",
+        "Libra": "Your heart seeks harmony. Honor both sides of your emotions today; balance is not betrayal.",
+        "Scorpio": "Your feelings run deep, like a hidden river. Trust the currents — they're carrying you toward transformation.",
+        "Sagittarius": "Your emotions are wanderlust. Follow them — they're pulling you toward a truth you're ready to meet.",
+        "Capricorn": "Your feelings build slowly, like a cathedral. You don't need to rush. Your steady heart is your strength.",
+        "Aquarius": "Your heart beats for the collective. Your feelings are a signal of what the world needs to hear right now.",
+        "Pisces": "Your emotions are an ocean. Let yourself float; you are held by something greater than you can name."
+    }
+    aspect_poetry = {
+        "Lunar Return": "The cosmos has aligned with your birth. This is a moment of homecoming. Trust what feels familiar.",
+        "Opposition": "Two parts of you are speaking at once. Don't choose — listen. The truth is in the tension.",
+        "Square": "The universe is asking you to stretch. Growth happens in the discomfort. You are not breaking — you are expanding.",
+        "Trine": "The stars are pouring grace into your path. Receive it. Let yourself be carried.",
+        "Cycle": "The wheel turns slowly, but it turns. You are exactly where you need to be. Trust the pace.",
+    }
+    vibe_boosters = [
+        "The moon knows your name.",
+        "You are the pattern in the chaos.",
+        "Every star in the sky is a mirror.",
+        "The universe listens when you feel.",
+        "Your pulse is the rhythm of creation."
+    ]
+    moon_sign = current['moon_sign']
+    aspect_key = aspect if aspect in aspect_poetry else "Cycle"
+    base = f"{moon_poetry.get(moon_sign, 'Your heart is a universe unto itself.')}"
+    aspect_line = f" {aspect_poetry.get(aspect_key, 'The cosmos is speaking — listen closely.')}"
+    vibe_line = f" {vibe_boosters[len(moon_sign) % len(vibe_boosters)]}"
+    insight = f"{base}{aspect_line} {vibe_line}"
+    return insight
 
 
 def render_home():
@@ -649,7 +658,7 @@ def render_home():
     else:
         aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
 
-    insight = get_ai_insight(natal, current, aspect)
+    insight = get_ai_insight_fallback(natal, current, aspect)
 
     sun_c = cosmic_cards.sign_color(natal["sun_sign"])
     moon_c = cosmic_cards.sign_color(natal["moon_sign"])
@@ -672,7 +681,7 @@ def render_home():
         </div>
         {f'''
         <div style="margin-top:0.8rem; background:rgba(188, 140, 255, 0.1); padding:0.8rem; border-radius:10px; border:1px solid #bc8cff;">
-            <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 DEEPSEEK AI INSIGHT</div>
+            <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 COSMIC INSIGHT</div>
             <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem; font-style: italic;">"{insight}"</div>
         </div>
         ''' if insight else ''}
