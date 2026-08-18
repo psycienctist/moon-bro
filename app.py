@@ -950,11 +950,10 @@ def render_tones():
           </button>
         </div>
 
-        <!-- Mode Toggle -->
+        <!-- Mode Toggle (Standard / Binaural only) -->
         <div class="mode-toggle" role="group" aria-label="Audio mode">
           <button id="mode-standard" class="active">Standard</button>
           <button id="mode-binaural">Binaural (Headphones)</button>
-          <button id="mode-random">Random / Sweep</button>
         </div>
 
         <div class="controls">
@@ -1023,7 +1022,6 @@ def render_tones():
           const status = document.getElementById("status");
           const modeStandard = document.getElementById("mode-standard");
           const modeBinaural = document.getElementById("mode-binaural");
-          const modeRandom = document.getElementById("mode-random");
           const beatControl = document.getElementById("beat-control");
 
           let audioContext = null;
@@ -1290,14 +1288,13 @@ def render_tones():
             });
           });
 
-          // Cycle mode selector
+          // Cycle mode selector (activates cyclic mode)
           cycleModeSelect.addEventListener("change", () => {
-            if (isRandom && leftOsc) {
-              // If already playing, reset the interval with new mode
+            isRandom = true;
+            if (leftOsc) {
               clearInterval(randomInterval);
               sequenceIndex = 0;
               sequenceDirection = 1;
-              // Pick next frequency based on new mode
               if (cycleModeSelect.value === 'random') {
                 const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
                 setFrequency(presetFrequencies[randomIndex]);
@@ -1312,13 +1309,12 @@ def render_tones():
             }
           });
 
-          // Mode Toggle (Standard/Binaural/Random)
+          // Mode Toggle (Standard/Binaural)
           modeStandard.addEventListener("click", () => {
             isBinaural = false;
             isRandom = false;
             modeStandard.classList.add("active");
             modeBinaural.classList.remove("active");
-            modeRandom.classList.remove("active");
             beatControl.style.display = "none";
             if (leftOsc || rightOsc) stopTone();
             setPlayingUI(false);
@@ -1330,26 +1326,10 @@ def render_tones():
             isRandom = false;
             modeBinaural.classList.add("active");
             modeStandard.classList.remove("active");
-            modeRandom.classList.remove("active");
             beatControl.style.display = "block";
             if (leftOsc || rightOsc) stopTone();
             setPlayingUI(false);
             setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
-          });
-
-          modeRandom.addEventListener("click", () => {
-            isRandom = true;
-            modeRandom.classList.add("active");
-            modeStandard.classList.remove("active");
-            modeBinaural.classList.remove("active");
-            if (isBinaural) {
-              beatControl.style.display = "block";
-            } else {
-              beatControl.style.display = "none";
-            }
-            if (leftOsc || rightOsc) stopTone();
-            setPlayingUI(false);
-            setStatus(`Random mode. Press Start to cycle.`);
           });
 
           frequencyInput.addEventListener("change", updateActiveFrequency);
