@@ -950,10 +950,21 @@ def render_tones():
           </button>
         </div>
 
+        <!-- Mode Toggle -->
+        <div class="mode-toggle" role="group" aria-label="Audio mode">
+          <button id="mode-standard" class="active">Standard</button>
+          <button id="mode-binaural">Binaural (Headphones)</button>
+          <button id="mode-random">Random</button>
+        </div>
+
         <div class="controls">
           <div class="control">
-            <label class="section-label" for="frequency">Custom frequency</label>
+            <label class="section-label" for="frequency">Base frequency</label>
             <input id="frequency" type="number" min="100" max="1000" step="1" value="432" inputmode="numeric">
+          </div>
+          <div class="control" id="beat-control" style="display: none;">
+            <label class="section-label" for="beat">Beat frequency (Hz)</label>
+            <input id="beat" type="number" min="0" max="20" step="0.01" value="7.83" inputmode="decimal">
           </div>
           <div class="control">
             <label class="section-label" for="waveform">Waveform</label>
@@ -969,10 +980,6 @@ def render_tones():
               <input id="volume" type="range" min="0" max="18" value="6" step="1" aria-describedby="volume-value">
               <output id="volume-value" for="volume">6%</output>
             </div>
-          </div>
-          <div class="control">
-            <span class="section-label">Sound safety</span>
-            <div style="color:var(--muted);font-size:0.75rem;line-height:1.35;padding-top:0.15rem;">Begin softly, especially with headphones.</div>
           </div>
         </div>
 
@@ -990,26 +997,38 @@ def render_tones():
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           const presetButtons = [...document.querySelectorAll(".preset")];
           const frequencyInput = document.getElementById("frequency");
+          const beatInput = document.getElementById("beat");
           const waveform = document.getElementById("waveform");
           const volume = document.getElementById("volume");
           const volumeValue = document.getElementById("volume-value");
           const startButton = document.getElementById("start");
           const stopButton = document.getElementById("stop");
           const status = document.getElementById("status");
+          const modeStandard = document.getElementById("mode-standard");
+          const modeBinaural = document.getElementById("mode-binaural");
+          const modeRandom = document.getElementById("mode-random");
+          const beatControl = document.getElementById("beat-control");
 
           let audioContext = null;
-          let oscillator = null;
-          let outputGain = null;
+          let leftOsc = null;
+          let rightOsc = null;
+          let leftGain = null;
+          let rightGain = null;
+          let isBinaural = false;
+          let isRandom = false;
+          let beatFrequency = 7.83;
           let selectedFrequency = 432;
+          let randomInterval = null;
+          const presetFrequencies = [174, 285, 432, 528, 639, 741];
 
           function setStatus(message, state = "idle") {
             status.textContent = message;
             status.dataset.state = state;
           }
 
-          function selectedPresetName() {
-            const selected = presetButtons.find(button => button.getAttribute("aria-pressed") === "true");
-            return selected ? selected.querySelector(".preset-name").textContent : "Custom";
+          function selectedPresetName(freq) {
+            const button = presetButtons.find(b => Number(b.dataset.frequency) === freq);
+            return button ? button.querySelector(".preset-name").textContent : "Custom";
           }
 
           function currentGain() {
@@ -1019,43 +1038,53 @@ def render_tones():
           function setPlayingUI(isPlaying) {
             startButton.disabled = isPlaying;
             stopButton.disabled = !isPlaying;
+            // Disable preset buttons when Random is active and playing
+            presetButtons.forEach(btn => btn.disabled = isPlaying && isRandom);
           }
 
           function updateVolumeLabel() {
             volumeValue.textContent = `${volume.value}%`;
           }
 
-          function updateActiveFrequency() {
-            const rawValue = Number(frequencyInput.value);
-            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
-            frequencyInput.value = selectedFrequency;
-
-            if (oscillator && audioContext) {
-              oscillator.frequency.cancelScheduledValues(audioContext.currentTime);
-              oscillator.frequency.setTargetAtTime(selectedFrequency, audioContext.currentTime, 0.03);
-              setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
-            } else {
-              setStatus(`Ready — ${selectedPresetName()} is selected at ${selectedFrequency} Hz.`);
+          function setFrequency(freq) {
+            selectedFrequency = freq;
+            if (isBinaural && leftOsc && rightOsc && audioContext) {
+              leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
+              leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
+              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
+              rightOsc.frequency.setTargetAtTime(freq + beatFrequency, audioContext.currentTime, 0.03);
+            } else if (leftOsc && audioContext) {
+              leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
+              leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
             }
-          }
-
-          function clearPresetSelection() {
-            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
+            // Update status
+            if (isRandom) {
+              setStatus(`Random: ${selectedPresetName(freq)} (${freq} Hz)${isBinaural ? ` + ${beatFrequency} Hz beat` : ''}`, "playing");
+            } else {
+              setStatus(`Playing ${selectedPresetName(freq)} at ${freq} Hz.`, "playing");
+            }
           }
 
           function stopTone() {
-            if (!oscillator || !audioContext || !outputGain) {
-              setPlayingUI(false);
-              return;
+            const now = audioContext ? audioContext.currentTime : 0;
+            if (randomInterval) {
+              clearInterval(randomInterval);
+              randomInterval = null;
             }
-
-            const source = oscillator;
-            const now = audioContext.currentTime;
-            oscillator = null;
-            outputGain.gain.cancelScheduledValues(now);
-            outputGain.gain.setValueAtTime(Math.max(outputGain.gain.value, 0), now);
-            outputGain.gain.linearRampToValueAtTime(0, now + 0.10);
-            source.stop(now + 0.11);
+            if (leftOsc) {
+              leftGain.gain.cancelScheduledValues(now);
+              leftGain.gain.setValueAtTime(Math.max(leftGain.gain.value, 0), now);
+              leftGain.gain.linearRampToValueAtTime(0, now + 0.10);
+              leftOsc.stop(now + 0.11);
+              leftOsc = null; leftGain = null;
+            }
+            if (rightOsc) {
+              rightGain.gain.cancelScheduledValues(now);
+              rightGain.gain.setValueAtTime(Math.max(rightGain.gain.value, 0), now);
+              rightGain.gain.linearRampToValueAtTime(0, now + 0.10);
+              rightOsc.stop(now + 0.11);
+              rightOsc = null; rightGain = null;
+            }
             setPlayingUI(false);
             setStatus("Tone stopped. Ready when you are.");
           }
@@ -1067,8 +1096,6 @@ def render_tones():
             }
 
             try {
-              // Create or resume audio only from a user click, respecting
-              // browser autoplay policies. Reuse one context for the session.
               if (!audioContext || audioContext.state === "closed") {
                 audioContext = new AudioContextClass();
               }
@@ -1076,84 +1103,196 @@ def render_tones():
                 await audioContext.resume();
               }
 
-              if (oscillator) {
+              if (leftOsc || rightOsc) {
                 stopTone();
+                await new Promise(r => setTimeout(r, 100));
               }
 
-              const source = audioContext.createOscillator();
-              const gain = audioContext.createGain();
-              source.type = waveform.value;
-              source.frequency.setValueAtTime(selectedFrequency, audioContext.currentTime);
-              gain.gain.setValueAtTime(0, audioContext.currentTime);
-              gain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-              source.connect(gain);
-              gain.connect(audioContext.destination);
-              source.start();
+              // Determine frequency: if random, pick first random
+              let startFreq = selectedFrequency;
+              if (isRandom) {
+                // Pick a random preset
+                const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
+                startFreq = presetFrequencies[randomIndex];
+                // Start the interval to change every 3 seconds
+                randomInterval = setInterval(() => {
+                  const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
+                  setFrequency(newFreq);
+                }, 3000);
+              }
 
-              oscillator = source;
-              outputGain = gain;
-              source.onended = () => {
-                if (oscillator === source) {
-                  oscillator = null;
-                  setPlayingUI(false);
+              if (isBinaural) {
+                // Left channel
+                leftOsc = audioContext.createOscillator();
+                leftGain = audioContext.createGain();
+                const leftPanner = audioContext.createStereoPanner();
+                leftPanner.pan.value = -1;
+                leftOsc.type = waveform.value;
+                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
+                leftGain.gain.setValueAtTime(0, audioContext.currentTime);
+                leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
+                leftOsc.connect(leftGain);
+                leftGain.connect(leftPanner);
+                leftPanner.connect(audioContext.destination);
+                leftOsc.start();
+
+                // Right channel
+                const rightFreq = startFreq + beatFrequency;
+                rightOsc = audioContext.createOscillator();
+                rightGain = audioContext.createGain();
+                const rightPanner = audioContext.createStereoPanner();
+                rightPanner.pan.value = 1;
+                rightOsc.type = waveform.value;
+                rightOsc.frequency.setValueAtTime(rightFreq, audioContext.currentTime);
+                rightGain.gain.setValueAtTime(0, audioContext.currentTime);
+                rightGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
+                rightOsc.connect(rightGain);
+                rightGain.connect(rightPanner);
+                rightPanner.connect(audioContext.destination);
+                rightOsc.start();
+
+                leftOsc.onended = () => { leftOsc = null; };
+                rightOsc.onended = () => { rightOsc = null; };
+
+                setPlayingUI(true);
+                if (isRandom) {
+                  setStatus(`Random: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
+                } else {
+                  setStatus(`Binaural: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
                 }
-              };
+              } else {
+                // Standard mono
+                leftOsc = audioContext.createOscillator();
+                leftGain = audioContext.createGain();
+                leftOsc.type = waveform.value;
+                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
+                leftGain.gain.setValueAtTime(0, audioContext.currentTime);
+                leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
+                leftOsc.connect(leftGain);
+                leftGain.connect(audioContext.destination);
+                leftOsc.start();
 
-              setPlayingUI(true);
-              setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
+                leftOsc.onended = () => { leftOsc = null; };
+
+                setPlayingUI(true);
+                if (isRandom) {
+                  setStatus(`Random: ${selectedPresetName(startFreq)} (${startFreq} Hz)`, "playing");
+                } else {
+                  setStatus(`Playing ${selectedPresetName(startFreq)} at ${startFreq} Hz.`, "playing");
+                }
+              }
             } catch (error) {
               console.error("Unable to start tone", error);
-              oscillator = null;
+              leftOsc = null; rightOsc = null;
               setPlayingUI(false);
               setStatus("The tone could not start. Check browser audio permissions and try again.", "error");
             }
           }
 
+          function updateActiveFrequency() {
+            const rawValue = Number(frequencyInput.value);
+            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
+            frequencyInput.value = selectedFrequency;
+            if (!isRandom && leftOsc) {
+              setFrequency(selectedFrequency);
+            } else if (!isRandom) {
+              setStatus(`Ready — ${selectedPresetName(selectedFrequency)} is selected at ${selectedFrequency} Hz.`);
+            }
+          }
+
+          function updateBeat() {
+            const rawValue = Number(beatInput.value);
+            beatFrequency = Math.min(20, Math.max(0, Number.isFinite(rawValue) ? rawValue : 7.83));
+            beatInput.value = beatFrequency;
+            if (isBinaural && leftOsc && rightOsc && audioContext) {
+              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
+              rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
+              setStatus(`Binaural: ${selectedPresetName(selectedFrequency)} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
+            } else {
+              setStatus(`Binaural mode ready. Beat set to ${beatFrequency} Hz.`);
+            }
+          }
+
+          function clearPresetSelection() {
+            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
+          }
+
+          // Preset Buttons
           presetButtons.forEach(button => {
             button.addEventListener("click", () => {
+              if (isRandom) return; // ignore if random mode active
               selectedFrequency = Number(button.dataset.frequency);
               frequencyInput.value = selectedFrequency;
               presetButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
-
-              if (oscillator && audioContext) {
-                oscillator.frequency.cancelScheduledValues(audioContext.currentTime);
-                oscillator.frequency.setTargetAtTime(selectedFrequency, audioContext.currentTime, 0.03);
-                setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
-              } else {
-                setStatus(`Ready — ${selectedPresetName()} is selected at ${selectedFrequency} Hz.`);
-              }
+              updateActiveFrequency();
             });
           });
 
-          frequencyInput.addEventListener("change", () => {
-            clearPresetSelection();
-            updateActiveFrequency();
+          // Mode Toggle
+          modeStandard.addEventListener("click", () => {
+            isBinaural = false;
+            isRandom = false;
+            modeStandard.classList.add("active");
+            modeBinaural.classList.remove("active");
+            modeRandom.classList.remove("active");
+            beatControl.style.display = "none";
+            if (leftOsc || rightOsc) stopTone();
+            setStatus("Standard mode. Select a frequency.");
           });
 
-          waveform.addEventListener("change", () => {
-            if (oscillator) {
-              oscillator.type = waveform.value;
+          modeBinaural.addEventListener("click", () => {
+            isBinaural = true;
+            isRandom = false;
+            modeBinaural.classList.add("active");
+            modeStandard.classList.remove("active");
+            modeRandom.classList.remove("active");
+            beatControl.style.display = "block";
+            if (leftOsc || rightOsc) stopTone();
+            setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
+          });
+
+          modeRandom.addEventListener("click", () => {
+            isRandom = true;
+            // Keep current binaural state
+            modeRandom.classList.add("active");
+            modeStandard.classList.remove("active");
+            modeBinaural.classList.remove("active");
+            if (isBinaural) {
+              beatControl.style.display = "block";
+            } else {
+              beatControl.style.display = "none";
             }
+            if (leftOsc || rightOsc) stopTone();
+            setStatus("Random mode. Press Start to cycle through presets.");
+          });
+
+          frequencyInput.addEventListener("change", updateActiveFrequency);
+          beatInput.addEventListener("change", updateBeat);
+
+          waveform.addEventListener("change", () => {
+            if (leftOsc) leftOsc.type = waveform.value;
+            if (rightOsc) rightOsc.type = waveform.value;
           });
 
           volume.addEventListener("input", () => {
             updateVolumeLabel();
-            if (outputGain && audioContext && oscillator) {
-              const now = audioContext.currentTime;
-              outputGain.gain.cancelScheduledValues(now);
-              outputGain.gain.setTargetAtTime(currentGain(), now, 0.025);
+            const currentGainValue = currentGain();
+            if (leftGain && audioContext) {
+              leftGain.gain.cancelScheduledValues(audioContext.currentTime);
+              leftGain.gain.setTargetAtTime(currentGainValue, audioContext.currentTime, 0.025);
+            }
+            if (rightGain && audioContext) {
+              rightGain.gain.cancelScheduledValues(audioContext.currentTime);
+              rightGain.gain.setTargetAtTime(currentGainValue, audioContext.currentTime, 0.025);
             }
           });
 
           startButton.addEventListener("click", startTone);
           stopButton.addEventListener("click", stopTone);
 
-          // Stop and release browser audio resources if Streamlit unmounts this
-          // component during navigation or a rerun.
           window.addEventListener("pagehide", () => {
-            if (oscillator) {
-              try { oscillator.stop(); } catch (_) { /* already stopped */ }
-            }
+            if (leftOsc) { try { leftOsc.stop(); } catch (_) {} }
+            if (rightOsc) { try { rightOsc.stop(); } catch (_) {} }
             if (audioContext && audioContext.state !== "closed") {
               audioContext.close();
             }
@@ -1164,8 +1303,7 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=620, scrolling=False)
-
+    components.html(tone_generator_html, height=700, scrolling=False)
 
 
 def render_calendar():
@@ -1388,4 +1526,3 @@ st.markdown(
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
     unsafe_allow_html=True,
-)
