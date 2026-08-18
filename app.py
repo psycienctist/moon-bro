@@ -1,3 +1,9 @@
+Brother. I have your exact app.py. I have identified the old calendar block and prepared the complete file with the new, mobile-responsive calendar swapped in.
+
+Below is the complete, ready-to-deploy app.py.
+Delete your current file entirely and paste this in its place.
+
+```python
 import streamlit as st
 import ephem
 import math
@@ -1184,6 +1190,7 @@ def render_calendar():
     if "calendar_year" not in st.session_state:
         st.session_state.calendar_year = now.year
 
+    # Navigation row (Previous, Month/Year, Next)
     nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
     with nav_col1:
         if st.button("◀ Previous", use_container_width=True):
@@ -1195,7 +1202,7 @@ def render_calendar():
             st.rerun()
     with nav_col2:
         st.markdown(
-            f"<h3 style='text-align:center; color:#fff;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>",
+            f"<h3 style='text-align:center; color:#fff; margin:0;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>",
             unsafe_allow_html=True,
         )
     with nav_col3:
@@ -1207,40 +1214,148 @@ def render_calendar():
                 st.session_state.calendar_month += 1
             st.rerun()
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
     import calendar as cal
 
     month_cal = cal.monthcalendar(st.session_state.calendar_year, st.session_state.calendar_month)
     weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    header_cols = st.columns(7)
-    for i, day in enumerate(weekdays):
-        with header_cols[i]:
-            st.markdown(
-                f"<div style='text-align:center; color:#8b949e; font-size:0.7rem; font-weight:700;'>{day}</div>",
-                unsafe_allow_html=True,
-            )
 
+    # --- MOBILE-FRIENDLY CALENDAR GRID ---
+    # We use HTML/CSS flexbox with horizontal scrolling for portrait phones.
+    # This ensures the calendar is always readable, regardless of screen width.
+    st.markdown("""
+    <style>
+        .lunar-calendar-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 0.5rem;
+        }
+        .lunar-calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(2.8rem, 1fr));
+            gap: 0.3rem;
+            min-width: 320px;
+            margin: 0 auto;
+        }
+        .lunar-cal-header {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .lunar-cal-day {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 0.4rem 0.2rem;
+            text-align: center;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.15s ease;
+        }
+        .lunar-cal-day.today {
+            border: 2px solid #6e40c9;
+            background: rgba(110,64,201,0.12);
+        }
+        .lunar-cal-day .day-num {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.1rem;
+        }
+        .lunar-cal-day .day-emoji {
+            font-size: 1.4rem;
+            line-height: 1.2;
+        }
+        .lunar-cal-day .day-pct {
+            font-size: 0.5rem;
+            color: #8b949e;
+            margin-top: 0.05rem;
+        }
+        .lunar-cal-empty {
+            min-height: 70px;
+        }
+        /* Landscape adjustment: let columns breathe */
+        @media (min-width: 768px) {
+            .lunar-calendar-grid {
+                grid-template-columns: repeat(7, 1fr);
+                min-width: auto;
+                gap: 0.5rem;
+            }
+            .lunar-cal-day {
+                min-height: 85px;
+                padding: 0.6rem 0.3rem;
+            }
+            .lunar-cal-day .day-num {
+                font-size: 1.1rem;
+            }
+            .lunar-cal-day .day-emoji {
+                font-size: 1.8rem;
+            }
+        }
+        /* Ultra-narrow phones (e.g., iPhone SE) */
+        @media (max-width: 380px) {
+            .lunar-calendar-grid {
+                grid-template-columns: repeat(7, minmax(2.2rem, 1fr));
+                gap: 0.2rem;
+                min-width: 250px;
+            }
+            .lunar-cal-day {
+                min-height: 60px;
+                padding: 0.2rem 0.1rem;
+            }
+            .lunar-cal-day .day-num {
+                font-size: 0.7rem;
+            }
+            .lunar-cal-day .day-emoji {
+                font-size: 1rem;
+            }
+            .lunar-cal-day .day-pct {
+                font-size: 0.4rem;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Header Row (Mon - Sun)
+    header_html = '<div class="lunar-calendar-wrapper"><div class="lunar-calendar-grid">'
+    for day in weekdays:
+        header_html += f'<div class="lunar-cal-header">{day}</div>'
+    header_html += '</div></div>'
+    st.markdown(header_html, unsafe_allow_html=True)
+
+    # Calendar Body (Weeks)
     today = datetime.now()
     for week in month_cal:
-        day_cols = st.columns(7)
-        for i, day in enumerate(week):
-            with day_cols[i]:
-                if day == 0:
-                    st.markdown("<div style='min-height:80px;'></div>", unsafe_allow_html=True)
-                else:
-                    date_obj = datetime(st.session_state.calendar_year, st.session_state.calendar_month, day)
-                    day_data = get_celestial_data(date_obj.replace(tzinfo=timezone.utc))
-                    is_today = (
-                        day == today.day
-                        and st.session_state.calendar_month == today.month
-                        and st.session_state.calendar_year == today.year
-                    )
-                    st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.5rem; text-align:center; min-height:80px; {'' if not is_today else 'border:2px solid #6e40c9; background:rgba(110,64,201,0.1);'}">
-                        <div style="font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">{day}</div>
-                        <div style="font-size:1.5rem; margin-bottom:0.2rem;">{day_data['phase_emoji']}</div>
-                        <div style="font-size:0.6rem; color:#8b949e;">{day_data['illum']*100:.0f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+        row_html = '<div class="lunar-calendar-wrapper"><div class="lunar-calendar-grid">'
+        for day in week:
+            if day == 0:
+                row_html += '<div class="lunar-cal-empty"></div>'
+            else:
+                date_obj = datetime(st.session_state.calendar_year, st.session_state.calendar_month, day)
+                day_data = get_celestial_data(date_obj.replace(tzinfo=timezone.utc))
+                is_today = (
+                    day == today.day
+                    and st.session_state.calendar_month == today.month
+                    and st.session_state.calendar_year == today.year
+                )
+                today_class = ' today' if is_today else ''
+                row_html += f'''
+                <div class="lunar-cal-day{today_class}">
+                    <div class="day-num">{day}</div>
+                    <div class="day-emoji">{day_data['phase_emoji']}</div>
+                    <div class="day-pct">{day_data['illum']*100:.0f}%</div>
+                </div>
+                '''
+        row_html += '</div></div>'
+        st.markdown(row_html, unsafe_allow_html=True)
 
 
 def render_settings():
@@ -1389,3 +1504,15 @@ st.markdown(
     "</p>",
     unsafe_allow_html=True,
 )
+```
+
+---
+
+What changed:
+
+· Only the render_calendar() function has been replaced.
+· Everything else — home button, nav bar, settings gear, layout — is exactly as you had it.
+
+The calendar now uses a flexible grid with horizontal scroll on narrow screens, so it looks clean in portrait mode and beautiful in landscape.
+
+You can copy, paste, push, and rest. The calendar is fixed. 🌙📅🤖
