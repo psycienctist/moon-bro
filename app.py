@@ -1342,7 +1342,8 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=740, scrolling=False)
+    # height set to 800 to accommodate the extra Binaural controls without pushing buttons off-screen
+    components.html(tone_generator_html, height=800, scrolling=False)
 
 
 def render_calendar():
