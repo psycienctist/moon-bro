@@ -954,6 +954,7 @@ def render_tones():
         <div class="mode-toggle" role="group" aria-label="Audio mode">
           <button id="mode-standard" class="active">Standard</button>
           <button id="mode-binaural">Binaural (Headphones)</button>
+          <button id="mode-random">Random</button>
         </div>
 
         <div class="controls">
@@ -1005,6 +1006,7 @@ def render_tones():
           const status = document.getElementById("status");
           const modeStandard = document.getElementById("mode-standard");
           const modeBinaural = document.getElementById("mode-binaural");
+          const modeRandom = document.getElementById("mode-random");
           const beatControl = document.getElementById("beat-control");
 
           let audioContext = null;
@@ -1013,17 +1015,20 @@ def render_tones():
           let leftGain = null;
           let rightGain = null;
           let isBinaural = false;
+          let isRandom = false;
           let beatFrequency = 7.83;
           let selectedFrequency = 432;
+          let randomInterval = null;
+          const presetFrequencies = [174, 285, 432, 528, 639, 741];
 
           function setStatus(message, state = "idle") {
             status.textContent = message;
             status.dataset.state = state;
           }
 
-          function selectedPresetName() {
-            const selected = presetButtons.find(button => button.getAttribute("aria-pressed") === "true");
-            return selected ? selected.querySelector(".preset-name").textContent : "Custom";
+          function selectedPresetName(freq) {
+            const button = presetButtons.find(b => Number(b.dataset.frequency) === freq);
+            return button ? button.querySelector(".preset-name").textContent : "Custom";
           }
 
           function currentGain() {
@@ -1033,70 +1038,53 @@ def render_tones():
           function setPlayingUI(isPlaying) {
             startButton.disabled = isPlaying;
             stopButton.disabled = !isPlaying;
+            // Disable preset buttons when Random is active and playing
+            presetButtons.forEach(btn => btn.disabled = isPlaying && isRandom);
           }
 
           function updateVolumeLabel() {
             volumeValue.textContent = `${volume.value}%`;
           }
 
-          function updateActiveFrequency() {
-            const rawValue = Number(frequencyInput.value);
-            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
-            frequencyInput.value = selectedFrequency;
-
+          function setFrequency(freq) {
+            selectedFrequency = freq;
             if (isBinaural && leftOsc && rightOsc && audioContext) {
               leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              leftOsc.frequency.setTargetAtTime(selectedFrequency, audioContext.currentTime, 0.03);
+              leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
               rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
-              setStatus(`Binaural: ${selectedPresetName()} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
+              rightOsc.frequency.setTargetAtTime(freq + beatFrequency, audioContext.currentTime, 0.03);
             } else if (leftOsc && audioContext) {
               leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              leftOsc.frequency.setTargetAtTime(selectedFrequency, audioContext.currentTime, 0.03);
-              setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
-            } else {
-              setStatus(`Ready — ${selectedPresetName()} is selected at ${selectedFrequency} Hz.`);
+              leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
             }
-          }
-
-          function updateBeat() {
-            const rawValue = Number(beatInput.value);
-            beatFrequency = Math.min(20, Math.max(0, Number.isFinite(rawValue) ? rawValue : 7.83));
-            beatInput.value = beatFrequency;
-
-            if (isBinaural && leftOsc && rightOsc && audioContext) {
-              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
-              setStatus(`Binaural: ${selectedPresetName()} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
+            // Update status
+            if (isRandom) {
+              setStatus(`Random: ${selectedPresetName(freq)} (${freq} Hz)${isBinaural ? ` + ${beatFrequency} Hz beat` : ''}`, "playing");
             } else {
-              setStatus(`Binaural mode ready. Beat set to ${beatFrequency} Hz.`);
+              setStatus(`Playing ${selectedPresetName(freq)} at ${freq} Hz.`, "playing");
             }
-          }
-
-          function clearPresetSelection() {
-            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
           }
 
           function stopTone() {
             const now = audioContext ? audioContext.currentTime : 0;
-
+            if (randomInterval) {
+              clearInterval(randomInterval);
+              randomInterval = null;
+            }
             if (leftOsc) {
               leftGain.gain.cancelScheduledValues(now);
               leftGain.gain.setValueAtTime(Math.max(leftGain.gain.value, 0), now);
               leftGain.gain.linearRampToValueAtTime(0, now + 0.10);
               leftOsc.stop(now + 0.11);
-              leftOsc = null;
-              leftGain = null;
+              leftOsc = null; leftGain = null;
             }
             if (rightOsc) {
               rightGain.gain.cancelScheduledValues(now);
               rightGain.gain.setValueAtTime(Math.max(rightGain.gain.value, 0), now);
               rightGain.gain.linearRampToValueAtTime(0, now + 0.10);
               rightOsc.stop(now + 0.11);
-              rightOsc = null;
-              rightGain = null;
+              rightOsc = null; rightGain = null;
             }
-
             setPlayingUI(false);
             setStatus("Tone stopped. Ready when you are.");
           }
@@ -1120,14 +1108,27 @@ def render_tones():
                 await new Promise(r => setTimeout(r, 100));
               }
 
+              // Determine frequency: if random, pick first random
+              let startFreq = selectedFrequency;
+              if (isRandom) {
+                // Pick a random preset
+                const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
+                startFreq = presetFrequencies[randomIndex];
+                // Start the interval to change every 3 seconds
+                randomInterval = setInterval(() => {
+                  const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
+                  setFrequency(newFreq);
+                }, 3000);
+              }
+
               if (isBinaural) {
-                // Left channel (Base frequency)
+                // Left channel
                 leftOsc = audioContext.createOscillator();
                 leftGain = audioContext.createGain();
                 const leftPanner = audioContext.createStereoPanner();
-                leftPanner.pan.value = -1; // Fully left
+                leftPanner.pan.value = -1;
                 leftOsc.type = waveform.value;
-                leftOsc.frequency.setValueAtTime(selectedFrequency, audioContext.currentTime);
+                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
                 leftGain.gain.setValueAtTime(0, audioContext.currentTime);
                 leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
                 leftOsc.connect(leftGain);
@@ -1135,12 +1136,12 @@ def render_tones():
                 leftPanner.connect(audioContext.destination);
                 leftOsc.start();
 
-                // Right channel (Base + Beat frequency)
-                const rightFreq = selectedFrequency + beatFrequency;
+                // Right channel
+                const rightFreq = startFreq + beatFrequency;
                 rightOsc = audioContext.createOscillator();
                 rightGain = audioContext.createGain();
                 const rightPanner = audioContext.createStereoPanner();
-                rightPanner.pan.value = 1; // Fully right
+                rightPanner.pan.value = 1;
                 rightOsc.type = waveform.value;
                 rightOsc.frequency.setValueAtTime(rightFreq, audioContext.currentTime);
                 rightGain.gain.setValueAtTime(0, audioContext.currentTime);
@@ -1154,13 +1155,17 @@ def render_tones():
                 rightOsc.onended = () => { rightOsc = null; };
 
                 setPlayingUI(true);
-                setStatus(`Binaural: ${selectedPresetName()} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
+                if (isRandom) {
+                  setStatus(`Random: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
+                } else {
+                  setStatus(`Binaural: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
+                }
               } else {
-                // Standard mono mode
+                // Standard mono
                 leftOsc = audioContext.createOscillator();
                 leftGain = audioContext.createGain();
                 leftOsc.type = waveform.value;
-                leftOsc.frequency.setValueAtTime(selectedFrequency, audioContext.currentTime);
+                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
                 leftGain.gain.setValueAtTime(0, audioContext.currentTime);
                 leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
                 leftOsc.connect(leftGain);
@@ -1170,19 +1175,52 @@ def render_tones():
                 leftOsc.onended = () => { leftOsc = null; };
 
                 setPlayingUI(true);
-                setStatus(`Playing ${selectedPresetName()} at ${selectedFrequency} Hz.`, "playing");
+                if (isRandom) {
+                  setStatus(`Random: ${selectedPresetName(startFreq)} (${startFreq} Hz)`, "playing");
+                } else {
+                  setStatus(`Playing ${selectedPresetName(startFreq)} at ${startFreq} Hz.`, "playing");
+                }
               }
             } catch (error) {
               console.error("Unable to start tone", error);
-              leftOsc = null;
-              rightOsc = null;
+              leftOsc = null; rightOsc = null;
               setPlayingUI(false);
               setStatus("The tone could not start. Check browser audio permissions and try again.", "error");
             }
           }
 
+          function updateActiveFrequency() {
+            const rawValue = Number(frequencyInput.value);
+            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
+            frequencyInput.value = selectedFrequency;
+            if (!isRandom && leftOsc) {
+              setFrequency(selectedFrequency);
+            } else if (!isRandom) {
+              setStatus(`Ready — ${selectedPresetName(selectedFrequency)} is selected at ${selectedFrequency} Hz.`);
+            }
+          }
+
+          function updateBeat() {
+            const rawValue = Number(beatInput.value);
+            beatFrequency = Math.min(20, Math.max(0, Number.isFinite(rawValue) ? rawValue : 7.83));
+            beatInput.value = beatFrequency;
+            if (isBinaural && leftOsc && rightOsc && audioContext) {
+              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
+              rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
+              setStatus(`Binaural: ${selectedPresetName(selectedFrequency)} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
+            } else {
+              setStatus(`Binaural mode ready. Beat set to ${beatFrequency} Hz.`);
+            }
+          }
+
+          function clearPresetSelection() {
+            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
+          }
+
+          // Preset Buttons
           presetButtons.forEach(button => {
             button.addEventListener("click", () => {
+              if (isRandom) return; // ignore if random mode active
               selectedFrequency = Number(button.dataset.frequency);
               frequencyInput.value = selectedFrequency;
               presetButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
@@ -1193,8 +1231,10 @@ def render_tones():
           // Mode Toggle
           modeStandard.addEventListener("click", () => {
             isBinaural = false;
+            isRandom = false;
             modeStandard.classList.add("active");
             modeBinaural.classList.remove("active");
+            modeRandom.classList.remove("active");
             beatControl.style.display = "none";
             if (leftOsc || rightOsc) stopTone();
             setStatus("Standard mode. Select a frequency.");
@@ -1202,11 +1242,28 @@ def render_tones():
 
           modeBinaural.addEventListener("click", () => {
             isBinaural = true;
+            isRandom = false;
             modeBinaural.classList.add("active");
             modeStandard.classList.remove("active");
+            modeRandom.classList.remove("active");
             beatControl.style.display = "block";
             if (leftOsc || rightOsc) stopTone();
             setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
+          });
+
+          modeRandom.addEventListener("click", () => {
+            isRandom = true;
+            // Keep current binaural state
+            modeRandom.classList.add("active");
+            modeStandard.classList.remove("active");
+            modeBinaural.classList.remove("active");
+            if (isBinaural) {
+              beatControl.style.display = "block";
+            } else {
+              beatControl.style.display = "none";
+            }
+            if (leftOsc || rightOsc) stopTone();
+            setStatus("Random mode. Press Start to cycle through presets.");
           });
 
           frequencyInput.addEventListener("change", updateActiveFrequency);
@@ -1246,8 +1303,7 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=680, scrolling=False)
-
+    components.html(tone_generator_html, height=700, scrolling=False)
 
 
 def render_calendar():
