@@ -975,6 +975,13 @@ def render_tones():
             </select>
           </div>
           <div class="control">
+            <label class="section-label" for="speed">Cycle speed (seconds)</label>
+            <div class="volume-line">
+              <input id="speed" type="range" min="2" max="12" step="1" value="5" aria-describedby="speed-value">
+              <output id="speed-value" for="speed">5s</output>
+            </div>
+          </div>
+          <div class="control">
             <label class="section-label" for="volume">Listening volume</label>
             <div class="volume-line">
               <input id="volume" type="range" min="0" max="18" value="6" step="1" aria-describedby="volume-value">
@@ -1001,6 +1008,8 @@ def render_tones():
           const waveform = document.getElementById("waveform");
           const volume = document.getElementById("volume");
           const volumeValue = document.getElementById("volume-value");
+          const speedInput = document.getElementById("speed");
+          const speedValue = document.getElementById("speed-value");
           const startButton = document.getElementById("start");
           const stopButton = document.getElementById("stop");
           const status = document.getElementById("status");
@@ -1019,6 +1028,7 @@ def render_tones():
           let beatFrequency = 7.83;
           let selectedFrequency = 432;
           let randomInterval = null;
+          let cycleDelay = 5000; // Default 5 seconds
           const presetFrequencies = [174, 285, 432, 528, 639, 741];
 
           function setStatus(message, state = "idle") {
@@ -1046,8 +1056,30 @@ def render_tones():
             volumeValue.textContent = `${volume.value}%`;
           }
 
+          function updateSpeedLabel() {
+            cycleDelay = Number(speedInput.value) * 1000;
+            speedValue.textContent = `${speedInput.value}s`;
+            // If random interval is running, reset it with the new delay
+            if (isRandom && randomInterval) {
+              clearInterval(randomInterval);
+              randomInterval = setInterval(() => {
+                const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
+                setFrequency(newFreq);
+              }, cycleDelay);
+            }
+          }
+
+          function highlightPreset(freq) {
+            // Update aria-pressed to reflect the currently playing frequency
+            presetButtons.forEach(btn => {
+              const isActive = Number(btn.dataset.frequency) === freq;
+              btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+            });
+          }
+
           function setFrequency(freq) {
             selectedFrequency = freq;
+            highlightPreset(freq);
             if (isBinaural && leftOsc && rightOsc && audioContext) {
               leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
               leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
@@ -1114,11 +1146,12 @@ def render_tones():
                 // Pick a random preset
                 const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
                 startFreq = presetFrequencies[randomIndex];
-                // Start the interval to change every 3 seconds
+                highlightPreset(startFreq);
+                // Start the interval to change based on cycleDelay
                 randomInterval = setInterval(() => {
                   const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
                   setFrequency(newFreq);
-                }, 3000);
+                }, cycleDelay);
               }
 
               if (isBinaural) {
@@ -1193,6 +1226,7 @@ def render_tones():
             const rawValue = Number(frequencyInput.value);
             selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
             frequencyInput.value = selectedFrequency;
+            highlightPreset(selectedFrequency);
             if (!isRandom && leftOsc) {
               setFrequency(selectedFrequency);
             } else if (!isRandom) {
@@ -1237,6 +1271,7 @@ def render_tones():
             modeRandom.classList.remove("active");
             beatControl.style.display = "none";
             if (leftOsc || rightOsc) stopTone();
+            setPlayingUI(false);
             setStatus("Standard mode. Select a frequency.");
           });
 
@@ -1248,6 +1283,7 @@ def render_tones():
             modeRandom.classList.remove("active");
             beatControl.style.display = "block";
             if (leftOsc || rightOsc) stopTone();
+            setPlayingUI(false);
             setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
           });
 
@@ -1263,6 +1299,7 @@ def render_tones():
               beatControl.style.display = "none";
             }
             if (leftOsc || rightOsc) stopTone();
+            setPlayingUI(false);
             setStatus("Random mode. Press Start to cycle through presets.");
           });
 
@@ -1287,6 +1324,8 @@ def render_tones():
             }
           });
 
+          speedInput.addEventListener("input", updateSpeedLabel);
+
           startButton.addEventListener("click", startTone);
           stopButton.addEventListener("click", stopTone);
 
@@ -1303,7 +1342,8 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=700, scrolling=False)
+    # height set to 800 to accommodate the extra Binaural controls without pushing buttons off-screen
+    components.html(tone_generator_html, height=800, scrolling=False)
 
 
 def render_calendar():
@@ -1526,3 +1566,4 @@ st.markdown(
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
     unsafe_allow_html=True,
+)
