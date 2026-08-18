@@ -1271,7 +1271,6 @@ def render_tones():
             modeRandom.classList.remove("active");
             beatControl.style.display = "none";
             if (leftOsc || rightOsc) stopTone();
-            // Ensure start is enabled
             setPlayingUI(false);
             setStatus("Standard mode. Select a frequency.");
           });
