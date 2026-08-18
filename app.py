@@ -1271,6 +1271,8 @@ def render_tones():
             modeRandom.classList.remove("active");
             beatControl.style.display = "none";
             if (leftOsc || rightOsc) stopTone();
+            // Ensure start is enabled
+            setPlayingUI(false);
             setStatus("Standard mode. Select a frequency.");
           });
 
@@ -1282,6 +1284,7 @@ def render_tones():
             modeRandom.classList.remove("active");
             beatControl.style.display = "block";
             if (leftOsc || rightOsc) stopTone();
+            setPlayingUI(false);
             setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
           });
 
@@ -1297,6 +1300,7 @@ def render_tones():
               beatControl.style.display = "none";
             }
             if (leftOsc || rightOsc) stopTone();
+            setPlayingUI(false);
             setStatus("Random mode. Press Start to cycle through presets.");
           });
 
