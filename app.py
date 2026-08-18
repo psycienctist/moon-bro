@@ -1046,8 +1046,17 @@ def render_tones():
             volumeValue.textContent = `${volume.value}%`;
           }
 
+          function highlightPreset(freq) {
+            // Update aria-pressed to reflect the currently playing frequency
+            presetButtons.forEach(btn => {
+              const isActive = Number(btn.dataset.frequency) === freq;
+              btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+            });
+          }
+
           function setFrequency(freq) {
             selectedFrequency = freq;
+            highlightPreset(freq);
             if (isBinaural && leftOsc && rightOsc && audioContext) {
               leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
               leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
@@ -1114,6 +1123,7 @@ def render_tones():
                 // Pick a random preset
                 const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
                 startFreq = presetFrequencies[randomIndex];
+                highlightPreset(startFreq);
                 // Start the interval to change every 3 seconds
                 randomInterval = setInterval(() => {
                   const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
@@ -1193,6 +1203,7 @@ def render_tones():
             const rawValue = Number(frequencyInput.value);
             selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
             frequencyInput.value = selectedFrequency;
+            highlightPreset(selectedFrequency);
             if (!isRandom && leftOsc) {
               setFrequency(selectedFrequency);
             } else if (!isRandom) {
