@@ -1346,8 +1346,8 @@ NAV_ITEMS = [
     ("Cosmic Cards", "🃏", "Cards"),
     ("LunaTick Talk", "🗣️", "Talk"),
     ("Journal", "📓", "Journal"),
-    ("Calendar", "📅", "Calendar"),
-    ("Settings", "⚙️", "Settings"),
+    ("Calendar", "📅", ""),
+    ("Settings", "⚙️", ""),
 ]
 
 # `key` gives this container the `.st-key-lunatick-bottom-nav` class. The
