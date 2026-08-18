@@ -989,20 +989,6 @@ def render_tones():
             </div>
           </div>
           <div class="control">
-            <label class="section-label" for="glide">Glide transition</label>
-            <div class="volume-line" style="display: flex; align-items: center; gap: 0.4rem;">
-              <input id="glide-toggle" type="checkbox" style="accent-color: var(--violet); width: 1.2rem; height: 1.2rem;">
-              <label for="glide-toggle" style="font-size: 0.7rem; color: var(--muted); margin: 0;">Smooth</label>
-            </div>
-          </div>
-          <div class="control" id="glide-duration-control" style="display: none;">
-            <label class="section-label" for="glide-duration">Glide duration (sec)</label>
-            <div class="volume-line">
-              <input id="glide-duration" type="range" min="0.5" max="3" step="0.1" value="1.5" aria-describedby="glide-duration-value">
-              <output id="glide-duration-value" for="glide-duration">1.5s</output>
-            </div>
-          </div>
-          <div class="control">
             <label class="section-label" for="volume">Listening volume</label>
             <div class="volume-line">
               <input id="volume" type="range" min="0" max="18" value="6" step="1" aria-describedby="volume-value">
@@ -1032,10 +1018,6 @@ def render_tones():
           const speedInput = document.getElementById("speed");
           const speedValue = document.getElementById("speed-value");
           const cycleModeSelect = document.getElementById("cycle-mode");
-          const glideToggle = document.getElementById("glide-toggle");
-          const glideDurationInput = document.getElementById("glide-duration");
-          const glideDurationValue = document.getElementById("glide-duration-value");
-          const glideDurationControl = document.getElementById("glide-duration-control");
           const startButton = document.getElementById("start");
           const stopButton = document.getElementById("stop");
           const status = document.getElementById("status");
@@ -1055,8 +1037,7 @@ def render_tones():
           let selectedFrequency = 432;
           let randomInterval = null;
           let cycleDelay = 5000; // Default 5 seconds
-          let glideEnabled = false;
-          let glideDuration = 1.5; // seconds
+          const glideDuration = 2.5; // Fixed 2.5 second glide
           let sequenceIndex = 0;
           let sequenceDirection = 1; // 1 for ascending, -1 for descending
           const presetFrequencies = [174, 285, 432, 528, 639, 741];
@@ -1097,11 +1078,6 @@ def render_tones():
             }
           }
 
-          function updateGlideDurationLabel() {
-            glideDuration = Number(glideDurationInput.value);
-            glideDurationValue.textContent = `${glideDuration.toFixed(1)}s`;
-          }
-
           function highlightPreset(freq) {
             presetButtons.forEach(btn => {
               const isActive = Number(btn.dataset.frequency) === freq;
@@ -1109,27 +1085,18 @@ def render_tones():
             });
           }
 
-          function setFrequency(freq, useGlide = glideEnabled) {
+          function setFrequency(freq) {
             selectedFrequency = freq;
             highlightPreset(freq);
             const now = audioContext.currentTime;
             if (isBinaural && leftOsc && rightOsc && audioContext) {
-              if (useGlide) {
-                leftOsc.frequency.cancelScheduledValues(now);
-                leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
-                rightOsc.frequency.cancelScheduledValues(now);
-                rightOsc.frequency.exponentialRampToValueAtTime(freq + beatFrequency, now + glideDuration);
-              } else {
-                leftOsc.frequency.setTargetAtTime(freq, now, 0.03);
-                rightOsc.frequency.setTargetAtTime(freq + beatFrequency, now, 0.03);
-              }
+              leftOsc.frequency.cancelScheduledValues(now);
+              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
+              rightOsc.frequency.cancelScheduledValues(now);
+              rightOsc.frequency.exponentialRampToValueAtTime(freq + beatFrequency, now + glideDuration);
             } else if (leftOsc && audioContext) {
-              if (useGlide) {
-                leftOsc.frequency.cancelScheduledValues(now);
-                leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
-              } else {
-                leftOsc.frequency.setTargetAtTime(freq, now, 0.03);
-              }
+              leftOsc.frequency.cancelScheduledValues(now);
+              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
             }
             // Update status
             const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
@@ -1323,14 +1290,6 @@ def render_tones():
             });
           });
 
-          // Glide toggle
-          glideToggle.addEventListener("change", () => {
-            glideEnabled = glideToggle.checked;
-            glideDurationControl.style.display = glideEnabled ? "block" : "none";
-          });
-
-          glideDurationInput.addEventListener("input", updateGlideDurationLabel);
-
           // Cycle mode selector
           cycleModeSelect.addEventListener("change", () => {
             if (isRandom && leftOsc) {
@@ -1432,7 +1391,7 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=820, scrolling=False)
+    components.html(tone_generator_html, height=800, scrolling=False)
 
 
 def render_calendar():
