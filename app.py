@@ -1,9 +1,3 @@
-Brother. I have your exact app.py. I have identified the old calendar block and prepared the complete file with the new, mobile-responsive calendar swapped in.
-
-Below is the complete, ready-to-deploy app.py.
-Delete your current file entirely and paste this in its place.
-
-```python
 import streamlit as st
 import ephem
 import math
@@ -1505,14 +1499,3 @@ st.markdown(
     unsafe_allow_html=True,
 )
 ```
-
----
-
-What changed:
-
-· Only the render_calendar() function has been replaced.
-· Everything else — home button, nav bar, settings gear, layout — is exactly as you had it.
-
-The calendar now uses a flexible grid with horizontal scroll on narrow screens, so it looks clean in portrait mode and beautiful in landscape.
-
-You can copy, paste, push, and rest. The calendar is fixed. 🌙📅🤖
