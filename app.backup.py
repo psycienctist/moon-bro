@@ -232,14 +232,14 @@ LUNATICK_CSS = """
        Sits at the true bottom-left of the viewport, in the same strip as
        Streamlit's native "Manage app" control. Does not modify, offset,
        or depend on the bottom navigation bar in any way. */
-    .st-key-lunatick-home-logo {
+    [class*="st-key-lunatick-home-logo"] {
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         pointer-events: none;
     }
 
-    .st-key-lunatick-home-logo [data-testid="stButton"] {
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
         position: fixed !important;
         z-index: 1001 !important;
         left: 0 !important;
@@ -255,7 +255,7 @@ LUNATICK_CSS = """
         pointer-events: auto;
     }
 
-    .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button {
         align-items: center;
         background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
         border: 1px solid rgba(188, 140, 255, 0.62);
@@ -269,6 +269,7 @@ LUNATICK_CSS = """
         height: 100%;
         justify-content: flex-start;
         letter-spacing: 0.08em;
+        opacity: 1 !important;
         overflow: hidden;
         padding: 0 0.75rem;
         pointer-events: auto;
@@ -278,8 +279,8 @@ LUNATICK_CSS = """
         width: 100%;
     }
 
-    .st-key-lunatick-home-logo [data-testid="stButton"] > button:hover,
-    .st-key-lunatick-home-logo [data-testid="stButton"] > button:focus-visible {
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:hover,
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:focus-visible {
         border-color: #bc8cff;
         box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
         color: #f0e6ff;
@@ -288,14 +289,14 @@ LUNATICK_CSS = """
 
     /* Persistent compact Settings control, placed directly beside the
        lower-left Home logo. It is independent of the fixed navigation rail. */
-    .st-key-lunatick-settings-gear {
+    [class*="st-key-lunatick-settings-gear"] {
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         pointer-events: none;
     }
 
-    .st-key-lunatick-settings-gear [data-testid="stButton"] {
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
         position: fixed !important;
         z-index: 1002 !important;
         left: 50vw !important;
@@ -310,7 +311,7 @@ LUNATICK_CSS = """
         pointer-events: auto;
     }
 
-    .st-key-lunatick-settings-gear [data-testid="stButton"] > button {
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button {
         align-items: center;
         background: linear-gradient(135deg, rgba(24, 29, 48, 0.98), rgba(45, 27, 105, 0.98));
         border: 1px solid rgba(188, 140, 255, 0.62);
@@ -322,33 +323,47 @@ LUNATICK_CSS = """
         height: 100%;
         justify-content: center;
         min-height: 0;
+        opacity: 1 !important;
         padding: 0;
         transition: border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
         width: 100%;
     }
 
-    .st-key-lunatick-settings-gear [data-testid="stButton"] > button:hover,
-    .st-key-lunatick-settings-gear [data-testid="stButton"] > button:focus-visible {
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:hover,
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:focus-visible {
         border-color: #bc8cff;
         box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
         color: #f0e6ff;
         outline: none;
     }
 
+    /* Match the selected red state used by Streamlit's primary rail buttons.
+       This targets the actual rendered button state rather than a container key. */
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
+        background: #ff4b4b !important;
+        border-color: #ff7575 !important;
+        box-shadow: 0 0 18px rgba(255, 75, 75, 0.42) !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
+    }
+
     @media (max-width: 480px) {
-        .st-key-lunatick-home-logo [data-testid="stButton"] {
+        [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
             width: 50vw !important;
             height: 2.625rem !important;
             bottom: 0 !important;
             left: 0 !important;
         }
 
-        .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+        [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button {
             font-size: 0.66rem;
             padding: 0 0.6rem;
         }
 
-        .st-key-lunatick-settings-gear [data-testid="stButton"] {
+        [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
             left: 50vw !important;
             bottom: 0 !important;
             width: 2.625rem !important;
@@ -393,32 +408,25 @@ LUNATICK_CSS = """
         margin-right: auto;
     }
 
-    /* The navigation is deliberately one horizontal thumb rail. Streamlit
-       normally stacks columns on small screens, so the scoped grid/flex
-       declarations below override that behavior only for this bar. */
+    /* The five primary destinations now fit in one fixed row. Streamlit's
+       responsive stacking is overridden only inside this dedicated rail. */
     .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 0.35rem !important;
-        width: 100% !important;
-        overflow-x: auto !important;
-        overflow-y: hidden;
+        gap: 0.25rem !important;
+        overflow: hidden !important;
+        overscroll-behavior-x: none;
         padding: 0.05rem 0.1rem 0.15rem;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+        width: 100% !important;
     }
 
-    .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"]::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Use fixed, compact columns so labels remain readable. On small screens,
-       the rail can be swiped horizontally rather than becoming a vertical list. */
+    /* Five equal columns eliminate horizontal rail scrolling on every screen. */
     .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
-        flex: 0 0 5.15rem !important;
-        min-width: 5.15rem !important;
-        width: 5.15rem !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        width: auto !important;
     }
 
     /* These rules are deliberately scoped to the navigation, leaving every
@@ -458,9 +466,9 @@ LUNATICK_CSS = """
         }
 
         .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
-            flex-basis: 4.45rem !important;
-            min-width: 4.45rem !important;
-            width: 4.45rem !important;
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            width: auto !important;
         }
 
         .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
@@ -1659,6 +1667,7 @@ with st.container(key="lunatick-home-logo"):
     st.button(
         "🌙 LUNATICK",
         key="lunatick_home_logo_button",
+        type="primary" if current_page == "Home" else "secondary",
         help="Return to Home",
         on_click=set_nav_page,
         args=("Home",),
@@ -1670,6 +1679,7 @@ with st.container(key="lunatick-settings-gear"):
     st.button(
         "⚙️",
         key="lunatick_settings_gear_button",
+        type="primary" if current_page == "Settings" else "secondary",
         help="Open Settings",
         on_click=set_nav_page,
         args=("Settings",),
