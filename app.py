@@ -435,11 +435,13 @@ LUNATICK_CSS = """
     /* Keep the longer Connect label compact on one line without changing
        any other bottom-navigation button. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
+        display: block !important;
         font-size: 0.54rem !important;
         letter-spacing: -0.025em;
-        padding-left: 0.15rem !important;
-        padding-right: 0.15rem !important;
-        white-space: nowrap !important;
+        line-height: 1.05;
+        padding: 0.25rem 0.15rem !important;
+        text-align: center;
+        white-space: pre-line !important;
     }
 
     @media (max-width: 480px) {
@@ -1633,9 +1635,12 @@ with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
+        # Community is the only longer label. An explicit line break preserves
+        # the shared icon-over-label treatment without breaking “Connect”.
+        nav_label = f"{icon}\n{compact_label}" if page_name == "Community" else f"{icon} {compact_label}"
         with column:
             st.button(
-                f"{icon} {compact_label}",
+                nav_label,
                 key=f"bottom_nav_{page_name.lower().replace(' ', '_')}",
                 type="primary" if st.session_state.nav_page == page_name else "secondary",
                 use_container_width=True,
