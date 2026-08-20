@@ -393,32 +393,25 @@ LUNATICK_CSS = """
         margin-right: auto;
     }
 
-    /* The navigation is deliberately one horizontal thumb rail. Streamlit
-       normally stacks columns on small screens, so the scoped grid/flex
-       declarations below override that behavior only for this bar. */
+    /* The five primary destinations now fit in one fixed row. Streamlit's
+       responsive stacking is overridden only inside this dedicated rail. */
     .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 0.35rem !important;
-        width: 100% !important;
-        overflow-x: auto !important;
-        overflow-y: hidden;
+        gap: 0.25rem !important;
+        overflow: hidden !important;
+        overscroll-behavior-x: none;
         padding: 0.05rem 0.1rem 0.15rem;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+        width: 100% !important;
     }
 
-    .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"]::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Use fixed, compact columns so labels remain readable. On small screens,
-       the rail can be swiped horizontally rather than becoming a vertical list. */
+    /* Five equal columns eliminate horizontal rail scrolling on every screen. */
     .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
-        flex: 0 0 5.15rem !important;
-        min-width: 5.15rem !important;
-        width: 5.15rem !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        width: auto !important;
     }
 
     /* These rules are deliberately scoped to the navigation, leaving every
@@ -458,9 +451,9 @@ LUNATICK_CSS = """
         }
 
         .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
-            flex-basis: 4.45rem !important;
-            min-width: 4.45rem !important;
-            width: 4.45rem !important;
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            width: auto !important;
         }
 
         .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
