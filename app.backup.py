@@ -950,11 +950,10 @@ def render_tones():
           </button>
         </div>
 
-        <!-- Mode Toggle -->
+        <!-- Mode Toggle (Standard / Binaural only) -->
         <div class="mode-toggle" role="group" aria-label="Audio mode">
           <button id="mode-standard" class="active">Standard</button>
           <button id="mode-binaural">Binaural (Headphones)</button>
-          <button id="mode-random">Random</button>
         </div>
 
         <div class="controls">
@@ -972,6 +971,13 @@ def render_tones():
               <option value="sine">Sine — soft</option>
               <option value="triangle">Triangle — warm</option>
               <option value="sawtooth">Sawtooth — bright</option>
+            </select>
+          </div>
+          <div class="control">
+            <label class="section-label" for="cycle-mode">Cycle mode</label>
+            <select id="cycle-mode">
+              <option value="random">Random</option>
+              <option value="sweep">Chakra Sweep</option>
             </select>
           </div>
           <div class="control">
@@ -1010,12 +1016,12 @@ def render_tones():
           const volumeValue = document.getElementById("volume-value");
           const speedInput = document.getElementById("speed");
           const speedValue = document.getElementById("speed-value");
+          const cycleModeSelect = document.getElementById("cycle-mode");
           const startButton = document.getElementById("start");
           const stopButton = document.getElementById("stop");
           const status = document.getElementById("status");
           const modeStandard = document.getElementById("mode-standard");
           const modeBinaural = document.getElementById("mode-binaural");
-          const modeRandom = document.getElementById("mode-random");
           const beatControl = document.getElementById("beat-control");
 
           let audioContext = null;
@@ -1024,11 +1030,14 @@ def render_tones():
           let leftGain = null;
           let rightGain = null;
           let isBinaural = false;
-          let isRandom = false;
+          let isRandom = false; // true if any cyclic mode (random or sweep)
           let beatFrequency = 7.83;
           let selectedFrequency = 432;
           let randomInterval = null;
           let cycleDelay = 5000; // Default 5 seconds
+          const glideDuration = 2.5; // Fixed 2.5 second glide
+          let sequenceIndex = 0;
+          let sequenceDirection = 1; // 1 for ascending, -1 for descending
           const presetFrequencies = [174, 285, 432, 528, 639, 741];
 
           function setStatus(message, state = "idle") {
@@ -1048,7 +1057,6 @@ def render_tones():
           function setPlayingUI(isPlaying) {
             startButton.disabled = isPlaying;
             stopButton.disabled = !isPlaying;
-            // Disable preset buttons when Random is active and playing
             presetButtons.forEach(btn => btn.disabled = isPlaying && isRandom);
           }
 
@@ -1059,18 +1067,16 @@ def render_tones():
           function updateSpeedLabel() {
             cycleDelay = Number(speedInput.value) * 1000;
             speedValue.textContent = `${speedInput.value}s`;
-            // If random interval is running, reset it with the new delay
+            // If cyclic mode is running, reset interval with new delay
             if (isRandom && randomInterval) {
               clearInterval(randomInterval);
               randomInterval = setInterval(() => {
-                const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
-                setFrequency(newFreq);
+                cycleNext();
               }, cycleDelay);
             }
           }
 
           function highlightPreset(freq) {
-            // Update aria-pressed to reflect the currently playing frequency
             presetButtons.forEach(btn => {
               const isActive = Number(btn.dataset.frequency) === freq;
               btn.setAttribute("aria-pressed", isActive ? "true" : "false");
@@ -1080,21 +1086,42 @@ def render_tones():
           function setFrequency(freq) {
             selectedFrequency = freq;
             highlightPreset(freq);
+            const now = audioContext.currentTime;
             if (isBinaural && leftOsc && rightOsc && audioContext) {
-              leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
-              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              rightOsc.frequency.setTargetAtTime(freq + beatFrequency, audioContext.currentTime, 0.03);
+              leftOsc.frequency.cancelScheduledValues(now);
+              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
+              rightOsc.frequency.cancelScheduledValues(now);
+              rightOsc.frequency.exponentialRampToValueAtTime(freq + beatFrequency, now + glideDuration);
             } else if (leftOsc && audioContext) {
-              leftOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              leftOsc.frequency.setTargetAtTime(freq, audioContext.currentTime, 0.03);
+              leftOsc.frequency.cancelScheduledValues(now);
+              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
             }
             // Update status
+            const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
             if (isRandom) {
-              setStatus(`Random: ${selectedPresetName(freq)} (${freq} Hz)${isBinaural ? ` + ${beatFrequency} Hz beat` : ''}`, "playing");
+              setStatus(`${modeName}: ${selectedPresetName(freq)} (${freq} Hz)${isBinaural ? ` + ${beatFrequency} Hz beat` : ''}`, "playing");
             } else {
               setStatus(`Playing ${selectedPresetName(freq)} at ${freq} Hz.`, "playing");
             }
+          }
+
+          function cycleNext() {
+            let nextFreq;
+            if (cycleModeSelect.value === 'random') {
+              // Random pick
+              const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
+              nextFreq = presetFrequencies[randomIndex];
+            } else {
+              // Chakra Sweep: sequential up and down
+              nextFreq = presetFrequencies[sequenceIndex];
+              sequenceIndex += sequenceDirection;
+              if (sequenceIndex >= presetFrequencies.length - 1) {
+                sequenceDirection = -1;
+              } else if (sequenceIndex <= 0) {
+                sequenceDirection = 1;
+              }
+            }
+            setFrequency(nextFreq);
           }
 
           function stopTone() {
@@ -1140,17 +1167,22 @@ def render_tones():
                 await new Promise(r => setTimeout(r, 100));
               }
 
-              // Determine frequency: if random, pick first random
+              // Determine starting frequency
               let startFreq = selectedFrequency;
               if (isRandom) {
-                // Pick a random preset
-                const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-                startFreq = presetFrequencies[randomIndex];
+                // Reset sequence for sweep
+                sequenceIndex = 0;
+                sequenceDirection = 1;
+                if (cycleModeSelect.value === 'random') {
+                  const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
+                  startFreq = presetFrequencies[randomIndex];
+                } else {
+                  startFreq = presetFrequencies[0];
+                }
                 highlightPreset(startFreq);
-                // Start the interval to change based on cycleDelay
+                // Start the interval
                 randomInterval = setInterval(() => {
-                  const newFreq = presetFrequencies[Math.floor(Math.random() * presetFrequencies.length)];
-                  setFrequency(newFreq);
+                  cycleNext();
                 }, cycleDelay);
               }
 
@@ -1188,11 +1220,8 @@ def render_tones():
                 rightOsc.onended = () => { rightOsc = null; };
 
                 setPlayingUI(true);
-                if (isRandom) {
-                  setStatus(`Random: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
-                } else {
-                  setStatus(`Binaural: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
-                }
+                const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
+                setStatus(`${modeName}: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
               } else {
                 // Standard mono
                 leftOsc = audioContext.createOscillator();
@@ -1208,11 +1237,8 @@ def render_tones():
                 leftOsc.onended = () => { leftOsc = null; };
 
                 setPlayingUI(true);
-                if (isRandom) {
-                  setStatus(`Random: ${selectedPresetName(startFreq)} (${startFreq} Hz)`, "playing");
-                } else {
-                  setStatus(`Playing ${selectedPresetName(startFreq)} at ${startFreq} Hz.`, "playing");
-                }
+                const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
+                setStatus(`${modeName}: ${selectedPresetName(startFreq)} (${startFreq} Hz)`, "playing");
               }
             } catch (error) {
               console.error("Unable to start tone", error);
@@ -1254,7 +1280,7 @@ def render_tones():
           // Preset Buttons
           presetButtons.forEach(button => {
             button.addEventListener("click", () => {
-              if (isRandom) return; // ignore if random mode active
+              if (isRandom) return;
               selectedFrequency = Number(button.dataset.frequency);
               frequencyInput.value = selectedFrequency;
               presetButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
@@ -1262,13 +1288,33 @@ def render_tones():
             });
           });
 
-          // Mode Toggle
+          // Cycle mode selector (activates cyclic mode)
+          cycleModeSelect.addEventListener("change", () => {
+            isRandom = true;
+            if (leftOsc) {
+              clearInterval(randomInterval);
+              sequenceIndex = 0;
+              sequenceDirection = 1;
+              if (cycleModeSelect.value === 'random') {
+                const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
+                setFrequency(presetFrequencies[randomIndex]);
+              } else {
+                setFrequency(presetFrequencies[0]);
+              }
+              randomInterval = setInterval(() => {
+                cycleNext();
+              }, cycleDelay);
+            } else {
+              setStatus(`Cycle mode: ${cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep'}`);
+            }
+          });
+
+          // Mode Toggle (Standard/Binaural)
           modeStandard.addEventListener("click", () => {
             isBinaural = false;
             isRandom = false;
             modeStandard.classList.add("active");
             modeBinaural.classList.remove("active");
-            modeRandom.classList.remove("active");
             beatControl.style.display = "none";
             if (leftOsc || rightOsc) stopTone();
             setPlayingUI(false);
@@ -1280,27 +1326,10 @@ def render_tones():
             isRandom = false;
             modeBinaural.classList.add("active");
             modeStandard.classList.remove("active");
-            modeRandom.classList.remove("active");
             beatControl.style.display = "block";
             if (leftOsc || rightOsc) stopTone();
             setPlayingUI(false);
             setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
-          });
-
-          modeRandom.addEventListener("click", () => {
-            isRandom = true;
-            // Keep current binaural state
-            modeRandom.classList.add("active");
-            modeStandard.classList.remove("active");
-            modeBinaural.classList.remove("active");
-            if (isBinaural) {
-              beatControl.style.display = "block";
-            } else {
-              beatControl.style.display = "none";
-            }
-            if (leftOsc || rightOsc) stopTone();
-            setPlayingUI(false);
-            setStatus("Random mode. Press Start to cycle through presets.");
           });
 
           frequencyInput.addEventListener("change", updateActiveFrequency);
@@ -1342,7 +1371,6 @@ def render_tones():
     </html>
     """
 
-    # height set to 800 to accommodate the extra Binaural controls without pushing buttons off-screen
     components.html(tone_generator_html, height=800, scrolling=False)
 
 
