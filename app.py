@@ -232,14 +232,14 @@ LUNATICK_CSS = """
        Sits at the true bottom-left of the viewport, in the same strip as
        Streamlit's native "Manage app" control. Does not modify, offset,
        or depend on the bottom navigation bar in any way. */
-    .st-key-lunatick-home-logo {
+    [class*="st-key-lunatick-home-logo"] {
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         pointer-events: none;
     }
 
-    .st-key-lunatick-home-logo [data-testid="stButton"] {
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
         position: fixed !important;
         z-index: 1001 !important;
         left: 0 !important;
@@ -255,7 +255,7 @@ LUNATICK_CSS = """
         pointer-events: auto;
     }
 
-    .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button {
         align-items: center;
         background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
         border: 1px solid rgba(188, 140, 255, 0.62);
@@ -278,8 +278,8 @@ LUNATICK_CSS = """
         width: 100%;
     }
 
-    .st-key-lunatick-home-logo [data-testid="stButton"] > button:hover,
-    .st-key-lunatick-home-logo [data-testid="stButton"] > button:focus-visible {
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:hover,
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:focus-visible {
         border-color: #bc8cff;
         box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
         color: #f0e6ff;
@@ -288,14 +288,14 @@ LUNATICK_CSS = """
 
     /* Persistent compact Settings control, placed directly beside the
        lower-left Home logo. It is independent of the fixed navigation rail. */
-    .st-key-lunatick-settings-gear {
+    [class*="st-key-lunatick-settings-gear"] {
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         pointer-events: none;
     }
 
-    .st-key-lunatick-settings-gear [data-testid="stButton"] {
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
         position: fixed !important;
         z-index: 1002 !important;
         left: 50vw !important;
@@ -310,7 +310,7 @@ LUNATICK_CSS = """
         pointer-events: auto;
     }
 
-    .st-key-lunatick-settings-gear [data-testid="stButton"] > button {
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button {
         align-items: center;
         background: linear-gradient(135deg, rgba(24, 29, 48, 0.98), rgba(45, 27, 105, 0.98));
         border: 1px solid rgba(188, 140, 255, 0.62);
@@ -327,28 +327,38 @@ LUNATICK_CSS = """
         width: 100%;
     }
 
-    .st-key-lunatick-settings-gear [data-testid="stButton"] > button:hover,
-    .st-key-lunatick-settings-gear [data-testid="stButton"] > button:focus-visible {
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:hover,
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:focus-visible {
         border-color: #bc8cff;
         box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
         color: #f0e6ff;
         outline: none;
     }
 
+    /* The persistent Home and Settings controls mirror the active red state
+       used by the selected bottom-navigation destination. */
+    [class*="st-key-lunatick-home-logo-active"] [data-testid="stButton"] > button,
+    [class*="st-key-lunatick-settings-gear-active"] [data-testid="stButton"] > button {
+        background: linear-gradient(135deg, #f25555, #e33f3f) !important;
+        border-color: rgba(255, 196, 196, 0.90) !important;
+        box-shadow: 0 0 18px rgba(242, 85, 85, 0.42) !important;
+        color: #ffffff !important;
+    }
+
     @media (max-width: 480px) {
-        .st-key-lunatick-home-logo [data-testid="stButton"] {
+        [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
             width: 50vw !important;
             height: 2.625rem !important;
             bottom: 0 !important;
             left: 0 !important;
         }
 
-        .st-key-lunatick-home-logo [data-testid="stButton"] > button {
+        [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button {
             font-size: 0.66rem;
             padding: 0 0.6rem;
         }
 
-        .st-key-lunatick-settings-gear [data-testid="stButton"] {
+        [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
             left: 50vw !important;
             bottom: 0 !important;
             width: 2.625rem !important;
@@ -1648,7 +1658,8 @@ with st.container(key="lunatick-bottom-nav"):
 # added in CSS keeps it fully scrollable above the persistent navigation.
 # This separate control is a permanent, lower-left Home shortcut. It uses the
 # existing navigation callback but does not add or alter any NAV_ITEMS entry.
-with st.container(key="lunatick-home-logo"):
+home_logo_key = "lunatick-home-logo-active" if current_page == "Home" else "lunatick-home-logo"
+with st.container(key=home_logo_key):
     st.button(
         "🌙 LUNATICK",
         key="lunatick_home_logo_button",
@@ -1659,7 +1670,8 @@ with st.container(key="lunatick-home-logo"):
 
 # Small adjacent Settings shortcut. This is intentionally separate from the
 # navigation rail and preserves the existing Settings route unchanged.
-with st.container(key="lunatick-settings-gear"):
+settings_gear_key = "lunatick-settings-gear-active" if current_page == "Settings" else "lunatick-settings-gear"
+with st.container(key=settings_gear_key):
     st.button(
         "⚙️",
         key="lunatick_settings_gear_button",
