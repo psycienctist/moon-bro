@@ -269,6 +269,7 @@ LUNATICK_CSS = """
         height: 100%;
         justify-content: flex-start;
         letter-spacing: 0.08em;
+        opacity: 1 !important;
         overflow: hidden;
         padding: 0 0.75rem;
         pointer-events: auto;
@@ -322,6 +323,7 @@ LUNATICK_CSS = """
         height: 100%;
         justify-content: center;
         min-height: 0;
+        opacity: 1 !important;
         padding: 0;
         transition: border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
         width: 100%;
@@ -335,14 +337,17 @@ LUNATICK_CSS = """
         outline: none;
     }
 
-    /* The persistent Home and Settings controls mirror the active red state
-       used by the selected bottom-navigation destination. */
-    [class*="st-key-lunatick-home-logo-active"] [data-testid="stButton"] > button,
-    [class*="st-key-lunatick-settings-gear-active"] [data-testid="stButton"] > button {
-        background: linear-gradient(135deg, #f25555, #e33f3f) !important;
-        border-color: rgba(255, 196, 196, 0.90) !important;
-        box-shadow: 0 0 18px rgba(242, 85, 85, 0.42) !important;
+    /* Match the selected red state used by Streamlit's primary rail buttons.
+       This targets the actual rendered button state rather than a container key. */
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
+    [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
+    [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
+        background: #ff4b4b !important;
+        border-color: #ff7575 !important;
+        box-shadow: 0 0 18px rgba(255, 75, 75, 0.42) !important;
         color: #ffffff !important;
+        opacity: 1 !important;
     }
 
     @media (max-width: 480px) {
@@ -1658,11 +1663,11 @@ with st.container(key="lunatick-bottom-nav"):
 # added in CSS keeps it fully scrollable above the persistent navigation.
 # This separate control is a permanent, lower-left Home shortcut. It uses the
 # existing navigation callback but does not add or alter any NAV_ITEMS entry.
-home_logo_key = "lunatick-home-logo-active" if current_page == "Home" else "lunatick-home-logo"
-with st.container(key=home_logo_key):
+with st.container(key="lunatick-home-logo"):
     st.button(
         "🌙 LUNATICK",
         key="lunatick_home_logo_button",
+        type="primary" if current_page == "Home" else "secondary",
         help="Return to Home",
         on_click=set_nav_page,
         args=("Home",),
@@ -1670,11 +1675,11 @@ with st.container(key=home_logo_key):
 
 # Small adjacent Settings shortcut. This is intentionally separate from the
 # navigation rail and preserves the existing Settings route unchanged.
-settings_gear_key = "lunatick-settings-gear-active" if current_page == "Settings" else "lunatick-settings-gear"
-with st.container(key=settings_gear_key):
+with st.container(key="lunatick-settings-gear"):
     st.button(
         "⚙️",
         key="lunatick_settings_gear_button",
+        type="primary" if current_page == "Settings" else "secondary",
         help="Open Settings",
         on_click=set_nav_page,
         args=("Settings",),
