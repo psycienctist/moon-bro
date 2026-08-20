@@ -1605,11 +1605,11 @@ else:
 # Settings remain available through their approved persistent controls, while
 # Community contains the former Chat, Boards, and LunaTicK Talk experiences.
 NAV_ITEMS = [
-    ("Community", "👥", "Community"),
+    ("Community", "👥", "Connect"),
     ("Journal", "📓", "Journal"),
-    ("Calendar", "📅", "Calendar"),
-    ("Cosmic Cards", "🃏", "Cards"),
-    ("Tones", "🎵", "Tones"),
+    ("Calendar", "📅", "Track"),
+    ("Cosmic Cards", "🃏", "Deal"),
+    ("Tones", "🎵", "Heal"),
 ]
 
 # `key` gives this container the `.st-key-lunatick-bottom-nav` class. The
