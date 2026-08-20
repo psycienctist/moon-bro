@@ -378,10 +378,11 @@ LUNATICK_CSS = """
        `.st-key-lunatick-bottom-nav` class in Streamlit 1.40+.
     */
 
-    /* Keep the page's final card, form control, and footer above the fixed
-       navigation bar. */
+    /* Begin app content flush with the viewport top while retaining enough
+       lower clearance for the fixed navigation and persistent controls. */
     [data-testid="stMainBlockContainer"] {
         padding-bottom: 9rem;
+        padding-top: 0 !important;
     }
 
     /* Pin only the dedicated navigation container to the viewport. */
@@ -458,6 +459,7 @@ LUNATICK_CSS = """
            overlay. The rail buttons and their horizontal layout are unchanged. */
         [data-testid="stMainBlockContainer"] {
             padding-bottom: calc(8.425rem + env(safe-area-inset-bottom));
+            padding-top: 0 !important;
         }
 
         .st-key-lunatick-bottom-nav {
