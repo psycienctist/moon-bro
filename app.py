@@ -432,6 +432,16 @@ LUNATICK_CSS = """
         white-space: nowrap;
     }
 
+    /* Keep the longer Connect label compact on one line without changing
+       any other bottom-navigation button. */
+    .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
+        font-size: 0.54rem !important;
+        letter-spacing: -0.025em;
+        padding-left: 0.15rem !important;
+        padding-right: 0.15rem !important;
+        white-space: nowrap !important;
+    }
+
     @media (max-width: 480px) {
         /* Midpoint lift above the hosted platform's bottom-right management
            overlay. The rail buttons and their horizontal layout are unchanged. */
@@ -454,6 +464,10 @@ LUNATICK_CSS = """
             min-height: 2.55rem;
             padding: 0.3rem 0.2rem;
             font-size: 0.63rem;
+        }
+
+        .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
+            font-size: 0.53rem !important;
         }
     }
 
