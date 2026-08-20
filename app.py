@@ -435,10 +435,15 @@ LUNATICK_CSS = """
     /* Keep the longer Connect label compact on one line without changing
        any other bottom-navigation button. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
-        display: block !important;
+        align-items: center;
+        display: flex !important;
+        flex-direction: column;
         font-size: 0.54rem !important;
+        height: 2.7rem !important;
+        justify-content: center;
         letter-spacing: -0.025em;
         line-height: 1.05;
+        min-height: 2.7rem !important;
         padding: 0.25rem 0.15rem !important;
         text-align: center;
         white-space: pre-line !important;
@@ -470,6 +475,8 @@ LUNATICK_CSS = """
 
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
             font-size: 0.53rem !important;
+            height: 2.55rem !important;
+            min-height: 2.55rem !important;
         }
     }
 
