@@ -14,6 +14,7 @@ import daily_reflection as reflection_ui
 import cosmic_cards
 import boards
 import chat_room
+import community
 import auth
 
 
@@ -1566,6 +1567,11 @@ except Exception:
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
 
+# Existing sessions may still point to a former standalone social tab. Move
+# those users directly into the unified Community destination on the next run.
+if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk"}:
+    st.session_state.nav_page = "Community"
+
 
 def set_nav_page(page_name: str) -> None:
     """Switch destinations before the next normal Streamlit script run."""
@@ -1578,14 +1584,10 @@ current_page = st.session_state.nav_page
 
 if current_page == "Home":
     render_home()
-elif current_page == "Chat":
-    chat_room.render_chat_tab()
-elif current_page == "Boards":
-    boards.render_boards_tab()
+elif current_page == "Community":
+    community.render_community()
 elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
-elif current_page == "LunaTick Talk":
-    talk_ui.render_talk_tab()
 elif current_page == "Journal":
     journal_ui.render_journal_tab()
 elif current_page == "Calendar":
@@ -1599,18 +1601,15 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# Keep the navigation metadata in one place. The single eight-item row becomes
-# a horizontally swipeable thumb rail on a phone instead of a vertical list.
+# The bottom rail now contains only the five primary destinations. Home and
+# Settings remain available through their approved persistent controls, while
+# Community contains the former Chat, Boards, and LunaTicK Talk experiences.
 NAV_ITEMS = [
-    ("Home", "🌕", "Home"),
-    ("Tones", "🎵", "Tones"),
-    ("Chat", "💬", "Chat"),
-    ("Boards", "📋", "Boards"),
-    ("Cosmic Cards", "🃏", "Cards"),
-    ("LunaTick Talk", "🗣️", "Talk"),
+    ("Community", "👥", "Community"),
     ("Journal", "📓", "Journal"),
-    ("Calendar", "📅", ""),
-    ("Settings", "⚙️", ""),
+    ("Calendar", "📅", "Calendar"),
+    ("Cosmic Cards", "🃏", "Cards"),
+    ("Tones", "🎵", "Tones"),
 ]
 
 # `key` gives this container the `.st-key-lunatick-bottom-nav` class. The
