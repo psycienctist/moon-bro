@@ -243,6 +243,7 @@ LUNATICK_CSS = """
         z-index: 1001 !important;
         left: 0 !important;
         bottom: 0 !important;
+        /* The Home logo remains at its original full half-screen width. */
         width: 50vw !important;
         height: 2.625rem !important;
         margin: 0 !important;
@@ -284,6 +285,55 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* Persistent compact Settings control, placed directly beside the
+       lower-left Home logo. It is independent of the fixed navigation rail. */
+    .st-key-lunatick-settings-gear {
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none;
+    }
+
+    .st-key-lunatick-settings-gear [data-testid="stButton"] {
+        position: fixed !important;
+        z-index: 1002 !important;
+        left: 50vw !important;
+        bottom: 0 !important;
+        width: 2.625rem !important;
+        height: 2.625rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto;
+    }
+
+    .st-key-lunatick-settings-gear [data-testid="stButton"] > button {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(24, 29, 48, 0.98), rgba(45, 27, 105, 0.98));
+        border: 1px solid rgba(188, 140, 255, 0.62);
+        border-radius: 0;
+        box-shadow: 0 0 12px rgba(110, 64, 201, 0.22);
+        color: #d2a8ff;
+        display: flex;
+        font-size: 1rem;
+        height: 100%;
+        justify-content: center;
+        min-height: 0;
+        padding: 0;
+        transition: border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+        width: 100%;
+    }
+
+    .st-key-lunatick-settings-gear [data-testid="stButton"] > button:hover,
+    .st-key-lunatick-settings-gear [data-testid="stButton"] > button:focus-visible {
+        border-color: #bc8cff;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
+        color: #f0e6ff;
+        outline: none;
+    }
+
     @media (max-width: 480px) {
         .st-key-lunatick-home-logo [data-testid="stButton"] {
             width: 50vw !important;
@@ -295,6 +345,13 @@ LUNATICK_CSS = """
         .st-key-lunatick-home-logo [data-testid="stButton"] > button {
             font-size: 0.66rem;
             padding: 0 0.6rem;
+        }
+
+        .st-key-lunatick-settings-gear [data-testid="stButton"] {
+            left: 50vw !important;
+            bottom: 0 !important;
+            width: 2.625rem !important;
+            height: 2.625rem !important;
         }
     }
 
@@ -1587,6 +1644,17 @@ with st.container(key="lunatick-home-logo"):
         args=("Home",),
     )
 
+# Small adjacent Settings shortcut. This is intentionally separate from the
+# navigation rail and preserves the existing Settings route unchanged.
+with st.container(key="lunatick-settings-gear"):
+    st.button(
+        "⚙️",
+        key="lunatick_settings_gear_button",
+        help="Open Settings",
+        on_click=set_nav_page,
+        args=("Settings",),
+    )
+
 st.markdown(
     "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
     "font-family:Orbitron, sans-serif;'>"
@@ -1594,4 +1662,3 @@ st.markdown(
     "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
     "</p>",
     unsafe_allow_html=True,
-)
