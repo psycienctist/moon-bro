@@ -8,7 +8,7 @@ LunaTicK should move from its local `lunatick.db` SQLite file to the existing, a
 
 The database export is **not a current blocker**. The codebase is already protected in GitHub, the app remains a single-user alpha, and no shared production data needs preservation before the transition. The optional owner-gated snapshot utility is present in the repository but is not activated because no owner secret was configured. No open export path was pushed.
 
-> **Cutover timing clarification:** This plan assumes that the Supabase cutover completes **before any tester invitation**. That is the preferred path. The current single-user state means Phase C has one identity to reconcile and no other person’s writing, profile, or Community activity at risk during the transition.
+> **Cutover timing clarification:** This plan assumes that the Supabase cutover completes **before any tester invitation**. That is the preferred path. The current single-user state also means LunaTicK will begin with an intentionally empty Supabase dataset: the founder will re-enter any desired profile or chart information after the application switches to Supabase. **No existing SQLite records will be imported.**
 
 > **Architecture after migration:** Auth0 verifies identity, Streamlit restores the native session, and Supabase becomes the durable system of record for LunaTicK data. Auth0 is not being replaced.
 
@@ -135,33 +135,23 @@ During alpha, the Streamlit server may use a Supabase service credential stored 
 
 **Gate:** The new schema contains no duplicate profile source of truth, all named indexes and privacy classifications exist, `migration_log` is writable only by the server-side migration path, and the database has a clean migration history. [3]
 
-### Phase C — Migrate the Active Single-User Profile
+### Phase C — Fresh-Start Supabase Application Cutover
 
-1. Write a standalone, idempotent SQLite-to-Supabase importer. It reads the local file, validates each record, upserts profiles strictly by immutable `auth_subject`, treats `user_hash` as a non-unique legacy field, writes reconciliation events to `migration_log`, and prints counts without exposing private record content.
-2. Start with the active authenticated profile and Cosmic Card/birth-chart fields.
-3. Compare source and target counts and perform a record-level reconciliation for the single active profile.
-4. Change `auth.py`, `cosmic_cards.py`, and the Settings profile editor to read and write through `supabase_store.py` when `DATA_BACKEND=supabase`.
+1. Add the server-only Supabase URL and service-role key to Streamlit Community Cloud Secrets.
+2. Set `DATA_BACKEND=supabase` only after the first Supabase-backed profile, Settings, Cosmic Card, Community, and journal write paths are implemented and reviewed.
+3. On first native sign-in, create an empty canonical `profiles` row from the Auth0 subject and let the founder re-enter profile, chart, and presence information through the normal Settings and Cosmic Card experiences.
+4. Create new boards, posts, chats, LunaTicK Talk records, trades, and journals in Supabase only. Do not read from, reconcile with, or import current SQLite records.
+5. Keep `DATA_BACKEND=sqlite` available solely as a short-lived code rollback switch until Supabase-backed feature checks pass; do not copy existing SQLite data at any point.
 
-**Gate:** Sign-in, profile save, avatar, bio, username lookup, birth chart, and Cosmic Card persistence work after a full deployment restart.
+**Gate:** A fresh native sign-in can create and persist a new profile, username, avatar, bio, chart, Community post, and journal entry through Supabase after a full deployment restart.
 
-### Phase D — Migrate Community
+### Phase D — Retire the SQLite Production Path
 
-1. Move boards and posts, then chat messages, then LunaTicK Talk posts/comments/votes.
-2. Preserve post timestamps, authorship references, moderation flags, anonymity flags, and vote uniqueness.
-3. Update Community modules to resolve author display values from `profiles`, while keeping the currently public fields limited to avatar, username, display name, and bio.
-4. Defer `community_feed.py` unless it is intentionally reintroduced into the product; unused tables should not add needless migration scope.
+1. After the Supabase-backed features have passed the agreed validation window, remove SQLite writes from the production application.
+2. Preserve the legacy SQLite code only in Git history or an explicitly archived maintenance branch; it is not a source for records to be migrated later.
+3. Keep the schema migrations, privacy matrix, and `migration_log` table as the durable operational record for the new system.
 
-**Gate:** A second test account can see intended public Community content, find a profile by username, and cannot view private profile or journal data.
-
-### Phase E — Move Journals and Cut Over
-
-1. Move `journal_entries` last because it is private writing and merits its own access tests.
-2. Run source-to-target count reconciliation and spot-check entries using the owner account.
-3. Set the production `DATA_BACKEND=supabase` value and deploy.
-4. Keep the SQLite read path in code for one short validation window, but stop writing new data to it after cutover.
-5. Remove the SQLite production path only after the app has completed the agreed validation window without data-integrity issues.
-
-**Gate:** Restart the Streamlit app, then verify that profile data, Community, cards, and journals remain present. This is the real durability test.
+**Gate:** Restart the Streamlit app, then verify that new profiles, Community content, cards, and journals remain present. This is the real durability test.
 
 ## Rollback Strategy
 
@@ -170,17 +160,16 @@ A migration is not considered complete until rollback is possible.
 | Event | Immediate response |
 |---|---|
 | Schema migration fails before data import | Stop; fix the named migration; do not alter the live SQLite workflow. |
-| Profile import mismatch | Leave `DATA_BACKEND=sqlite`, correct the importer, rerun its idempotent upsert. |
-| Feature regression after a Supabase deployment | Set `DATA_BACKEND=sqlite` temporarily and redeploy while the issue is diagnosed. |
-| Successful cutover | Retain the SQLite code path briefly as a read-only contingency, then remove it deliberately after validation. |
+| Fresh-start Supabase feature regression | Set `DATA_BACKEND=sqlite` temporarily and redeploy while the issue is diagnosed; do not import historical SQLite rows. |
+| Successful cutover | Retain the SQLite code path briefly as a code-only contingency, then remove it deliberately after validation. |
 
 ## What We Do Not Do Yet
 
-This plan deliberately does **not** create a new Supabase project, modify the existing `lunatick` project, add secrets, run SQL, migrate records, or expose a full-database export. Those are execution steps that should happen only after your explicit approval of the target schema and project credentials.
+This plan deliberately does **not** import, reconcile, or preserve existing SQLite records. The Phase A and B Supabase foundation is already applied to the existing `lunatick` project. Adding deployment secrets and activating the Supabase write path remain separate, explicitly approved cutover steps.
 
 ## Recommended Next Decision
 
-The next concrete step should be to approve **Phase A and Phase B only**: establish the Supabase data-access module, write the first schema migration, and review it before applying it to the existing empty `lunatick` project. No user records move until the schema and access boundary are approved.
+The next concrete step is to implement the **fresh-start Supabase write path** feature by feature, beginning with the canonical profile and Settings editor. No user records will move; all new Supabase data begins after cutover.
 
 ## References
 
