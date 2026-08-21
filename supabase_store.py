@@ -1,8 +1,9 @@
 """Server-side Supabase access foundation for the LunaTicK data migration.
 
 This module deliberately uses the existing ``requests`` dependency rather than
-adding a client SDK. It must run only inside Streamlit server code. The service
-role key is read from Streamlit Secrets and is never sent to a browser.
+adding a client SDK. It must run only inside Streamlit server code. A legacy
+service-role key or modern Secret API key is read from Streamlit Secrets and is
+never sent to a browser.
 """
 
 from __future__ import annotations
@@ -97,11 +98,20 @@ class SupabaseStore:
 
     @property
     def _headers(self) -> dict[str, str]:
-        return {
-            "apikey": self._settings.service_role_key,
-            "Authorization": f"Bearer {self._settings.service_role_key}",
+        """Build documented server-only REST headers for either Supabase key model.
+
+        Modern ``sb_secret_`` keys are opaque values and must be sent on the
+        ``apikey`` header only. Legacy service-role JWTs continue to use both
+        ``apikey`` and ``Authorization`` for compatibility with PostgREST.
+        """
+        api_key = self._settings.service_role_key
+        headers = {
+            "apikey": api_key,
             "Content-Type": "application/json",
         }
+        if not api_key.startswith("sb_secret_"):
+            headers["Authorization"] = f"Bearer {api_key}"
+        return headers
 
     def _request(
         self,

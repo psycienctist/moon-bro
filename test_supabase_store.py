@@ -62,6 +62,16 @@ def main() -> None:
     assert fake_http.calls[-1]["params"] == {"on_conflict": "auth_subject"}
     assert fake_http.calls[-1]["headers"]["Authorization"] == "Bearer server-only-key"
 
+    secret_settings = supabase_store.SupabaseSettings.from_mapping(
+        {"url": "https://example.supabase.co", "service_role_key": "sb_secret_lunatick_test"}
+    )
+    secret_store = supabase_store.SupabaseStore(secret_settings, FakeHttp())
+    assert secret_store._headers == {
+        "apikey": "sb_secret_lunatick_test",
+        "Content-Type": "application/json",
+    }
+    assert "Authorization" not in secret_store._headers
+
     fake_http.responses.append(
         FakeResponse(
             200,
