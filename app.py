@@ -17,6 +17,13 @@ import chat_room
 import community
 import auth
 
+# Streamlit can retain imported helper modules across a live-code update. If
+# the Settings UI has been refreshed before auth.py, reload this one module so
+# the paired profile-save interface is guaranteed to be available.
+if not hasattr(auth, "update_presence_profile"):
+    import importlib
+    auth = importlib.reload(auth)
+
 
 def init_session_state():
     defaults = {
