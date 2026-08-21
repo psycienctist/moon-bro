@@ -510,9 +510,7 @@ if not auth.render_login_page():
 with st.sidebar:
     st.markdown(f"**@{st.session_state.get('username', '?')}**")
     st.caption(st.session_state.get("display_name", ""))
-    if st.button("Log out"):
-        auth.logout()
-        st.rerun()
+    st.button("Log out", on_click=auth.logout)
 
 # ---------------------------------------------------------------------------
 # Logic Functions
@@ -1572,9 +1570,7 @@ def render_settings():
         if "journal_entries" in st.session_state:
             st.session_state.journal_entries = []
             st.success("Journal entries cleared.")
-    if st.button("Log out of this account", type="secondary"):
-        auth.logout()
-        st.rerun()
+    st.button("Log out of this account", type="secondary", on_click=auth.logout)
 
 
 # Sync phase
