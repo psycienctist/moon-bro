@@ -1,13 +1,14 @@
 # auth.py
-# Native Streamlit OIDC authentication for LunaTicK.
+# Native Streamlit OIDC authentication and profile presence for LunaTicK.
 #
 # Auth0 hosts the email-and-password account experience. Streamlit owns the
-# secure identity cookie and restores it automatically for up to 30 days.
-# No password or custom browser session token is stored by this application.
+# secure identity cookie. This module stores only LunaTicK-facing profile data;
+# passwords and provider tokens never enter the local application database.
 
 from __future__ import annotations
 
 import hashlib
+import re
 import sqlite3
 from datetime import datetime
 from typing import Any
@@ -16,16 +17,25 @@ import streamlit as st
 
 DB = "lunatick.db"
 AUTH_PROVIDER = "auth0"
+DEFAULT_AVATAR = "🌙"
+USERNAME_PATTERN = re.compile(r"^[a-z0-9_]{3,24}$")
+
+
+def _connect() -> sqlite3.Connection:
+    """Open the local alpha profile database with row access by column name."""
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def init_auth_db() -> None:
-    """Create the local identity-to-profile mapping used by active app modules.
+    """Create and migrate the local identity-to-profile mapping.
 
-    The identity provider is the source of authentication. This small table only
-    maps the provider's immutable subject to LunaTicK's existing user_hash and
-    retains display/birth-profile values used by the current SQLite-backed alpha.
+    The immutable OIDC subject remains the authentication key. Username,
+    display name, avatar, bio, and birth date are LunaTicK profile attributes
+    designed to move directly into the later Supabase migration.
     """
-    conn = sqlite3.connect(DB)
+    conn = _connect()
     c = conn.cursor()
     c.execute(
         """
@@ -33,13 +43,28 @@ def init_auth_db() -> None:
             subject TEXT PRIMARY KEY,
             user_hash TEXT UNIQUE NOT NULL,
             email TEXT,
+            username TEXT,
             display_name TEXT,
+            avatar TEXT,
+            bio TEXT,
             birth_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+
+    # Existing alpha databases were created before public presence fields
+    # existed. SQLite requires an explicit additive migration for each column.
+    existing_columns = {row["name"] for row in c.execute("PRAGMA table_info(oidc_identities)")}
+    for column, definition in (
+        ("username", "TEXT"),
+        ("avatar", "TEXT"),
+        ("bio", "TEXT"),
+    ):
+        if column not in existing_columns:
+            c.execute(f"ALTER TABLE oidc_identities ADD COLUMN {column} {definition}")
+
     conn.commit()
     conn.close()
 
@@ -76,6 +101,11 @@ def _stable_user_hash(subject: str) -> str:
     return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:16]
 
 
+def _default_username(user_hash: str) -> str:
+    """Create a private, editable initial handle without exposing email address."""
+    return f"moon_{user_hash[:6]}"
+
+
 def _display_name_from_claims(email: str) -> str:
     """Choose an initial profile label without exposing the raw provider ID."""
     display_name = (
@@ -85,10 +115,52 @@ def _display_name_from_claims(email: str) -> str:
         or ""
     )
     if display_name:
-        return str(display_name).strip()
+        return str(display_name).strip()[:48]
     if email and "@" in email:
-        return email.split("@", 1)[0]
+        return email.split("@", 1)[0][:48]
     return "Moon Wanderer"
+
+
+def _clean_username(username: str) -> str:
+    """Normalize an app-facing username to its stable canonical form."""
+    return (username or "").strip().lower().lstrip("@")
+
+
+def _username_is_available(conn: sqlite3.Connection, username: str, subject: str) -> bool:
+    """Check handle availability while allowing a user to retain their own handle."""
+    row = conn.execute(
+        """
+        SELECT subject FROM oidc_identities
+        WHERE lower(COALESCE(username, '')) = lower(?) AND subject != ?
+        LIMIT 1
+        """,
+        (username, subject),
+    ).fetchone()
+    return row is None
+
+
+def _presence_from_row(
+    row: sqlite3.Row | None,
+    user_hash: str,
+    email: str,
+) -> tuple[str, str, str, str | None, str]:
+    """Return stable, complete profile values from an existing or new record."""
+    default_username = _default_username(user_hash)
+    if row is None:
+        return (
+            default_username,
+            _display_name_from_claims(email),
+            DEFAULT_AVATAR,
+            None,
+            "",
+        )
+
+    username = _clean_username(row["username"] or default_username)
+    display_name = (row["display_name"] or _display_name_from_claims(email)).strip()[:48]
+    avatar = (row["avatar"] or DEFAULT_AVATAR).strip()[:8] or DEFAULT_AVATAR
+    bio = (row["bio"] or "").strip()[:240]
+    birth_date = row["birth_date"]
+    return username, display_name, avatar, birth_date, bio
 
 
 def native_user_from_identity() -> dict[str, str | None] | None:
@@ -103,61 +175,62 @@ def native_user_from_identity() -> dict[str, str | None] | None:
         return None
 
     email = str(_claim("email", "")).strip().lower()
-    initial_name = _display_name_from_claims(email)
     user_hash = _stable_user_hash(subject)
 
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        "SELECT display_name, birth_date FROM oidc_identities WHERE subject=?",
+    conn = _connect()
+    existing = conn.execute(
+        """
+        SELECT username, display_name, avatar, bio, birth_date
+        FROM oidc_identities WHERE subject=?
+        """,
         (subject,),
-    )
-    existing = c.fetchone()
+    ).fetchone()
+    username, display_name, avatar, birth_date, bio = _presence_from_row(existing, user_hash, email)
 
     if existing:
-        display_name = existing[0] or initial_name
-        birth_date = existing[1]
-        c.execute(
+        conn.execute(
             """
             UPDATE oidc_identities
-            SET email=?, updated_at=CURRENT_TIMESTAMP
+            SET email=?, username=?, display_name=?, avatar=?, bio=?, updated_at=CURRENT_TIMESTAMP
             WHERE subject=?
             """,
-            (email or None, subject),
+            (email or None, username, display_name, avatar, bio or None, subject),
         )
     else:
-        display_name = initial_name
-        birth_date = None
-        c.execute(
+        conn.execute(
             """
             INSERT INTO oidc_identities
-                (subject, user_hash, email, display_name, birth_date)
-            VALUES (?, ?, ?, ?, NULL)
+                (subject, user_hash, email, username, display_name, avatar, bio, birth_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
             """,
-            (subject, user_hash, email or None, display_name),
+            (subject, user_hash, email or None, username, display_name, avatar, bio or None),
         )
 
     conn.commit()
     conn.close()
 
-    # Existing active modules use username for sidebar presentation and profile
-    # updates. Email is friendlier than an opaque OIDC subject.
     return {
-        "username": email or subject,
+        "username": username,
         "auth_subject": subject,
         "user_hash": user_hash,
+        "email": email or None,
         "display_name": display_name,
+        "avatar": avatar,
+        "bio": bio or "",
         "birth_date": birth_date,
     }
 
 
 def apply_user_to_session(user: dict[str, str | None]) -> None:
-    """Populate the keys already consumed by journals, cards, and community."""
+    """Populate the session keys consumed by LunaTicK modules and profile UI."""
     st.session_state.is_authenticated = True
     st.session_state.username = user["username"]
     st.session_state.auth_subject = user["auth_subject"]
     st.session_state.user_hash = user["user_hash"]
+    st.session_state.email = user.get("email") or ""
     st.session_state.display_name = user["display_name"]
+    st.session_state.avatar = user.get("avatar") or DEFAULT_AVATAR
+    st.session_state.bio = user.get("bio") or ""
 
     if user.get("birth_date"):
         try:
@@ -168,26 +241,77 @@ def apply_user_to_session(user: dict[str, str | None]) -> None:
             st.session_state.birth_date = user["birth_date"]
 
 
-def update_user_profile(username: str, display_name: str, birth_date: str | None) -> None:
-    """Persist app-level profile details without handling passwords or sessions."""
+def update_presence_profile(
+    username: str,
+    display_name: str,
+    avatar: str,
+    bio: str,
+) -> tuple[bool, str]:
+    """Validate and save LunaTicK-facing profile and community presence fields."""
     subject = str(st.session_state.get("auth_subject", "")).strip()
     if not subject:
-        return
+        return False, "Your sign-in session is missing. Please sign in again."
 
-    clean_name = (display_name or "Moon Wanderer").strip() or "Moon Wanderer"
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
+    clean_username = _clean_username(username)
+    clean_display_name = (display_name or "").strip()
+    clean_avatar = (avatar or DEFAULT_AVATAR).strip()[:8] or DEFAULT_AVATAR
+    clean_bio = (bio or "").strip()
+
+    if not USERNAME_PATTERN.fullmatch(clean_username):
+        return False, "Username must be 3–24 lowercase letters, numbers, or underscores."
+    if not clean_display_name:
+        return False, "Display name cannot be empty."
+    if len(clean_display_name) > 48:
+        return False, "Display name must be 48 characters or fewer."
+    if len(clean_bio) > 240:
+        return False, "Bio must be 240 characters or fewer."
+
+    conn = _connect()
+    if not _username_is_available(conn, clean_username, subject):
+        conn.close()
+        return False, "That username is already claimed. Please choose another."
+
+    conn.execute(
         """
         UPDATE oidc_identities
-        SET email=?, display_name=?, birth_date=?, updated_at=CURRENT_TIMESTAMP
+        SET username=?, display_name=?, avatar=?, bio=?, updated_at=CURRENT_TIMESTAMP
         WHERE subject=?
         """,
-        (username.strip().lower() or None, clean_name, birth_date, subject),
+        (clean_username, clean_display_name, clean_avatar, clean_bio or None, subject),
     )
     conn.commit()
     conn.close()
 
+    st.session_state.username = clean_username
+    st.session_state.display_name = clean_display_name
+    st.session_state.avatar = clean_avatar
+    st.session_state.bio = clean_bio
+    return True, "Profile saved."
+
+
+def update_user_profile(username: str, display_name: str, birth_date: str | None) -> None:
+    """Persist birth-profile values while preserving the public presence fields."""
+    subject = str(st.session_state.get("auth_subject", "")).strip()
+    if not subject:
+        return
+
+    clean_username = _clean_username(username) or _default_username(
+        str(st.session_state.get("user_hash", "moon"))
+    )
+    clean_name = (display_name or "Moon Wanderer").strip()[:48] or "Moon Wanderer"
+    conn = _connect()
+    conn.execute(
+        """
+        UPDATE oidc_identities
+        SET username=?, display_name=?, birth_date=?, updated_at=CURRENT_TIMESTAMP
+        WHERE subject=?
+        """,
+        (clean_username, clean_name, birth_date, subject),
+    )
+    conn.commit()
+    conn.close()
+
+    st.session_state.username = clean_username
     st.session_state.display_name = clean_name
     if birth_date:
         try:
@@ -202,8 +326,11 @@ def logout() -> None:
         "is_authenticated",
         "user_hash",
         "username",
+        "email",
         "auth_subject",
         "display_name",
+        "avatar",
+        "bio",
         "birth_date",
     ):
         st.session_state.pop(key, None)
@@ -212,8 +339,9 @@ def logout() -> None:
     st.session_state.user_hash = "anonymous"
 
     if _native_user_is_logged_in():
-        # st.logout() clears Streamlit's managed identity cookie and starts a
-        # fresh session. It intentionally terminates the current script run.
+        # With Auth0 end-session discovery disabled, this clears LunaTicK's
+        # identity cookie and starts a clean sign-in session without a provider
+        # redirect that can fail externally.
         st.logout()
 
 
@@ -223,7 +351,7 @@ def render_login_page() -> bool:
 
     if not _native_auth_available():
         st.error(
-            "LunaTicK needs Streamlit 1.42 or later for secure native sign-in. "
+            "LunaTicK needs Streamlit 1.48.1 or later for secure native sign-in. "
             "Update the deployment dependencies and restart the app."
         )
         return False
@@ -249,8 +377,6 @@ def render_login_page() -> bool:
     )
 
     if st.button("Continue to secure sign-in", type="primary", use_container_width=True):
-        # Auth0's Universal Login handles registration, email/password login,
-        # password recovery, rate limiting, and identity verification.
         st.login(AUTH_PROVIDER)
 
     st.caption(

@@ -49,13 +49,13 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
     first = auth.native_user_from_identity()
     assert first is not None
-    assert first["username"] == "moon.wanderer@example.test"
+    assert first["username"] == auth._default_username(first["user_hash"])
     assert first["display_name"] == "Moon Wanderer"
     assert first["auth_subject"] == "auth0|alpha-user-001"
 
     auth.apply_user_to_session(first)
     auth.update_user_profile(
-        "moon.wanderer@example.test", "Luna Alpha", "1990-01-01"
+        first["username"], "Luna Alpha", "1990-01-01"
     )
 
     fake_streamlit.session_state.clear()

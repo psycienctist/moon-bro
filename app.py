@@ -508,7 +508,7 @@ if not auth.render_login_page():
 
 # Logged-in sidebar identity + logout
 with st.sidebar:
-    st.markdown(f"**@{st.session_state.get('username', '?')}**")
+    st.markdown(f"{st.session_state.get('avatar', '🌙')} **@{st.session_state.get('username', '?')}**")
     st.caption(st.session_state.get("display_name", ""))
     st.button("Log out", on_click=auth.logout)
 
@@ -1543,8 +1543,67 @@ def render_settings():
     </div>
     """, unsafe_allow_html=True)
 
-    st.info(f"Logged in as **@{st.session_state.get('username', '?')}**")
+    avatar_options = ["🌙", "🔮", "🪐", "✨", "🌿", "🔥", "🌊", "🦋", "☄️", "🧿"]
+    current_avatar = st.session_state.get("avatar", "🌙")
+    if current_avatar not in avatar_options:
+        avatar_options.insert(0, current_avatar)
 
+    st.markdown("### ✦ Profile & Presence")
+    st.caption("Choose how you appear across LunaTicK Community. Your sign-in email stays private.")
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:0.7rem; padding:0.75rem 0.9rem; margin:0.45rem 0 0.9rem; border:1px solid rgba(188,140,255,0.24); border-radius:12px; background:rgba(110,64,201,0.10);">
+          <div style="font-size:2rem; line-height:1;">{current_avatar}</div>
+          <div>
+            <div style="color:#f0f6fc; font-weight:700;">{st.session_state.get('display_name', 'Moon Wanderer')}</div>
+            <div style="color:#bc8cff; font-size:0.82rem;">@{st.session_state.get('username', 'moon_wanderer')}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.form("presence_profile_form", clear_on_submit=False):
+        profile_columns = st.columns([1, 2])
+        with profile_columns[0]:
+            avatar = st.selectbox(
+                "Avatar",
+                avatar_options,
+                index=avatar_options.index(current_avatar),
+                help="Select an icon for your LunaTicK presence.",
+            )
+        with profile_columns[1]:
+            username = st.text_input(
+                "Username",
+                value=st.session_state.get("username", ""),
+                max_chars=24,
+                help="3–24 lowercase letters, numbers, or underscores. This is your public handle.",
+            )
+        display_name = st.text_input(
+            "Display name",
+            value=st.session_state.get("display_name", "Moon Wanderer"),
+            max_chars=48,
+            help="This is the name shown beside your avatar.",
+        )
+        bio = st.text_area(
+            "Bio",
+            value=st.session_state.get("bio", ""),
+            max_chars=240,
+            height=96,
+            placeholder="A few words about your cosmic orbit…",
+            help="Optional. Up to 240 characters.",
+        )
+        save_presence = st.form_submit_button("Save profile", type="primary", use_container_width=True)
+
+    if save_presence:
+        saved, message = auth.update_presence_profile(username, display_name, avatar, bio)
+        if saved:
+            st.success(message)
+            st.rerun()
+        else:
+            st.error(message)
+
+    st.markdown("---")
     st.markdown("### 🧬 Birth chart")
     st.caption("Date, time, and place power your Cosmic Card (including Rising).")
     cosmic_cards.render_profile_form(
