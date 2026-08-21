@@ -17,6 +17,7 @@ import boards
 import chat_room
 import community
 import auth
+import database_backup
 
 # Streamlit can retain imported helper modules across a live-code update. If
 # the Settings UI has been refreshed before auth.py, reload this one module so
@@ -1545,6 +1546,18 @@ def render_calendar():
                     """, unsafe_allow_html=True)
 
 
+def _is_backup_owner() -> bool:
+    """Allow full-database export only for the email configured in Cloud secrets."""
+    try:
+        backup_config = st.secrets.get("backup", {})
+        owner_email = str(backup_config.get("owner_email", "")).strip().lower()
+    except Exception:
+        return False
+
+    current_email = str(st.session_state.get("email", "")).strip().lower()
+    return bool(owner_email and current_email and owner_email == current_email)
+
+
 def render_settings():
     st.markdown("""
     <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
@@ -1634,6 +1647,48 @@ def render_settings():
     st.markdown("### 💎 Subscription")
     st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
     st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")
+
+    st.markdown("---")
+    if _is_backup_owner():
+        st.markdown("### 🗄️ Backup & Recovery")
+        st.caption("Owner-only export. Creates an integrity-checked SQLite snapshot before the Supabase migration.")
+        if st.button("Prepare verified SQLite backup", key="prepare_sqlite_backup", type="secondary"):
+            try:
+                backup_bytes, backup_manifest, backup_name = database_backup.create_verified_backup()
+                st.session_state["sqlite_backup_bytes"] = backup_bytes
+                st.session_state["sqlite_backup_manifest"] = backup_manifest
+                st.session_state["sqlite_backup_name"] = backup_name
+                st.success(
+                    f"Verified backup ready: {backup_manifest['database_bytes']:,} bytes · "
+                    f"{sum(backup_manifest['table_counts'].values())} rows across "
+                    f"{len(backup_manifest['table_counts'])} tables."
+                )
+            except Exception as error:
+                st.error(f"Backup could not be prepared: {error}")
+
+        if st.session_state.get("sqlite_backup_bytes"):
+            backup_manifest = st.session_state["sqlite_backup_manifest"]
+            backup_name = st.session_state["sqlite_backup_name"]
+            st.download_button(
+                "Download verified SQLite backup",
+                data=st.session_state["sqlite_backup_bytes"],
+                file_name=backup_name,
+                mime="application/vnd.sqlite3",
+                use_container_width=True,
+                key="download_sqlite_backup",
+            )
+            st.download_button(
+                "Download backup manifest",
+                data=database_backup.manifest_bytes(backup_manifest),
+                file_name=database_backup.manifest_filename(backup_name),
+                mime="application/json",
+                use_container_width=True,
+                key="download_sqlite_backup_manifest",
+            )
+            st.caption(
+                f"SHA-256: `{backup_manifest['sha256']}` · SQLite integrity check: "
+                f"{backup_manifest['integrity_check']}"
+            )
 
     st.markdown("---")
     st.markdown("### 🗑️ Danger Zone")
