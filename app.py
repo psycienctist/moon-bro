@@ -19,8 +19,8 @@ import auth
 
 # Streamlit can retain imported helper modules across a live-code update. If
 # the Settings UI has been refreshed before auth.py, reload this one module so
-# the paired profile-save interface is guaranteed to be available.
-if not hasattr(auth, "update_presence_profile"):
+# the paired profile-save and public-profile interfaces are both available.
+if not all(hasattr(auth, method) for method in ("update_presence_profile", "get_public_profile")):
     import importlib
     auth = importlib.reload(auth)
 

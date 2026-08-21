@@ -241,6 +241,35 @@ def apply_user_to_session(user: dict[str, str | None]) -> None:
             st.session_state.birth_date = user["birth_date"]
 
 
+def get_public_profile(username: str) -> dict[str, str] | None:
+    """Return only the profile fields safe to show to another LunaTicK user."""
+    clean_username = _clean_username(username)
+    if not USERNAME_PATTERN.fullmatch(clean_username):
+        return None
+
+    conn = _connect()
+    row = conn.execute(
+        """
+        SELECT username, display_name, avatar, bio
+        FROM oidc_identities
+        WHERE lower(username) = lower(?)
+        LIMIT 1
+        """,
+        (clean_username,),
+    ).fetchone()
+    conn.close()
+
+    if row is None:
+        return None
+
+    return {
+        "username": _clean_username(row["username"]),
+        "display_name": (row["display_name"] or "Moon Wanderer").strip()[:48],
+        "avatar": (row["avatar"] or DEFAULT_AVATAR).strip()[:8] or DEFAULT_AVATAR,
+        "bio": (row["bio"] or "").strip()[:240],
+    }
+
+
 def update_presence_profile(
     username: str,
     display_name: str,

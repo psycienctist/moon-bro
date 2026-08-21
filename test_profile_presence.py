@@ -79,6 +79,18 @@ def main() -> None:
         ).fetchone()
         assert row == ("alpha_orbit", "Alpha Moon", "🪐", "Listening to the tides.")
 
+        public_profile = auth.get_public_profile("@ALPHA_ORBIT")
+        assert public_profile == {
+            "username": "alpha_orbit",
+            "display_name": "Alpha Moon",
+            "avatar": "🪐",
+            "bio": "Listening to the tides.",
+        }
+        assert "email" not in public_profile
+        assert "birth_date" not in public_profile
+        assert auth.get_public_profile("not-a-valid-handle") is None
+        assert auth.get_public_profile("missing_user") is None
+
         conn.execute(
             """
             INSERT INTO oidc_identities (subject, user_hash, username, display_name, avatar)
