@@ -85,8 +85,10 @@ The final schema uses PostgreSQL foreign keys, UTC timestamps, and an exact prim
 | `idx_journal_profile_phase` | `(profile_auth_subject, phase, created_at DESC)`; owner journal retrieval by lunar phase. |
 | `idx_talk_posts_phase` | `(phase, created_at DESC)`; current-phase LunaTicK Talk feed ordering. |
 | `idx_talk_comments_post_id` | `(post_id, created_at ASC)`; efficient comment-thread retrieval. |
-| `idx_board_posts_board_created` | `(board_slug, created_at DESC)`; board timelines. |
-| `idx_chat_messages_created` | `(created_at DESC)`; recent chat retrieval. |
+| `idx_board_posts_board_created` / `idx_board_posts_profile_auth_subject` | Board timelines and profile foreign-key coverage. |
+| `idx_chat_messages_created` / `idx_chat_messages_profile_auth_subject` | Recent chat retrieval and profile foreign-key coverage. |
+| `idx_talk_posts_profile_auth_subject` / `idx_talk_comments_profile_auth_subject` | Author foreign-key coverage for social records. |
+| `idx_user_votes_post_id` | Vote-to-post foreign-key coverage. |
 | `idx_card_trades_sender_status` / `idx_card_trades_receiver_status` | `(sender_auth_subject, status)` and `(receiver_auth_subject, status)`; inbox and outbox views. |
 | `user_votes` constraint | `PRIMARY KEY (profile_auth_subject, post_id)`; exactly one current vote per user and post. |
 
