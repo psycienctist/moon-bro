@@ -87,6 +87,16 @@ def main() -> None:
     assert "email" not in public_profile
     assert fake_http.calls[-1]["params"]["select"] == "username,display_name,avatar,bio"
 
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.username_is_available("moon_orbit", "auth0|user-1") is True
+    username_query = fake_http.calls[-1]["params"]
+    assert username_query == {
+        "select": "auth_subject",
+        "username": "eq.moon_orbit",
+        "auth_subject": "neq.auth0|user-1",
+        "limit": "1",
+    }
+
     fake_http.responses.append(FakeResponse(201))
     store.log_migration_event(
         run_id="run-001",

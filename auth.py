@@ -15,6 +15,8 @@ from typing import Any
 
 import streamlit as st
 
+import supabase_store
+
 DB = "lunatick.db"
 AUTH_PROVIDER = "auth0"
 DEFAULT_AVATAR = "🌙"
@@ -28,13 +30,21 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
-def init_auth_db() -> None:
-    """Create and migrate the local identity-to-profile mapping.
+def using_supabase_backend() -> bool:
+    """Return whether the fresh Supabase profile path is explicitly activated."""
+    return supabase_store.data_backend_from_streamlit_secrets() == "supabase"
 
-    The immutable OIDC subject remains the authentication key. Username,
-    display name, avatar, bio, and birth date are LunaTicK profile attributes
-    designed to move directly into the later Supabase migration.
-    """
+
+def _supabase() -> supabase_store.SupabaseStore:
+    """Create the server-only Supabase store only after the backend switch is on."""
+    return supabase_store.SupabaseStore(supabase_store.SupabaseSettings.from_streamlit_secrets())
+
+
+def init_auth_db() -> None:
+    """Create and migrate the local identity-to-profile mapping when SQLite is active."""
+    if using_supabase_backend():
+        return
+
     conn = _connect()
     c = conn.cursor()
     c.execute(
@@ -163,20 +173,64 @@ def _presence_from_row(
     return username, display_name, avatar, birth_date, bio
 
 
-def native_user_from_identity() -> dict[str, str | None] | None:
-    """Map the logged-in OIDC identity to LunaTicK's active user-session shape."""
-    if not _native_user_is_logged_in():
-        return None
+def _session_user(
+    *,
+    subject: str,
+    user_hash: str,
+    email: str,
+    username: str,
+    display_name: str,
+    avatar: str,
+    bio: str,
+    birth_date: str | None,
+) -> dict[str, str | None]:
+    """Build the app's established authenticated session representation."""
+    return {
+        "username": username,
+        "auth_subject": subject,
+        "user_hash": user_hash,
+        "email": email or None,
+        "display_name": display_name,
+        "avatar": avatar,
+        "bio": bio or "",
+        "birth_date": birth_date,
+    }
 
-    subject = str(_claim("sub", "")).strip()
-    if not subject:
-        # A standards-compliant OIDC identity must include an immutable subject.
-        # Do not fall back to email; email can change and would split profiles.
-        return None
 
-    email = str(_claim("email", "")).strip().lower()
-    user_hash = _stable_user_hash(subject)
+def _native_user_from_supabase(subject: str, email: str, user_hash: str) -> dict[str, str | None]:
+    """Create or restore the fresh canonical profile in Supabase by Auth0 subject."""
+    store = _supabase()
+    existing = store.get_profile_by_auth_subject(subject)
+    username, display_name, avatar, birth_date, bio = _presence_from_row(existing, user_hash, email)
 
+    # A fresh-start profile is created on first native sign-in. The immutable
+    # Auth0 subject is the upsert conflict key; no SQLite row is read or copied.
+    store.upsert_profile(
+        {
+            "auth_subject": subject,
+            "user_hash": user_hash,
+            "email": email or None,
+            "username": username,
+            "display_name": display_name,
+            "avatar": avatar,
+            "bio": bio or "",
+            "birth_date": birth_date,
+        }
+    )
+    return _session_user(
+        subject=subject,
+        user_hash=user_hash,
+        email=email,
+        username=username,
+        display_name=display_name,
+        avatar=avatar,
+        bio=bio,
+        birth_date=birth_date,
+    )
+
+
+def _native_user_from_sqlite(subject: str, email: str, user_hash: str) -> dict[str, str | None]:
+    """Restore the legacy SQLite profile while the rollback backend is selected."""
     conn = _connect()
     existing = conn.execute(
         """
@@ -208,17 +262,34 @@ def native_user_from_identity() -> dict[str, str | None] | None:
 
     conn.commit()
     conn.close()
+    return _session_user(
+        subject=subject,
+        user_hash=user_hash,
+        email=email,
+        username=username,
+        display_name=display_name,
+        avatar=avatar,
+        bio=bio,
+        birth_date=birth_date,
+    )
 
-    return {
-        "username": username,
-        "auth_subject": subject,
-        "user_hash": user_hash,
-        "email": email or None,
-        "display_name": display_name,
-        "avatar": avatar,
-        "bio": bio or "",
-        "birth_date": birth_date,
-    }
+
+def native_user_from_identity() -> dict[str, str | None] | None:
+    """Map the logged-in OIDC identity to the active backend's canonical profile."""
+    if not _native_user_is_logged_in():
+        return None
+
+    subject = str(_claim("sub", "")).strip()
+    if not subject:
+        # A standards-compliant OIDC identity must include an immutable subject.
+        # Do not fall back to email; email can change and would split profiles.
+        return None
+
+    email = str(_claim("email", "")).strip().lower()
+    user_hash = _stable_user_hash(subject)
+    if using_supabase_backend():
+        return _native_user_from_supabase(subject, email, user_hash)
+    return _native_user_from_sqlite(subject, email, user_hash)
 
 
 def apply_user_to_session(user: dict[str, str | None]) -> None:
@@ -246,6 +317,9 @@ def get_public_profile(username: str) -> dict[str, str] | None:
     clean_username = _clean_username(username)
     if not USERNAME_PATTERN.fullmatch(clean_username):
         return None
+
+    if using_supabase_backend():
+        return _supabase().get_public_profile_by_username(clean_username)
 
     conn = _connect()
     row = conn.execute(
@@ -295,21 +369,40 @@ def update_presence_profile(
     if len(clean_bio) > 240:
         return False, "Bio must be 240 characters or fewer."
 
-    conn = _connect()
-    if not _username_is_available(conn, clean_username, subject):
-        conn.close()
-        return False, "That username is already claimed. Please choose another."
+    if using_supabase_backend():
+        store = _supabase()
+        if not store.username_is_available(clean_username, subject):
+            return False, "That username is already claimed. Please choose another."
 
-    conn.execute(
-        """
-        UPDATE oidc_identities
-        SET username=?, display_name=?, avatar=?, bio=?, updated_at=CURRENT_TIMESTAMP
-        WHERE subject=?
-        """,
-        (clean_username, clean_display_name, clean_avatar, clean_bio or None, subject),
-    )
-    conn.commit()
-    conn.close()
+        existing = store.get_profile_by_auth_subject(subject) or {}
+        store.upsert_profile(
+            {
+                "auth_subject": subject,
+                "user_hash": str(existing.get("user_hash") or st.session_state.get("user_hash", "")),
+                "email": str(existing.get("email") or st.session_state.get("email", "")).strip() or None,
+                "username": clean_username,
+                "display_name": clean_display_name,
+                "avatar": clean_avatar,
+                "bio": clean_bio,
+                "birth_date": existing.get("birth_date"),
+            }
+        )
+    else:
+        conn = _connect()
+        if not _username_is_available(conn, clean_username, subject):
+            conn.close()
+            return False, "That username is already claimed. Please choose another."
+
+        conn.execute(
+            """
+            UPDATE oidc_identities
+            SET username=?, display_name=?, avatar=?, bio=?, updated_at=CURRENT_TIMESTAMP
+            WHERE subject=?
+            """,
+            (clean_username, clean_display_name, clean_avatar, clean_bio or None, subject),
+        )
+        conn.commit()
+        conn.close()
 
     st.session_state.username = clean_username
     st.session_state.display_name = clean_display_name

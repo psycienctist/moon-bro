@@ -181,6 +181,21 @@ class SupabaseStore:
             return None
         return {field: rows[0].get(field) for field in PUBLIC_PROFILE_FIELDS}
 
+    def username_is_available(self, username: str, auth_subject: str) -> bool:
+        """Check uniqueness server-side while allowing the owner to retain a handle."""
+        normalized_username = username.strip().lower().lstrip("@")
+        rows = self._request(
+            "GET",
+            "profiles",
+            params={
+                "select": "auth_subject",
+                "username": f"eq.{normalized_username}",
+                "auth_subject": f"neq.{auth_subject}",
+                "limit": "1",
+            },
+        )
+        return not rows
+
     def log_migration_event(
         self,
         *,
