@@ -1,5 +1,6 @@
 import streamlit as st
 import ephem
+import importlib
 import math
 import requests
 from datetime import datetime, timezone, timedelta
@@ -21,8 +22,12 @@ import auth
 # the Settings UI has been refreshed before auth.py, reload this one module so
 # the paired profile-save and public-profile interfaces are both available.
 if not all(hasattr(auth, method) for method in ("update_presence_profile", "get_public_profile")):
-    import importlib
     auth = importlib.reload(auth)
+
+# The Community page is likewise an imported module. Reload only if a live
+# Streamlit update retained the older module that lacks public profile lookup.
+if not hasattr(community, "_render_public_profile_lookup"):
+    community = importlib.reload(community)
 
 
 def init_session_state():
