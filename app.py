@@ -509,6 +509,19 @@ LUNATICK_CSS = """
             padding-left: 0.04rem !important;
             padding-right: 0.04rem !important;
         }
+
+        /* Journal is the widest remaining compact label on narrow iPhones.
+           Tighten only its own typography and padding so the final “l” cannot
+           create a third line or stretch the otherwise fixed-height rail. */
+        .st-key-lunatick-bottom-nav .st-key-bottom_nav_journal button {
+            font-size: 0.56rem !important;
+            letter-spacing: -0.02em;
+            overflow-wrap: normal !important;
+            padding-left: 0.04rem !important;
+            padding-right: 0.04rem !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+        }
     }
 
     ::-webkit-scrollbar { width: 6px; }
