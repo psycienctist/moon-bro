@@ -14,7 +14,9 @@ assert "vibe-card" not in home_source
 assert "event-item" not in home_source
 assert "DEEPSEEK AI INSIGHT" not in home_source
 assert "FORECAST" not in home_source
-assert "☾ MOON IN ENERGY" in home_source
+assert "☾ MOON IN ENERGY" not in home_source
+assert "YOUR COSMIC MOON COMPANION" not in home_source
+assert "AI + I = All. Always." not in home_source
 assert "Moon in {current['moon_sign']}" in home_source
 assert "import daily_reflection as reflection_ui" in journal_source
 assert 'JOURNAL_MODULE_VERSION = "daily_reflection_v1"' in journal_source

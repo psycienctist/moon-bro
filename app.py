@@ -758,7 +758,6 @@ def render_home():
             <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
         </div>
         <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
-            <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">☾ MOON IN ENERGY</div>
             <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
             <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{current['moon_vibe']}</div>
         </div>
@@ -1848,12 +1847,3 @@ with st.container(key="lunatick-settings-gear"):
         on_click=set_nav_page,
         args=("Settings",),
     )
-
-st.markdown(
-    "<p style='text-align:center; color:#484f58; font-size:0.65rem; "
-    "font-family:Orbitron, sans-serif;'>"
-    "🌙 LUNATICK — YOUR COSMIC MOON COMPANION"
-    "<br><span style='font-size:0.5rem;'>AI + I = All. Always.</span>"
-    "</p>",
-    unsafe_allow_html=True,
-)
