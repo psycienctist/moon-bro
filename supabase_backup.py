@@ -37,6 +37,11 @@ SNAPSHOT_TABLES = (
         "id.asc",
     ),
     SnapshotTable(
+        "journal_practice_days",
+        "profile_auth_subject,practice_date,created_at",
+        "profile_auth_subject.asc,practice_date.asc",
+    ),
+    SnapshotTable(
         "calendar_entries",
         "id,profile_auth_subject,entry_date,note,cycle_marker,severity,created_at,updated_at",
         "id.asc",

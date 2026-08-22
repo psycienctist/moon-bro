@@ -55,6 +55,9 @@ def save_entry(phase, prompt_type, content):
         _supabase().create_journal_entry(
             _resolve_auth_subject(), phase, prompt_type, content.strip()
         )
+        # Record only the canonical practice date after the private entry is
+        # safely stored. The tracking row never contains entry content.
+        reflection_ui.record_practice_day()
         return
 
     conn = sqlite3.connect("lunatick.db")
@@ -136,6 +139,9 @@ def render_journal_tab():
     # ------------------------------------------------------------------
     # Step 1: Select Prompt Mode
     # ------------------------------------------------------------------
+
+    if st.session_state.pop("daily_reflection_write_intent", False):
+        st.caption("Your private writing space is ready below.")
 
     prompt_mode = st.radio(
         "Choose your prompt mode:",

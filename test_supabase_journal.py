@@ -22,6 +22,7 @@ class FakeSessionState(dict):
 class FakeJournalStore:
     def __init__(self) -> None:
         self.created: list[tuple[str, str, str, str]] = []
+        self.practice_days: list[tuple[str, str]] = []
         self.entries = [
             {
                 "id": 2,
@@ -50,6 +51,13 @@ class FakeJournalStore:
         self.last_limit = limit
         return list(self.entries[:limit])
 
+    def record_journal_practice_day(self, subject: str, practice_date: str) -> dict[str, Any]:
+        self.practice_days.append((subject, practice_date))
+        return {"profile_auth_subject": subject, "practice_date": practice_date}
+
+    def list_journal_practice_days(self, subject: str, limit: int = 730) -> list[dict[str, Any]]:
+        return []
+
 
 fake_streamlit = types.SimpleNamespace(
     session_state=FakeSessionState(
@@ -67,9 +75,14 @@ store = FakeJournalStore()
 journal._using_supabase_backend = lambda: True
 journal._supabase = lambda: store
 
+reflection = importlib.import_module("daily_reflection")
+reflection._using_supabase = lambda: True
+reflection._store = lambda: store
+
 journal.init_db()
 journal.save_entry("Full Moon", "phase", "  A private entry.  ")
 assert store.created == [("auth0|current", "Full Moon", "phase", "A private entry.")]
+assert store.practice_days and store.practice_days[0][0] == "auth0|current"
 entries = journal.get_recent_entries(limit=2)
 assert entries == [
     ("Full Moon", "phase", "Second private reflection.", "2026-08-22T00:02:00+00:00"),
@@ -79,11 +92,9 @@ assert store.last_list_subject == "auth0|current"
 assert store.last_limit == 2
 assert "auth0|current" not in str(entries)
 
-reflection = importlib.import_module("daily_reflection")
-reflection.talk_db.get_lunatick_pulse = lambda phase: "Community pulse."
-reflection.journal_ui.get_recent_entries = journal.get_recent_entries
-context = reflection.gather_context()
-assert context["pulse"] == "Community pulse."
-assert "Second private reflection" in context["journal_summary"]
+reflection_source = open("daily_reflection.py", encoding="utf-8").read()
+assert "talk_db" not in reflection_source
+assert "get_recent_entries" not in reflection_source
+assert "Second private reflection" not in reflection_source
 
 print("Supabase Journal owner-only persistence and reflection compatibility passed.")
