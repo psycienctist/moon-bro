@@ -546,17 +546,26 @@ def _render_card_css() -> None:
       background-image:radial-gradient(circle at 12% 18%,rgba(255,255,255,.48) 0 1px,transparent 1.4px),radial-gradient(circle at 76% 28%,rgba(88,166,255,.45) 0 1px,transparent 1.4px),radial-gradient(circle at 44% 72%,rgba(188,140,255,.36) 0 1px,transparent 1.4px);
       background-size:82px 91px,121px 109px,151px 137px;
     }
+    /* Keep the two three-tile rows intact even on narrow phones. Streamlit
+       otherwise collapses st.columns into a vertical list at mobile width. */
+    div[class*="st-key-cosmic_card_"] [data-testid="stHorizontalBlock"] {
+      flex-flow:row nowrap !important; gap:.42rem !important;
+    }
+    div[class*="st-key-cosmic_card_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+      min-width:0 !important; width:calc((100% - .84rem) / 3) !important; flex:1 1 0 !important;
+    }
     div[class*="st-key-card_tile_"] button {
-      min-height:88px !important; border:1px solid rgba(255,255,255,.14) !important;
-      border-radius:13px !important; background:rgba(6,12,26,.56) !important;
+      min-height:104px !important; padding:.42rem .2rem !important;
+      border:1.5px solid rgba(255,255,255,.18) !important; border-radius:13px !important;
+      background:linear-gradient(145deg,rgba(27,34,61,.86),rgba(11,16,33,.88)) !important;
       color:#edf5ff !important; white-space:pre-line !important; line-height:1.28 !important;
-      font-size:.75rem !important; box-shadow:inset 0 0 18px rgba(255,255,255,.025) !important;
+      font-size:.70rem !important; box-shadow:inset 0 0 18px rgba(255,255,255,.025) !important;
     }
     div[class*="st-key-card_tile_"] button:hover {
-      border-color:#79c7ff !important; background:rgba(28,56,98,.55) !important;
+      background:linear-gradient(145deg,rgba(42,59,99,.92),rgba(13,24,48,.94)) !important;
       transform:translateY(-1px);
     }
-    div[class*="st-key-card_tile_"] button p { white-space:pre-line !important; }
+    div[class*="st-key-card_tile_"] button p { white-space:pre-line !important; overflow-wrap:anywhere !important; }
     </style>
     """)
 
@@ -596,7 +605,15 @@ def render_collectible_card(card: dict, *, is_owner: bool = True, key_prefix: st
 
     with st.container(key=f"cosmic_card_{safe_key}", border=False):
         st.html(f"""
-        <style>.st-key-cosmic_card_{safe_key}{{border:2px solid {accent}!important;box-shadow:inset 0 0 36px rgba(0,0,0,.36),0 0 28px {accent}3d!important;}}</style>
+        <style>
+        .st-key-cosmic_card_{safe_key}{{border:2px solid {accent}!important;box-shadow:inset 0 0 36px rgba(0,0,0,.36),0 0 28px {accent}3d!important;}}
+        .st-key-card_tile_{safe_key}_sun button{{border-color:{sign_color(natal['sun_sign'])}!important;box-shadow:inset 0 0 18px {sign_color(natal['sun_sign'])}22,0 0 11px {sign_color(natal['sun_sign'])}28!important;}}
+        .st-key-card_tile_{safe_key}_moon button{{border-color:{sign_color(natal['moon_sign'])}!important;box-shadow:inset 0 0 18px {sign_color(natal['moon_sign'])}22,0 0 11px {sign_color(natal['moon_sign'])}28!important;}}
+        .st-key-card_tile_{safe_key}_rising button{{border-color:{sign_color(natal.get('rising_sign')) if natal.get('has_rising') else '#6b7280'}!important;box-shadow:inset 0 0 18px rgba(255,255,255,.04),0 0 11px rgba(255,255,255,.12)!important;}}
+        .st-key-card_tile_{safe_key}_birth_phase button{{border-color:#f2cc60!important;}}
+        .st-key-card_tile_{safe_key}_full_moons button{{border-color:#bc8cff!important;}}
+        .st-key-card_tile_{safe_key}_dominant button{{border-color:#6ee7b7!important;}}
+        </style>
         <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;margin:0.1rem 0 .65rem;">
           <div style="font-size:.62rem;letter-spacing:2.5px;color:#83caff;font-weight:700;">LUNATICK COSMIC CARD</div>
           <div style="font-size:.65rem;color:#8b949e;">{'MY CARD' if is_owner else 'COLLECTED CARD'}</div>

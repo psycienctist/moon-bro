@@ -38,6 +38,10 @@ assert "Your Collection" in source
 assert "Add time + coords" in source
 assert "use_loc = place.strip()" not in source
 assert "actual_coordinates = _has_actual_coordinates(latitude, longitude)" in source
+assert 'flex-flow:row nowrap !important;' in source
+assert 'width:calc((100% - .84rem) / 3) !important;' in source
+for tile_color in ("#f2cc60", "#bc8cff", "#6ee7b7"):
+    assert tile_color in source, tile_color
 assert 'if not hasattr(cosmic_cards, "shareable_card")' in app_source
 assert "cosmic_cards = importlib.reload(cosmic_cards)" in app_source
 
