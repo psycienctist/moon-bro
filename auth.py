@@ -12,7 +12,9 @@ import re
 import sqlite3
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
+import requests
 import streamlit as st
 
 import supabase_store
@@ -21,6 +23,8 @@ DB = "lunatick.db"
 AUTH_PROVIDER = "auth0"
 DEFAULT_AVATAR = "🌙"
 USERNAME_PATTERN = re.compile(r"^[a-z0-9_]{3,24}$")
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+DEFAULT_AUTH0_DATABASE_CONNECTION = "Username-Password-Authentication"
 
 
 def _connect() -> sqlite3.Connection:
@@ -90,6 +94,55 @@ def _claim(name: str, default: Any = None) -> Any:
             return default if value is None else value
         except Exception:
             return default
+
+
+def _auth0_password_reset_config() -> tuple[str, str, str] | None:
+    """Return the existing Auth0 database reset endpoint and public client settings.
+
+    The endpoint sends a recovery email through Auth0. LunaTicK neither receives
+    nor stores a password, reset ticket, or provider token.
+    """
+    try:
+        config = st.secrets.get("auth", {}).get("auth0", {})
+        metadata_url = str(config.get("server_metadata_url", "")).strip()
+        client_id = str(config.get("client_id", "")).strip()
+        connection = str(
+            config.get("database_connection", DEFAULT_AUTH0_DATABASE_CONNECTION)
+        ).strip()
+    except Exception:
+        return None
+
+    parsed = urlparse(metadata_url)
+    if not parsed.scheme or not parsed.netloc or not client_id or not connection:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}/dbconnections/change_password", client_id, connection
+
+
+def request_password_reset(email: str, http_client: Any = requests) -> tuple[bool, str]:
+    """Ask Auth0 to email a database-password reset link without revealing account status."""
+    clean_email = (email or "").strip().lower()
+    if not EMAIL_PATTERN.fullmatch(clean_email):
+        return False, "Enter a valid email address."
+
+    config = _auth0_password_reset_config()
+    if config is None:
+        return False, "Password recovery is temporarily unavailable. Please try again later."
+    endpoint, client_id, connection = config
+
+    try:
+        response = http_client.post(
+            endpoint,
+            json={"client_id": client_id, "email": clean_email, "connection": connection},
+            timeout=15,
+        )
+    except requests.RequestException:
+        return False, "Password recovery is temporarily unavailable. Please try again later."
+
+    # Always use a generic success result on an Auth0 response. This avoids
+    # revealing whether an address belongs to a LunaTicK account.
+    if response.ok:
+        return True, "If an account exists for that email, Auth0 has sent a password-reset link."
+    return False, "Password recovery could not be started. Please try again shortly."
 
 
 def _native_auth_available() -> bool:
@@ -515,6 +568,25 @@ def render_login_page() -> bool:
 
     if st.button("Continue to secure sign-in", type="primary", use_container_width=True):
         st.login(AUTH_PROVIDER)
+
+    with st.expander("Forgot your password?", expanded=False):
+        st.caption(
+            "Enter the email used for your LunaTicK account. Auth0 will send a secure reset link if an account exists."
+        )
+        with st.form("auth0_password_recovery_form", clear_on_submit=True):
+            recovery_email = st.text_input(
+                "Account email",
+                type="email",
+                placeholder="you@example.com",
+                key="auth0_recovery_email",
+            )
+            send_recovery = st.form_submit_button("Email password-reset link", use_container_width=True)
+        if send_recovery:
+            sent, message = request_password_reset(recovery_email)
+            if sent:
+                st.success(message)
+            else:
+                st.warning(message)
 
     st.caption(
         "Keep your account signed in for up to 30 days. "

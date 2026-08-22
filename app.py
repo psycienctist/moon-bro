@@ -1654,6 +1654,27 @@ def render_settings():
         st.success("You have opted out of community sharing.")
 
     st.markdown("---")
+    st.markdown("### 🔐 Password & Sign-in")
+    account_email = str(st.session_state.get("email", "")).strip().lower()
+    st.caption(
+        "LunaTicK never stores your password. Auth0 manages sign-in and sends secure reset links to your account email."
+    )
+    if account_email:
+        if st.button(
+            "Email me a password-reset link",
+            key="settings_password_reset",
+            type="secondary",
+            use_container_width=True,
+        ):
+            sent, message = auth.request_password_reset(account_email)
+            if sent:
+                st.success(message)
+            else:
+                st.warning(message)
+    else:
+        st.info("Your account email is unavailable in this session. Log out and sign in again to request a reset link.")
+
+    st.markdown("---")
     st.markdown("### 💎 Subscription")
     st.selectbox("Your Tier", ["Free", "Community ($5/mo)", "Resonance ($15/mo)"])
     st.info("Upgrade to Community or Resonance for full access to AI insights and community features.")

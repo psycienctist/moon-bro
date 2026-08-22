@@ -38,6 +38,8 @@ cookie_secret = "PASTE_A_LONG_RANDOM_PRIVATE_VALUE_HERE"
 client_id = "PASTE_THE_AUTH0_CLIENT_ID"
 client_secret = "PASTE_THE_AUTH0_CLIENT_SECRET"
 server_metadata_url = "https://YOUR_AUTH0_DOMAIN/.well-known/openid-configuration"
+# Keep this value aligned with the enabled Auth0 database connection.
+database_connection = "Username-Password-Authentication"
 ```
 
 Generate the `cookie_secret` with a password manager or a cryptographic random generator. It must remain stable after deployment; changing it deliberately signs all users out.
@@ -47,6 +49,10 @@ Generate the `cookie_secret` with a password manager or a cryptographic random g
 After deploying the code and secrets, open LunaTicK in an incognito browser window. Select **Continue to secure sign-in**, create a new email-and-password account, and complete the provider's verification process if it asks for one. You should return to the LunaTicK home screen.
 
 Close the tab entirely, reopen the same app URL in the same browser, and confirm that the home screen loads directly without asking for credentials. Finally, choose **Log out** in Settings, reopen the app, and confirm that the sign-in screen returns.
+
+## 5. Verify password recovery
+
+From LunaTicK's sign-in screen, open **Forgot your password?**, enter the account email, and select **Email password-reset link**. Auth0 sends the recovery email and hosts the new-password page; LunaTicK never receives, stores, or changes a password. A signed-in user can request the same Auth0 reset link in **Settings → Password & Sign-in**. For privacy, the app shows a generic success message rather than revealing whether an email address has an account.
 
 ## Notes for the current alpha
 
