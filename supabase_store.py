@@ -53,8 +53,6 @@ CARD_PROFILE_FIELDS = (
     "lat",
     "lon",
     "utc_offset",
-    "hd_profile",
-    "hd_authority",
 )
 PROFILE_MUTABLE_FIELDS = frozenset(
     {
@@ -69,8 +67,6 @@ PROFILE_MUTABLE_FIELDS = frozenset(
         "lat",
         "lon",
         "utc_offset",
-        "hd_profile",
-        "hd_authority",
     }
 )
 

@@ -134,19 +134,31 @@ assert "user_hash" not in birth_update
 my_card = cards.build_card("current_hash")
 assert my_card is not None
 assert my_card["profile_auth_subject"] == "auth0|current"
-assert my_card["hd_profile"]
-assert my_card["hd_authority"]
-assert store.profiles["auth0|current"]["hd_profile"] == my_card["hd_profile"]
+assert "hd_profile" not in my_card
+assert "hd_authority" not in my_card
+assert "rarity" not in my_card
+assert my_card["natal"]["has_rising"] is True
 
 updates_before_other_card = len(store.updates)
 other_cards = cards.list_users_with_cards("current_hash")
 assert len(other_cards) == 1
 assert other_cards[0]["profile_auth_subject"] == "auth0|other"
+assert "birth_date" not in other_cards[0]
+assert "birth_time" not in other_cards[0]
+assert "birth_place" not in other_cards[0]
+assert "lat" not in other_cards[0]
+assert "lon" not in other_cards[0]
 assert len(store.updates) == updates_before_other_card
+
+friend_card = cards.build_friend_card("current_hash", "auth0|other")
+assert friend_card is not None
+assert friend_card["display_name"] == "Other Moon"
+for private_field in ("birth_date", "birth_time", "birth_place", "lat", "lon", "utc_offset", "auth_subject", "profile_auth_subject", "user_hash"):
+    assert private_field not in friend_card
 
 saved, note = cards.send_trade("current_hash", "auth0|other", "Let us connect.")
 assert saved is True
-assert note == "Trade (friend request) sent!"
+assert note == "Card trade sent!"
 assert store.trades == [("auth0|current", "auth0|other", "Let us connect.")]
 
 incoming = cards.list_trades("current_hash", "incoming")
@@ -155,4 +167,7 @@ assert cards.resolve_trade(9, "current_hash", True) is True
 assert store.resolutions == [(9, "auth0|current", True)]
 assert cards.friends_of("current_hash") == ["auth0|other"]
 
-print("Supabase Cosmic Card profile and card-trade cutover passed.")
+assert cards._has_actual_coordinates(None, None) is False
+assert cards._has_actual_coordinates(0.0, 0.0) is False
+assert cards._has_actual_coordinates(30.2672, -97.7431) is True
+print("Supabase Cosmic Card single-face and share-safe collection checks passed.")
