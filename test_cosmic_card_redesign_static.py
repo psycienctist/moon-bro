@@ -42,6 +42,8 @@ assert 'flex-flow:row nowrap !important;' in source
 assert 'width:calc((100% - .84rem) / 3) !important;' in source
 for tile_color in ("#f2cc60", "#bc8cff", "#6ee7b7"):
     assert tile_color in source, tile_color
+assert "@media (max-width: 600px)" in source
+assert "min-height:84px !important;" in source
 assert 'if not hasattr(cosmic_cards, "shareable_card")' in app_source
 assert "cosmic_cards = importlib.reload(cosmic_cards)" in app_source
 

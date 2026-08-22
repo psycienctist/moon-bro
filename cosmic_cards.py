@@ -566,6 +566,19 @@ def _render_card_css() -> None:
       transform:translateY(-1px);
     }
     div[class*="st-key-card_tile_"] button p { white-space:pre-line !important; overflow-wrap:anywhere !important; }
+    @media (max-width: 600px) {
+      div[class*="st-key-cosmic_card_"] {
+        padding:.62rem .58rem .68rem !important;
+        margin:.28rem 0 .52rem !important;
+        border-radius:18px !important;
+      }
+      div[class*="st-key-card_tile_"] button {
+        min-height:84px !important;
+        padding:.28rem .12rem !important;
+        font-size:.64rem !important;
+        line-height:1.18 !important;
+      }
+    }
     </style>
     """)
 
