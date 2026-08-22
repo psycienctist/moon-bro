@@ -9,6 +9,7 @@ import hashlib
 import supabase_store
 import daily_reflection as reflection_ui
 
+JOURNAL_MODULE_VERSION = "daily_reflection_v1"
 
 # --------------------------------------------------------------------------
 # Database Setup

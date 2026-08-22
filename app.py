@@ -30,6 +30,11 @@ if not all(
 ):
     auth = importlib.reload(auth)
 
+# Reload Journal only when a warm Streamlit worker retained the previous
+# module and would otherwise omit the relocated Daily Reflection block.
+if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "daily_reflection_v1":
+    journal_ui = importlib.reload(journal_ui)
+
 # The backup Settings view can be updated before its server-only adapter in a
 # warm Streamlit process. Reload only when the required snapshot reader is absent.
 if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
