@@ -17,6 +17,20 @@ import requests
 
 VALID_BACKENDS = {"sqlite", "supabase"}
 PUBLIC_PROFILE_FIELDS = ("username", "display_name", "avatar", "bio")
+BACKUP_TABLES = frozenset(
+    {
+        "profiles",
+        "journal_entries",
+        "boards",
+        "board_posts",
+        "chat_messages",
+        "lunatick_talk_posts",
+        "lunatick_talk_comments",
+        "user_votes",
+        "card_trades",
+        "migration_log",
+    }
+)
 CARD_PROFILE_FIELDS = (
     "auth_subject",
     "user_hash",
@@ -174,6 +188,32 @@ class SupabaseStore:
         if response.status_code == 204 or not response.content:
             return None
         return response.json()
+
+    def list_backup_rows(
+        self,
+        table: str,
+        columns: str,
+        *,
+        order: str,
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Read one ordered backup page from an explicitly approved LunaTicK table."""
+        if table not in BACKUP_TABLES:
+            raise ValueError(f"{table!r} is not approved for LunaTicK backup export.")
+        page_size = max(1, min(int(limit), 1000))
+        page_offset = max(0, int(offset))
+        rows = self._request(
+            "GET",
+            table,
+            params={
+                "select": columns,
+                "order": order,
+                "limit": str(page_size),
+                "offset": str(page_offset),
+            },
+        )
+        return list(rows or [])
 
     def healthcheck(self) -> bool:
         """Verify that the target schema responds without returning record data."""

@@ -18,6 +18,8 @@ import chat_room
 import community
 import auth
 import database_backup
+import supabase_backup
+import supabase_store
 
 # Streamlit can retain imported helper modules across a live-code update. If
 # the Settings UI has been refreshed before auth.py, reload this one module so
@@ -1651,44 +1653,96 @@ def render_settings():
     st.markdown("---")
     if _is_backup_owner():
         st.markdown("### 🗄️ Backup & Recovery")
-        st.caption("Owner-only export. Creates an integrity-checked SQLite snapshot before the Supabase migration.")
-        if st.button("Prepare verified SQLite backup", key="prepare_sqlite_backup", type="secondary"):
-            try:
-                backup_bytes, backup_manifest, backup_name = database_backup.create_verified_backup()
-                st.session_state["sqlite_backup_bytes"] = backup_bytes
-                st.session_state["sqlite_backup_manifest"] = backup_manifest
-                st.session_state["sqlite_backup_name"] = backup_name
-                st.success(
-                    f"Verified backup ready: {backup_manifest['database_bytes']:,} bytes · "
-                    f"{sum(backup_manifest['table_counts'].values())} rows across "
-                    f"{len(backup_manifest['table_counts'])} tables."
-                )
-            except Exception as error:
-                st.error(f"Backup could not be prepared: {error}")
-
-        if st.session_state.get("sqlite_backup_bytes"):
-            backup_manifest = st.session_state["sqlite_backup_manifest"]
-            backup_name = st.session_state["sqlite_backup_name"]
-            st.download_button(
-                "Download verified SQLite backup",
-                data=st.session_state["sqlite_backup_bytes"],
-                file_name=backup_name,
-                mime="application/vnd.sqlite3",
-                use_container_width=True,
-                key="download_sqlite_backup",
-            )
-            st.download_button(
-                "Download backup manifest",
-                data=database_backup.manifest_bytes(backup_manifest),
-                file_name=database_backup.manifest_filename(backup_name),
-                mime="application/json",
-                use_container_width=True,
-                key="download_sqlite_backup_manifest",
-            )
+        if auth.using_supabase_backend():
             st.caption(
-                f"SHA-256: `{backup_manifest['sha256']}` · SQLite integrity check: "
-                f"{backup_manifest['integrity_check']}"
+                "Owner-only logical Supabase export. It packages the live LunaTicK data tables with "
+                "per-table counts and SHA-256 verification; it never includes service credentials."
             )
+            st.warning(
+                "Keep the downloaded ZIP and manifest in secure offline storage. This export is a "
+                "point-in-time logical snapshot, not an in-app restore button."
+            )
+            if st.button("Prepare verified Supabase backup", key="prepare_supabase_backup", type="secondary"):
+                try:
+                    store = supabase_store.SupabaseStore(
+                        supabase_store.SupabaseSettings.from_streamlit_secrets()
+                    )
+                    backup_bytes, backup_manifest, backup_name = (
+                        supabase_backup.create_verified_supabase_backup(store)
+                    )
+                    st.session_state["supabase_backup_bytes"] = backup_bytes
+                    st.session_state["supabase_backup_manifest"] = backup_manifest
+                    st.session_state["supabase_backup_name"] = backup_name
+                    st.success(
+                        f"Verified backup ready: {backup_manifest['archive_bytes']:,} bytes · "
+                        f"{sum(backup_manifest['table_counts'].values()):,} rows across "
+                        f"{len(backup_manifest['table_counts'])} tables."
+                    )
+                except Exception as error:
+                    st.error(f"Supabase backup could not be prepared: {error}")
+
+            if st.session_state.get("supabase_backup_bytes"):
+                backup_manifest = st.session_state["supabase_backup_manifest"]
+                backup_name = st.session_state["supabase_backup_name"]
+                st.download_button(
+                    "Download verified Supabase backup",
+                    data=st.session_state["supabase_backup_bytes"],
+                    file_name=backup_name,
+                    mime="application/zip",
+                    use_container_width=True,
+                    key="download_supabase_backup",
+                )
+                st.download_button(
+                    "Download backup manifest",
+                    data=supabase_backup.manifest_bytes(backup_manifest),
+                    file_name=supabase_backup.manifest_filename(backup_name),
+                    mime="application/json",
+                    use_container_width=True,
+                    key="download_supabase_backup_manifest",
+                )
+                st.caption(
+                    f"Archive SHA-256: `{backup_manifest['archive_sha256']}` · "
+                    f"Snapshot SHA-256: `{backup_manifest['snapshot_sha256']}`"
+                )
+        else:
+            st.caption("Owner-only legacy SQLite export for the explicit rollback backend.")
+            if st.button("Prepare verified SQLite backup", key="prepare_sqlite_backup", type="secondary"):
+                try:
+                    backup_bytes, backup_manifest, backup_name = database_backup.create_verified_backup()
+                    st.session_state["sqlite_backup_bytes"] = backup_bytes
+                    st.session_state["sqlite_backup_manifest"] = backup_manifest
+                    st.session_state["sqlite_backup_name"] = backup_name
+                    st.success(
+                        f"Verified backup ready: {backup_manifest['database_bytes']:,} bytes · "
+                        f"{sum(backup_manifest['table_counts'].values())} rows across "
+                        f"{len(backup_manifest['table_counts'])} tables."
+                    )
+                except Exception as error:
+                    st.error(f"Backup could not be prepared: {error}")
+
+            if st.session_state.get("sqlite_backup_bytes"):
+                backup_manifest = st.session_state["sqlite_backup_manifest"]
+                backup_name = st.session_state["sqlite_backup_name"]
+                st.download_button(
+                    "Download verified SQLite backup",
+                    data=st.session_state["sqlite_backup_bytes"],
+                    file_name=backup_name,
+                    mime="application/vnd.sqlite3",
+                    use_container_width=True,
+                    key="download_sqlite_backup",
+                )
+                st.download_button(
+                    "Download backup manifest",
+                    data=database_backup.manifest_bytes(backup_manifest),
+                    file_name=database_backup.manifest_filename(backup_name),
+                    mime="application/json",
+                    use_container_width=True,
+                    key="download_sqlite_backup_manifest",
+                )
+                st.caption(
+                    f"SHA-256: `{backup_manifest['sha256']}` · SQLite integrity check: "
+                    f"{backup_manifest['integrity_check']}"
+                )
 
     st.markdown("---")
     st.markdown("### 🗑️ Danger Zone")
