@@ -34,7 +34,10 @@ if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
 
 # The Community page is likewise an imported module. Reload only if a live
 # Streamlit update retained the older module that lacks public profile lookup.
-if not hasattr(community, "_render_public_profile_lookup"):
+if not all(
+    hasattr(community, attribute)
+    for attribute in ("_render_public_profile_lookup", "moderation")
+):
     community = importlib.reload(community)
 
 
