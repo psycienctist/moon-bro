@@ -28,12 +28,17 @@ SNAPSHOT_TABLES = (
     SnapshotTable(
         "profiles",
         "auth_subject,user_hash,username,display_name,avatar,bio,email,birth_date,birth_time,"
-        "birth_place,lat,lon,utc_offset,hd_profile,hd_authority,created_at,updated_at",
+        "birth_place,lat,lon,utc_offset,public_card_values_visible,hd_profile,hd_authority,created_at,updated_at",
         "auth_subject.asc",
     ),
     SnapshotTable(
         "journal_entries",
         "id,profile_auth_subject,phase,prompt_type,content,created_at",
+        "id.asc",
+    ),
+    SnapshotTable(
+        "calendar_entries",
+        "id,profile_auth_subject,entry_date,note,cycle_marker,severity,created_at,updated_at",
         "id.asc",
     ),
     SnapshotTable("boards", "slug,name,description,created_at", "slug.asc"),

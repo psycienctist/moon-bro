@@ -28,6 +28,7 @@ BACKUP_TABLES = frozenset(
     {
         "profiles",
         "journal_entries",
+        "calendar_entries",
         "boards",
         "board_posts",
         "chat_messages",
@@ -683,6 +684,64 @@ class SupabaseStore:
                 },
             )
             or []
+        )
+
+    def upsert_calendar_entry(
+        self,
+        profile_auth_subject: str,
+        entry_date: str,
+        note: str,
+        cycle_marker: str | None,
+        severity: int | None,
+    ) -> dict[str, Any]:
+        """Create or replace one private Track entry for its canonical owner."""
+        rows = self._request(
+            "POST",
+            "calendar_entries",
+            params={"on_conflict": "profile_auth_subject,entry_date"},
+            payload={
+                "profile_auth_subject": profile_auth_subject,
+                "entry_date": entry_date,
+                "note": note,
+                "cycle_marker": cycle_marker,
+                "severity": severity,
+            },
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Calendar entry upsert did not return exactly one row.")
+        return rows[0]
+
+    def list_calendar_entries(
+        self, profile_auth_subject: str, start_date: str, end_date: str
+    ) -> list[dict[str, Any]]:
+        """List only the owner's private Track entries inside one month range."""
+        return list(
+            self._request(
+                "GET",
+                "calendar_entries",
+                params={
+                    "select": "entry_date,note,cycle_marker,severity,updated_at",
+                    "profile_auth_subject": f"eq.{profile_auth_subject}",
+                    "entry_date": f"gte.{start_date}",
+                    "entry_date": f"lt.{end_date}",
+                    "order": "entry_date.asc",
+                    "limit": "42",
+                },
+            )
+            or []
+        )
+
+    def delete_calendar_entry(self, profile_auth_subject: str, entry_date: str) -> None:
+        """Delete only the owner's selected private Track entry."""
+        self._request(
+            "DELETE",
+            "calendar_entries",
+            params={
+                "profile_auth_subject": f"eq.{profile_auth_subject}",
+                "entry_date": f"eq.{entry_date}",
+            },
+            prefer="return=minimal",
         )
 
     def hide_talk_post(self, post_id: int) -> None:

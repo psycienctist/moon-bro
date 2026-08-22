@@ -13,6 +13,7 @@ import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
 import daily_reflection as reflection_ui
 import cosmic_cards
+import track_calendar
 import boards
 import chat_room
 import community
@@ -48,6 +49,11 @@ if (
 # module version rather than checking only a helper that older releases share.
 if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "public_value_privacy_v3":
     cosmic_cards = importlib.reload(cosmic_cards)
+
+# The phone-first Track renderer is also an imported module. Reload it only
+# when a warm worker retained the prior calendar implementation.
+if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "mobile_grid_private_entries_v1":
+    track_calendar = importlib.reload(track_calendar)
 
 
 def init_session_state():
@@ -1504,78 +1510,8 @@ def render_tones():
 
 
 def render_calendar():
-    st.markdown("""
-    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 3px; color: #bc8cff; text-transform: uppercase; margin-bottom: 0.3rem;">
-        📅 Lunar Calendar
-    </div>
-    <div style="font-family: 'Crimson Pro', serif; font-size: 1rem; color: #8b949e; margin-bottom: 1.2rem; font-style: italic;">
-        Track moon phases throughout the month.
-    </div>
-    """, unsafe_allow_html=True)
-
-    now = datetime.now()
-    if "calendar_month" not in st.session_state:
-        st.session_state.calendar_month = now.month
-    if "calendar_year" not in st.session_state:
-        st.session_state.calendar_year = now.year
-
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
-    with nav_col1:
-        if st.button("◀ Previous", use_container_width=True):
-            if st.session_state.calendar_month == 1:
-                st.session_state.calendar_month = 12
-                st.session_state.calendar_year -= 1
-            else:
-                st.session_state.calendar_month -= 1
-            st.rerun()
-    with nav_col2:
-        st.markdown(
-            f"<h3 style='text-align:center; color:#fff;'>{datetime(st.session_state.calendar_year, st.session_state.calendar_month, 1).strftime('%B %Y')}</h3>",
-            unsafe_allow_html=True,
-        )
-    with nav_col3:
-        if st.button("Next ▶", use_container_width=True):
-            if st.session_state.calendar_month == 12:
-                st.session_state.calendar_month = 1
-                st.session_state.calendar_year += 1
-            else:
-                st.session_state.calendar_month += 1
-            st.rerun()
-
-    import calendar as cal
-
-    month_cal = cal.monthcalendar(st.session_state.calendar_year, st.session_state.calendar_month)
-    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    header_cols = st.columns(7)
-    for i, day in enumerate(weekdays):
-        with header_cols[i]:
-            st.markdown(
-                f"<div style='text-align:center; color:#8b949e; font-size:0.7rem; font-weight:700;'>{day}</div>",
-                unsafe_allow_html=True,
-            )
-
-    today = datetime.now()
-    for week in month_cal:
-        day_cols = st.columns(7)
-        for i, day in enumerate(week):
-            with day_cols[i]:
-                if day == 0:
-                    st.markdown("<div style='min-height:80px;'></div>", unsafe_allow_html=True)
-                else:
-                    date_obj = datetime(st.session_state.calendar_year, st.session_state.calendar_month, day)
-                    day_data = get_celestial_data(date_obj.replace(tzinfo=timezone.utc))
-                    is_today = (
-                        day == today.day
-                        and st.session_state.calendar_month == today.month
-                        and st.session_state.calendar_year == today.year
-                    )
-                    st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.5rem; text-align:center; min-height:80px; {'' if not is_today else 'border:2px solid #6e40c9; background:rgba(110,64,201,0.1);'}">
-                        <div style="font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">{day}</div>
-                        <div style="font-size:1.5rem; margin-bottom:0.2rem;">{day_data['phase_emoji']}</div>
-                        <div style="font-size:0.6rem; color:#8b949e;">{day_data['illum']*100:.0f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+    """Render the phone-first Track calendar implementation."""
+    track_calendar.render_track_tab()
 
 
 def _is_backup_owner() -> bool:

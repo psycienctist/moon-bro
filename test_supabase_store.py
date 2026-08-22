@@ -272,6 +272,38 @@ def main() -> None:
     assert journal_query["select"] == "id,phase,prompt_type,content,created_at"
     assert "email" not in journal_query["select"]
 
+    fake_http.responses.append(FakeResponse(201, [{"id": 31, "entry_date": "2026-08-28"}]))
+    calendar_entry = store.upsert_calendar_entry(
+        "auth0|user-1", "2026-08-28", "Observed a quiet evening.", "started", 3
+    )
+    assert calendar_entry["id"] == 31
+    calendar_write = fake_http.calls[-1]
+    assert calendar_write["params"] == {"on_conflict": "profile_auth_subject,entry_date"}
+    assert calendar_write["json"] == {
+        "profile_auth_subject": "auth0|user-1",
+        "entry_date": "2026-08-28",
+        "note": "Observed a quiet evening.",
+        "cycle_marker": "started",
+        "severity": 3,
+    }
+
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.list_calendar_entries("auth0|user-1", "2026-08-01", "2026-09-01") == []
+    calendar_query = fake_http.calls[-1]["params"]
+    assert calendar_query["profile_auth_subject"] == "eq.auth0|user-1"
+    assert calendar_query["entry_date"] == "lt.2026-09-01"
+    assert calendar_query["select"] == "entry_date,note,cycle_marker,severity,updated_at"
+    assert "email" not in calendar_query["select"]
+
+    fake_http.responses.append(FakeResponse(204))
+    store.delete_calendar_entry("auth0|user-1", "2026-08-28")
+    calendar_delete = fake_http.calls[-1]
+    assert calendar_delete["method"] == "DELETE"
+    assert calendar_delete["params"] == {
+        "profile_auth_subject": "eq.auth0|user-1",
+        "entry_date": "eq.2026-08-28",
+    }
+
     fake_http.responses.append(FakeResponse(201))
     store.log_migration_event(
         run_id="run-001",
