@@ -7,6 +7,7 @@ import sqlite3
 import hashlib
 
 import supabase_store
+import daily_reflection as reflection_ui
 
 
 # --------------------------------------------------------------------------
@@ -124,6 +125,12 @@ def render_journal_tab():
         Three prompts. One moon. Your voice.
     </div>
     """, unsafe_allow_html=True)
+
+    # Daily Reflection belongs with the private writing practice rather than
+    # adding a second scrollable section to Home. Its existing renderer is
+    # intentionally reused unchanged.
+    reflection_ui.render_daily_reflection()
+    st.markdown("---")
 
     # ------------------------------------------------------------------
     # Step 1: Select Prompt Mode

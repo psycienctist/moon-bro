@@ -11,7 +11,6 @@ from datetime import datetime, timezone, timedelta
 import journal as journal_ui
 import lunatick_talk_ui as talk_ui
 import lunatick_talk_db as talk_db
-import daily_reflection as reflection_ui
 import cosmic_cards
 import track_calendar
 import boards
@@ -738,21 +737,6 @@ def render_home():
     birth_utc = datetime.combine(birth_day, datetime.min.time()).replace(tzinfo=timezone.utc)
     natal = get_celestial_data(birth_utc)
     total_moons = (now_utc - birth_utc).days / 29.53
-    diff = (current["moon_lon"] - natal["moon_lon"]) % 360
-
-    if diff < 10 or diff > 350:
-        aspect, guidance = "Lunar Return", "High intuition today. Your birth rhythm is peaking."
-    elif 170 < diff < 190:
-        aspect, guidance = "Opposition", "Emotions might feel like a tug-of-war. Balance yourself."
-    elif 80 < diff < 100 or 260 < diff < 280:
-        aspect, guidance = "Square", "Tension in the air. The universe is pushing you to grow."
-    elif 110 < diff < 130 or 230 < diff < 250:
-        aspect, guidance = "Trine", "Harmony! Today's cosmic tide flows perfectly with you."
-    else:
-        aspect, guidance = "Cycle", "Steady growth. Build on the intentions you set recently."
-
-    insight = get_ai_insight(natal, current, aspect)
-
     sun_c = cosmic_cards.sign_color(natal["sun_sign"])
     moon_c = cosmic_cards.sign_color(natal["moon_sign"])
     cur_moon_c = cosmic_cards.sign_color(current["moon_sign"])
@@ -769,15 +753,10 @@ def render_home():
             <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
         </div>
         <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
-            <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">✨ {aspect.upper()} FORECAST</div>
-            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{guidance}</div>
+            <div style="color:#58a6ff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">☾ MOON IN ENERGY</div>
+            <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
+            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{current['moon_vibe']}</div>
         </div>
-        {f'''
-        <div style="margin-top:0.8rem; background:rgba(188, 140, 255, 0.1); padding:0.8rem; border-radius:10px; border:1px solid #bc8cff;">
-            <div style="color:#bc8cff; font-weight:700; font-size:0.8rem; margin-bottom:0.2rem;">🔮 DEEPSEEK AI INSIGHT</div>
-            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem; font-style: italic;">"{insight}"</div>
-        </div>
-        ''' if insight else ''}
     </div>
     """, unsafe_allow_html=True)
 
@@ -800,38 +779,6 @@ def render_home():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    vcol, ecol = st.columns([1, 1])
-    with vcol:
-        st.markdown(f"""
-        <div class="vibe-card">
-            <div class="vibe-tag">ENERGY</div>
-            <h3 style="color:{cur_moon_c}; margin-bottom:0.5rem; font-size:1.1rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</h3>
-            <p style="font-size:0.9rem; line-height:1.4; color:#c9d1d9;">{current['moon_vibe']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with ecol:
-        st.subheader("🔭 2026 Cosmic Calendar")
-        for d_str, title, desc in [
-            ("March 3", "Total Lunar Eclipse", "Visible across the Americas, Europe, and Africa."),
-            ("August 12, 2026", "Total Solar Eclipse", "Major eclipse visible in Europe & Greenland."),
-            ("August 28, 2026", "Partial Lunar Eclipse", "Visible from the Pacific region."),
-            ("September 26, 2026", "Corn Moon (Supermoon)", "The largest full moon appearance of the year."),
-        ]:
-            st.markdown(f'''
-            <div class="event-item">
-                <div class="event-info">
-                    <div class="etitle">{title}</div>
-                    <div class="edesc">{desc}</div>
-                </div>
-                <div class="event-date">{d_str}</div>
-            </div>
-            ''', unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("### 🧠 Daily Reflection")
-    reflection_ui.render_daily_reflection()
 
 
 def render_tones():
