@@ -29,6 +29,8 @@ BACKUP_TABLES = frozenset(
         "user_votes",
         "card_trades",
         "migration_log",
+        "moderator_roles",
+        "moderation_actions",
     }
 )
 CARD_PROFILE_FIELDS = (
@@ -685,6 +687,206 @@ class SupabaseStore:
             "lunatick_talk_posts",
             params={"id": f"eq.{int(post_id)}"},
             payload={"is_hidden": True},
+            prefer="return=minimal",
+        )
+
+    def find_profile_for_moderation(self, username: str) -> dict[str, Any] | None:
+        """Resolve a prospective moderator by public handle without reading private profile data."""
+        normalized_username = username.strip().lower().lstrip("@")
+        rows = self._request(
+            "GET",
+            "profiles",
+            params={
+                "select": "auth_subject,username,display_name",
+                "username": f"eq.{normalized_username}",
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    def get_moderator_role(self, auth_subject: str) -> dict[str, Any] | None:
+        """Return the active server-side moderation role for one canonical identity."""
+        rows = self._request(
+            "GET",
+            "moderator_roles",
+            params={
+                "select": "auth_subject,role,is_active,granted_by_auth_subject,granted_at,revoked_at",
+                "auth_subject": f"eq.{auth_subject}",
+                "is_active": "eq.true",
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    def upsert_moderator_role(
+        self, auth_subject: str, role: str, granted_by_auth_subject: str
+    ) -> dict[str, Any]:
+        """Grant or reactivate a founder/moderator role through the server-only path."""
+        if role not in {"founder", "moderator"}:
+            raise ValueError("role must be founder or moderator")
+        rows = self._request(
+            "POST",
+            "moderator_roles",
+            params={"on_conflict": "auth_subject"},
+            payload={
+                "auth_subject": auth_subject,
+                "role": role,
+                "is_active": True,
+                "granted_by_auth_subject": granted_by_auth_subject,
+                "revoked_at": None,
+            },
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Moderator role update did not return exactly one row.")
+        return rows[0]
+
+    def revoke_moderator_role(self, auth_subject: str) -> None:
+        """Deactivate a delegated role without deleting its authorization history."""
+        self._request(
+            "PATCH",
+            "moderator_roles",
+            params={"auth_subject": f"eq.{auth_subject}"},
+            payload={"is_active": False, "revoked_at": datetime.now(timezone.utc).isoformat()},
+            prefer="return=minimal",
+        )
+
+    def list_moderator_roles(self, limit: int = 100) -> list[dict[str, Any]]:
+        """List role records for the protected moderator-management console."""
+        return list(
+            self._request(
+                "GET",
+                "moderator_roles",
+                params={
+                    "select": "auth_subject,role,is_active,granted_by_auth_subject,granted_at,revoked_at",
+                    "order": "granted_at.asc",
+                    "limit": str(max(1, min(int(limit), 100))),
+                },
+            )
+            or []
+        )
+
+    def list_moderation_actions(self, limit: int = 100) -> list[dict[str, Any]]:
+        """List accountability metadata only; this never returns moderated content text."""
+        return list(
+            self._request(
+                "GET",
+                "moderation_actions",
+                params={
+                    "select": "id,moderator_auth_subject,target_type,target_id,target_auth_subject,action,reason,details,created_at",
+                    "order": "created_at.desc",
+                    "limit": str(max(1, min(int(limit), 100))),
+                },
+            )
+            or []
+        )
+
+    def list_moderation_content(self, target_type: str, limit: int = 100) -> list[dict[str, Any]]:
+        """List public Community records for a protected moderation console only."""
+        catalog = {
+            "board_post": (
+                "board_posts",
+                "id,board_slug,profile_auth_subject,title,content,created_at,is_hidden",
+            ),
+            "chat_message": (
+                "chat_messages",
+                "id,profile_auth_subject,content,created_at,is_hidden",
+            ),
+            "talk_post": (
+                "lunatick_talk_posts",
+                "id,profile_auth_subject,content,current_moon_phase,created_at,is_anonymous,is_hidden",
+            ),
+            "talk_comment": (
+                "lunatick_talk_comments",
+                "id,post_id,profile_auth_subject,content,created_at,is_anonymous,is_hidden",
+            ),
+        }
+        try:
+            table, columns = catalog[target_type]
+        except KeyError as error:
+            raise ValueError("Unsupported public moderation target type.") from error
+        return list(
+            self._request(
+                "GET",
+                table,
+                params={
+                    "select": columns,
+                    "order": "created_at.desc",
+                    "limit": str(max(1, min(int(limit), 100))),
+                },
+            )
+            or []
+        )
+
+    def set_moderation_visibility(self, target_type: str, target_id: int, is_hidden: bool) -> None:
+        """Hide or restore one public Community record without accessing private data."""
+        tables = {
+            "board_post": "board_posts",
+            "chat_message": "chat_messages",
+            "talk_post": "lunatick_talk_posts",
+            "talk_comment": "lunatick_talk_comments",
+        }
+        try:
+            table = tables[target_type]
+        except KeyError as error:
+            raise ValueError("Unsupported public moderation target type.") from error
+        self._request(
+            "PATCH",
+            table,
+            params={"id": f"eq.{int(target_id)}"},
+            payload={"is_hidden": bool(is_hidden)},
+            prefer="return=minimal",
+        )
+
+    def delete_moderation_content(self, target_type: str, target_id: int) -> None:
+        """Permanently delete one public Community record after an audited confirmation."""
+        tables = {
+            "board_post": "board_posts",
+            "chat_message": "chat_messages",
+            "talk_post": "lunatick_talk_posts",
+            "talk_comment": "lunatick_talk_comments",
+        }
+        try:
+            table = tables[target_type]
+        except KeyError as error:
+            raise ValueError("Unsupported public moderation target type.") from error
+        self._request(
+            "DELETE",
+            table,
+            params={"id": f"eq.{int(target_id)}"},
+            prefer="return=minimal",
+        )
+
+    def log_moderation_action(
+        self,
+        moderator_auth_subject: str,
+        target_type: str,
+        action: str,
+        *,
+        target_id: int | None = None,
+        target_auth_subject: str | None = None,
+        reason: str = "",
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Write minimal moderator accountability metadata without copying content."""
+        if target_type not in {"board_post", "chat_message", "talk_post", "talk_comment", "moderator_role"}:
+            raise ValueError("Unsupported moderation target type.")
+        if action not in {"hide", "restore", "delete", "grant_role", "revoke_role"}:
+            raise ValueError("Unsupported moderation action.")
+        if target_id is None and not target_auth_subject:
+            raise ValueError("A moderation target id or subject is required.")
+        self._request(
+            "POST",
+            "moderation_actions",
+            payload={
+                "moderator_auth_subject": moderator_auth_subject,
+                "target_type": target_type,
+                "target_id": int(target_id) if target_id is not None else None,
+                "target_auth_subject": target_auth_subject,
+                "action": action,
+                "reason": reason.strip()[:240],
+                "details": dict(details or {}),
+            },
             prefer="return=minimal",
         )
 

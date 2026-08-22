@@ -73,6 +73,16 @@ SNAPSHOT_TABLES = (
         "id,run_id,stage,severity,entity,source_count,target_count,details,created_at",
         "id.asc",
     ),
+    SnapshotTable(
+        "moderator_roles",
+        "auth_subject,role,is_active,granted_by_auth_subject,granted_at,revoked_at",
+        "auth_subject.asc",
+    ),
+    SnapshotTable(
+        "moderation_actions",
+        "id,moderator_auth_subject,target_type,target_id,target_auth_subject,action,reason,details,created_at",
+        "id.asc",
+    ),
 )
 
 

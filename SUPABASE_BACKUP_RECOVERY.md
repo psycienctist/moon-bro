@@ -29,6 +29,7 @@ The owner-only export includes the complete rows of the following active LunaTic
 | `lunatick_talk_posts`, `lunatick_talk_comments`, `user_votes` | LunaTicK Talk activity | Shared/public-facing |
 | `card_trades` | Card connection requests | Private to participants |
 | `migration_log` | Server-side migration audit metadata | Server-only operational record |
+| `moderator_roles`, `moderation_actions` | Public-content moderation roles and accountability metadata | Server-only operational record |
 
 No persistent user-uploaded media is currently included because LunaTicK Talk image attachments are intentionally disabled under the Supabase backend until a separate private object-storage phase is implemented.
 

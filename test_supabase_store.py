@@ -197,6 +197,47 @@ def main() -> None:
     store.hide_talk_post(24)
     assert fake_http.calls[-1]["json"] == {"is_hidden": True}
 
+    moderation_start = len(fake_http.calls)
+    fake_http.responses.append(FakeResponse(200, [{"auth_subject": "auth0|user-2", "username": "other_moon", "display_name": "Other Moon"}]))
+    candidate = store.find_profile_for_moderation("@OTHER_MOON")
+    assert candidate == {"auth_subject": "auth0|user-2", "username": "other_moon", "display_name": "Other Moon"}
+    assert fake_http.calls[-1]["params"]["select"] == "auth_subject,username,display_name"
+
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.get_moderator_role("auth0|user-1") is None
+    assert fake_http.calls[-1]["params"]["is_active"] == "eq.true"
+
+    fake_http.responses.append(FakeResponse(201, [{"auth_subject": "auth0|user-1", "role": "founder"}]))
+    founder_role = store.upsert_moderator_role("auth0|user-1", "founder", "auth0|user-1")
+    assert founder_role["role"] == "founder"
+    assert fake_http.calls[-1]["json"]["is_active"] is True
+
+    fake_http.responses.append(FakeResponse(200, [{"id": 22, "profile_auth_subject": "auth0|user-2", "title": "Title", "content": "Body", "is_hidden": False}]))
+    public_rows = store.list_moderation_content("board_post")
+    assert public_rows[0]["id"] == 22
+    assert fake_http.calls[-1]["params"]["select"] == "id,board_slug,profile_auth_subject,title,content,created_at,is_hidden"
+
+    fake_http.responses.append(FakeResponse(204))
+    store.set_moderation_visibility("board_post", 22, True)
+    assert fake_http.calls[-1]["method"] == "PATCH"
+    assert fake_http.calls[-1]["json"] == {"is_hidden": True}
+
+    fake_http.responses.append(FakeResponse(201))
+    store.log_moderation_action(
+        "auth0|user-1", "board_post", "hide", target_id=22, target_auth_subject="auth0|user-2", reason="Test"
+    )
+    moderation_payload = fake_http.calls[-1]["json"]
+    assert moderation_payload["target_type"] == "board_post"
+    assert moderation_payload["action"] == "hide"
+    assert "content" not in moderation_payload
+
+    fake_http.responses.append(FakeResponse(204))
+    store.delete_moderation_content("board_post", 22)
+    assert fake_http.calls[-1]["method"] == "DELETE"
+    assert fake_http.calls[-1]["url"].endswith("/board_posts")
+    moderation_calls = fake_http.calls[moderation_start:]
+    assert all("journal_entries" not in call["url"] for call in moderation_calls)
+
     fake_http.responses.append(FakeResponse(201, [{"id": 25}]))
     journal_entry = store.create_journal_entry("auth0|user-1", "Full Moon", "phase", "Private reflection")
     assert journal_entry == {"id": 25}

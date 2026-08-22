@@ -10,6 +10,7 @@ import auth
 import boards
 import chat_room
 import lunatick_talk_ui
+import moderation
 
 
 COMMUNITY_VIEWS = (
@@ -267,6 +268,7 @@ def render_community() -> None:
             unsafe_allow_html=True,
         )
         _render_public_profile_lookup()
+        moderation.render_moderation_console()
         _render_community_nav(active_view)
 
     if active_view == "Chat":
