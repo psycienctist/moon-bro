@@ -603,6 +603,41 @@ class SupabaseStore:
         )
         return upvotes, downvotes
 
+    def create_journal_entry(
+        self, profile_auth_subject: str, phase: str, prompt_type: str, content: str
+    ) -> dict[str, Any]:
+        """Create one private reflection for its canonical owner profile."""
+        rows = self._request(
+            "POST",
+            "journal_entries",
+            payload={
+                "profile_auth_subject": profile_auth_subject,
+                "phase": phase,
+                "prompt_type": prompt_type,
+                "content": content,
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Journal entry creation did not return exactly one row.")
+        return rows[0]
+
+    def list_journal_entries(self, profile_auth_subject: str, limit: int = 5) -> list[dict[str, Any]]:
+        """List only the active profile's private reflections, newest first."""
+        return list(
+            self._request(
+                "GET",
+                "journal_entries",
+                params={
+                    "select": "id,phase,prompt_type,content,created_at",
+                    "profile_auth_subject": f"eq.{profile_auth_subject}",
+                    "order": "created_at.desc",
+                    "limit": str(max(1, min(int(limit), 100))),
+                },
+            )
+            or []
+        )
+
     def hide_talk_post(self, post_id: int) -> None:
         """Mark one Talk post hidden through the server-only moderation path."""
         self._request(

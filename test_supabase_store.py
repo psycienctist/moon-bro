@@ -197,6 +197,23 @@ def main() -> None:
     store.hide_talk_post(24)
     assert fake_http.calls[-1]["json"] == {"is_hidden": True}
 
+    fake_http.responses.append(FakeResponse(201, [{"id": 25}]))
+    journal_entry = store.create_journal_entry("auth0|user-1", "Full Moon", "phase", "Private reflection")
+    assert journal_entry == {"id": 25}
+    assert fake_http.calls[-1]["json"] == {
+        "profile_auth_subject": "auth0|user-1",
+        "phase": "Full Moon",
+        "prompt_type": "phase",
+        "content": "Private reflection",
+    }
+
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.list_journal_entries("auth0|user-1", limit=5) == []
+    journal_query = fake_http.calls[-1]["params"]
+    assert journal_query["profile_auth_subject"] == "eq.auth0|user-1"
+    assert journal_query["select"] == "id,phase,prompt_type,content,created_at"
+    assert "email" not in journal_query["select"]
+
     fake_http.responses.append(FakeResponse(201))
     store.log_migration_event(
         run_id="run-001",

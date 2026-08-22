@@ -6,11 +6,32 @@ from datetime import datetime
 import sqlite3
 import hashlib
 
+import supabase_store
+
+
 # --------------------------------------------------------------------------
 # Database Setup
 # --------------------------------------------------------------------------
 
+def _using_supabase_backend():
+    return supabase_store.data_backend_from_streamlit_secrets() == "supabase"
+
+
+def _supabase():
+    return supabase_store.SupabaseStore(supabase_store.SupabaseSettings.from_streamlit_secrets())
+
+
+def _resolve_auth_subject():
+    subject = str(st.session_state.get("auth_subject", "")).strip()
+    if not subject:
+        raise ValueError("A signed-in LunaTicK identity is required to use the Journal.")
+    return subject
+
+
 def init_db():
+    if _using_supabase_backend():
+        return
+
     conn = sqlite3.connect("lunatick.db")
     c = conn.cursor()
     c.execute("""
@@ -27,6 +48,13 @@ def init_db():
     conn.close()
 
 def save_entry(phase, prompt_type, content):
+    """Seal a private reflection in the active backend."""
+    if _using_supabase_backend():
+        _supabase().create_journal_entry(
+            _resolve_auth_subject(), phase, prompt_type, content.strip()
+        )
+        return
+
     conn = sqlite3.connect("lunatick.db")
     c = conn.cursor()
     user_hash = st.session_state.get("user_hash", "anonymous")
@@ -37,7 +65,16 @@ def save_entry(phase, prompt_type, content):
     conn.commit()
     conn.close()
 
+
 def get_recent_entries(limit=5):
+    """Return the current owner's reflections in the existing tuple shape."""
+    if _using_supabase_backend():
+        rows = _supabase().list_journal_entries(_resolve_auth_subject(), limit)
+        return [
+            (row["phase"], row["prompt_type"], row["content"], str(row.get("created_at") or ""))
+            for row in rows
+        ]
+
     conn = sqlite3.connect("lunatick.db")
     c = conn.cursor()
     user_hash = st.session_state.get("user_hash", "anonymous")
