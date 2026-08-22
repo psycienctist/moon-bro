@@ -43,10 +43,10 @@ if not all(
 ):
     community = importlib.reload(community)
 
-# A warm Streamlit worker can retain the former flippable Cosmic Card module
-# after app.py has updated. The single-face release exposes shareable_card;
-# its absence identifies the stale module without reloading on every run.
-if not hasattr(cosmic_cards, "shareable_card"):
+# A warm Streamlit worker can retain an older Cosmic Card renderer and routing
+# function after app.py updates. Require the complete approved visual-trade
+# module version rather than checking only a helper that older releases share.
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "visual_trade_layout_v2":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 

@@ -21,6 +21,9 @@ import supabase_store
 
 
 DB = "lunatick.db"
+# Bumped whenever a complete Cosmic Card module reload is required after a
+# warm-worker deployment, not merely a check for an older helper symbol.
+CARD_MODULE_VERSION = "visual_trade_layout_v2"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -555,11 +558,17 @@ def _render_card_css() -> None:
       min-width:0 !important; width:calc((100% - .84rem) / 3) !important; flex:1 1 0 !important;
     }
     .cosmic-card-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.46rem; position:relative; z-index:1; }
-    .cosmic-card-tile { min-height:102px; padding:.52rem .2rem .42rem; border:1.5px solid var(--tile-color); border-radius:13px; background:linear-gradient(145deg,rgba(27,34,61,.86),rgba(11,16,33,.88)); box-shadow:inset 0 0 18px color-mix(in srgb,var(--tile-color) 16%,transparent),0 0 11px color-mix(in srgb,var(--tile-color) 16%,transparent); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; text-decoration:none!important; color:#edf5ff!important; overflow:hidden; }
+    .cosmic-card-tile { min-height:102px; padding:.52rem .2rem .42rem; border:1.5px solid #7b8496; border-radius:13px; background:linear-gradient(145deg,rgba(27,34,61,.86),rgba(11,16,33,.88)); box-shadow:inset 0 0 18px rgba(255,255,255,.025); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; text-decoration:none!important; color:#edf5ff!important; overflow:hidden; }
     .cosmic-card-tile:hover { background:linear-gradient(145deg,rgba(42,59,99,.92),rgba(13,24,48,.94)); transform:translateY(-1px); }
     .cosmic-card-tile-label { font-size:.58rem; font-weight:700; letter-spacing:1.35px; color:#a9b3c6; line-height:1.15; text-transform:uppercase; }
     .cosmic-card-tile-symbol { font-size:1.55rem; line-height:1.05; margin:.22rem 0 .16rem; }
     .cosmic-card-tile-value { font-size:1rem; font-weight:800; line-height:1.08; letter-spacing:-.02em; overflow-wrap:anywhere; }
+    .cosmic-card-tile--sun { border-color:#d8dee9; box-shadow:inset 0 0 18px rgba(216,222,233,.16),0 0 11px rgba(216,222,233,.18); }.cosmic-card-tile--sun .cosmic-card-tile-value { color:#d8dee9; }
+    .cosmic-card-tile--moon { border-color:#66a8ff; box-shadow:inset 0 0 18px rgba(102,168,255,.16),0 0 11px rgba(102,168,255,.18); }.cosmic-card-tile--moon .cosmic-card-tile-value { color:#66a8ff; }
+    .cosmic-card-tile--rising { border-color:#f7d25c; box-shadow:inset 0 0 18px rgba(247,210,92,.16),0 0 11px rgba(247,210,92,.18); }.cosmic-card-tile--rising .cosmic-card-tile-value { color:#f7d25c; }
+    .cosmic-card-tile--birth_phase { border-color:#c5a6ff; box-shadow:inset 0 0 18px rgba(197,166,255,.14),0 0 11px rgba(197,166,255,.15); }.cosmic-card-tile--birth_phase .cosmic-card-tile-value { color:#c5a6ff; }
+    .cosmic-card-tile--full_moons { border-color:#9c7bff; box-shadow:inset 0 0 18px rgba(156,123,255,.14),0 0 11px rgba(156,123,255,.15); }.cosmic-card-tile--full_moons .cosmic-card-tile-value { color:#9c7bff; }
+    .cosmic-card-tile--dominant { border-color:#73dfbf; box-shadow:inset 0 0 18px rgba(115,223,191,.14),0 0 11px rgba(115,223,191,.15); }.cosmic-card-tile--dominant .cosmic-card-tile-value { color:#73dfbf; }
     @media (max-width: 600px) {
       div[class*="st-key-cosmic_card_"] { padding:.62rem .58rem .68rem !important; margin:.28rem 0 .52rem !important; border-radius:18px !important; }
       .cosmic-card-grid { gap:.35rem; }
@@ -579,10 +588,10 @@ def _detail_href(card_key: str, tile_key: str) -> str:
 
 def _card_tile(card_key: str, tile_key: str, icon: str, label: str, value: str, color: str) -> str:
     """Render one compact visual card tile; all strings are escaped before HTML output."""
-    return f'''<a class="cosmic-card-tile" style="--tile-color:{color};" href="{_detail_href(card_key, tile_key)}">
+    return f'''<a class="cosmic-card-tile cosmic-card-tile--{html.escape(tile_key)}" href="{_detail_href(card_key, tile_key)}">
       <span class="cosmic-card-tile-label">{html.escape(label)}</span>
       <span class="cosmic-card-tile-symbol">{html.escape(icon)}</span>
-      <span class="cosmic-card-tile-value" style="color:{color};">{html.escape(value)}</span>
+      <span class="cosmic-card-tile-value">{html.escape(value)}</span>
     </a>'''
 
 
