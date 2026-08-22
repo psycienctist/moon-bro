@@ -554,47 +554,44 @@ def _render_card_css() -> None:
     div[class*="st-key-cosmic_card_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
       min-width:0 !important; width:calc((100% - .84rem) / 3) !important; flex:1 1 0 !important;
     }
-    div[class*="st-key-card_tile_"] button {
-      min-height:104px !important; padding:.42rem .2rem !important;
-      border:1.5px solid rgba(255,255,255,.18) !important; border-radius:13px !important;
-      background:linear-gradient(145deg,rgba(27,34,61,.86),rgba(11,16,33,.88)) !important;
-      color:#edf5ff !important; white-space:pre-line !important; line-height:1.28 !important;
-      font-size:.70rem !important; box-shadow:inset 0 0 18px rgba(255,255,255,.025) !important;
-    }
-    div[class*="st-key-card_tile_"] button:hover {
-      background:linear-gradient(145deg,rgba(42,59,99,.92),rgba(13,24,48,.94)) !important;
-      transform:translateY(-1px);
-    }
-    div[class*="st-key-card_tile_"] button p { white-space:pre-line !important; overflow-wrap:anywhere !important; }
+    .cosmic-card-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.46rem; position:relative; z-index:1; }
+    .cosmic-card-tile { min-height:102px; padding:.52rem .2rem .42rem; border:1.5px solid var(--tile-color); border-radius:13px; background:linear-gradient(145deg,rgba(27,34,61,.86),rgba(11,16,33,.88)); box-shadow:inset 0 0 18px color-mix(in srgb,var(--tile-color) 16%,transparent),0 0 11px color-mix(in srgb,var(--tile-color) 16%,transparent); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; text-decoration:none!important; color:#edf5ff!important; overflow:hidden; }
+    .cosmic-card-tile:hover { background:linear-gradient(145deg,rgba(42,59,99,.92),rgba(13,24,48,.94)); transform:translateY(-1px); }
+    .cosmic-card-tile-label { font-size:.58rem; font-weight:700; letter-spacing:1.35px; color:#a9b3c6; line-height:1.15; text-transform:uppercase; }
+    .cosmic-card-tile-symbol { font-size:1.55rem; line-height:1.05; margin:.22rem 0 .16rem; }
+    .cosmic-card-tile-value { font-size:1rem; font-weight:800; line-height:1.08; letter-spacing:-.02em; overflow-wrap:anywhere; }
     @media (max-width: 600px) {
-      div[class*="st-key-cosmic_card_"] {
-        padding:.62rem .58rem .68rem !important;
-        margin:.28rem 0 .52rem !important;
-        border-radius:18px !important;
-      }
-      div[class*="st-key-card_tile_"] button {
-        min-height:84px !important;
-        padding:.28rem .12rem !important;
-        font-size:.64rem !important;
-        line-height:1.18 !important;
-      }
+      div[class*="st-key-cosmic_card_"] { padding:.62rem .58rem .68rem !important; margin:.28rem 0 .52rem !important; border-radius:18px !important; }
+      .cosmic-card-grid { gap:.35rem; }
+      .cosmic-card-tile { min-height:82px; padding:.35rem .08rem .3rem; border-radius:11px; }
+      .cosmic-card-tile-label { font-size:.48rem; letter-spacing:.9px; }
+      .cosmic-card-tile-symbol { font-size:1.25rem; margin:.16rem 0 .1rem; }
+      .cosmic-card-tile-value { font-size:.78rem; line-height:1.04; }
     }
     </style>
     """)
 
 
-def _tile_button(card_key: str, tile_key: str, icon: str, label: str, value: str) -> bool:
-    return st.button(
-        f"{icon}\n{label.upper()}\n{value}",
-        key=f"card_tile_{card_key}_{tile_key}",
-        use_container_width=True,
-    )
+def _detail_href(card_key: str, tile_key: str) -> str:
+    """Create a non-sensitive in-app route for a card tile explanation."""
+    return f"?cosmic_detail={card_key}__{tile_key}"
+
+
+def _card_tile(card_key: str, tile_key: str, icon: str, label: str, value: str, color: str) -> str:
+    """Render one compact visual card tile; all strings are escaped before HTML output."""
+    return f'''<a class="cosmic-card-tile" style="--tile-color:{color};" href="{_detail_href(card_key, tile_key)}">
+      <span class="cosmic-card-tile-label">{html.escape(label)}</span>
+      <span class="cosmic-card-tile-symbol">{html.escape(icon)}</span>
+      <span class="cosmic-card-tile-value" style="color:{color};">{html.escape(value)}</span>
+    </a>'''
 
 
 def _render_detail_panel(card_key: str) -> None:
-    selected = st.session_state.get(f"card_detail_{card_key}")
-    if not selected:
+    token = st.query_params.get("cosmic_detail")
+    prefix = f"{card_key}__"
+    if not isinstance(token, str) or not token.startswith(prefix):
         return
+    selected = token.removeprefix(prefix)
     detail = TERM_EXPLANATIONS.get(selected)
     if not detail:
         return
@@ -603,68 +600,45 @@ def _render_detail_panel(card_key: str) -> None:
     st.caption("**How LunaTicK gets it:** " + detail["how"])
     st.caption("**Note on precision:** " + detail["note"])
     if st.button("Close explanation", key=f"close_card_detail_{card_key}"):
-        st.session_state.pop(f"card_detail_{card_key}", None)
+        st.query_params.pop("cosmic_detail", None)
         st.rerun()
 
 
 def render_collectible_card(card: dict, *, is_owner: bool = True, key_prefix: str = "my") -> None:
-    """Render one non-flippable, six-field Cosmic Card with public-safe contact mode."""
+    """Render one non-flippable, visually compact Cosmic Card with public-safe contact mode."""
     _render_card_css()
     safe_key = f"{key_prefix}_{card.get('card_key') or _safe_card_key(card.get('profile_auth_subject') or card.get('user_hash'))}"
     natal = card["natal"]
     accent = sign_color(natal["sun_sign"])
     display_name = html.escape(str(card.get("display_name") or "Moon Wanderer"))
     avatar = html.escape(str(card.get("avatar") or "✦"))
+    rising_value = natal["rising_sign"] if natal.get("has_rising") else "Add coords"
+    rising_icon = natal["rising_symbol"] if natal.get("has_rising") else "↑"
+    dominant = card.get("dominant") or {"name": "Sun", "symbol": "☉"}
+
+    tiles = "".join((
+        _card_tile(safe_key, "sun", natal["sun_symbol"], "Sun", natal["sun_sign"], "#d8dee9"),
+        _card_tile(safe_key, "moon", natal["moon_symbol"], "Moon", natal["moon_sign"], "#66a8ff"),
+        _card_tile(safe_key, "rising", rising_icon, "Rising", rising_value, "#f7d25c"),
+        _card_tile(safe_key, "birth_phase", natal["phase_emoji"], "Birth Phase", natal["phase_name"], "#c5a6ff"),
+        _card_tile(safe_key, "full_moons", "◌", "Full Moons", str(card.get("full_moons_lived", 0)), "#9c7bff"),
+        _card_tile(safe_key, "dominant", dominant["symbol"], "Dominant", dominant["name"], "#73dfbf"),
+    ))
 
     with st.container(key=f"cosmic_card_{safe_key}", border=False):
         st.html(f"""
-        <style>
-        .st-key-cosmic_card_{safe_key}{{border:2px solid {accent}!important;box-shadow:inset 0 0 36px rgba(0,0,0,.36),0 0 28px {accent}3d!important;}}
-        .st-key-card_tile_{safe_key}_sun button{{border-color:{sign_color(natal['sun_sign'])}!important;box-shadow:inset 0 0 18px {sign_color(natal['sun_sign'])}22,0 0 11px {sign_color(natal['sun_sign'])}28!important;}}
-        .st-key-card_tile_{safe_key}_moon button{{border-color:{sign_color(natal['moon_sign'])}!important;box-shadow:inset 0 0 18px {sign_color(natal['moon_sign'])}22,0 0 11px {sign_color(natal['moon_sign'])}28!important;}}
-        .st-key-card_tile_{safe_key}_rising button{{border-color:{sign_color(natal.get('rising_sign')) if natal.get('has_rising') else '#6b7280'}!important;box-shadow:inset 0 0 18px rgba(255,255,255,.04),0 0 11px rgba(255,255,255,.12)!important;}}
-        .st-key-card_tile_{safe_key}_birth_phase button{{border-color:#f2cc60!important;}}
-        .st-key-card_tile_{safe_key}_full_moons button{{border-color:#bc8cff!important;}}
-        .st-key-card_tile_{safe_key}_dominant button{{border-color:#6ee7b7!important;}}
-        </style>
-        <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;margin:0.1rem 0 .65rem;">
-          <div style="font-size:.62rem;letter-spacing:2.5px;color:#83caff;font-weight:700;">LUNATICK COSMIC CARD</div>
-          <div style="font-size:.65rem;color:#8b949e;">{'MY CARD' if is_owner else 'COLLECTED CARD'}</div>
+        <style>.st-key-cosmic_card_{safe_key}{{border:2px solid {accent}!important;box-shadow:inset 0 0 36px rgba(0,0,0,.36),0 0 28px {accent}3d!important;}}</style>
+        <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;margin:0.05rem 0 .4rem;">
+          <div style="font-size:.57rem;letter-spacing:2.2px;color:#83caff;font-weight:700;">LUNATICK COSMIC CARD</div>
+          <div style="font-size:.58rem;color:#8b949e;">{'MY CARD' if is_owner else 'COLLECTED CARD'}</div>
         </div>
-        <div style="position:relative;z-index:1;display:flex;gap:.55rem;align-items:center;margin-bottom:.9rem;">
-          <div style="width:2rem;height:2rem;border-radius:50%;border:1px solid {accent};display:flex;align-items:center;justify-content:center;color:{accent};font-size:1rem;overflow:hidden;">{avatar}</div>
-          <div style="font-size:1.22rem;font-weight:700;color:#f0f6fc;line-height:1.1;">{display_name}</div>
+        <div style="position:relative;z-index:1;display:flex;gap:.42rem;align-items:center;margin-bottom:.56rem;">
+          <div style="width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid {accent};display:flex;align-items:center;justify-content:center;color:{accent};font-size:.88rem;overflow:hidden;">{avatar}</div>
+          <div style="font-size:1.05rem;font-weight:700;color:#f0f6fc;line-height:1.1;">{display_name}</div>
         </div>
-        </div>
+        <div class="cosmic-card-grid">{tiles}</div>
         """)
-        row_one = st.columns(3, gap="small")
-        with row_one[0]:
-            sun_pressed = _tile_button(safe_key, "sun", natal["sun_symbol"], "Sun", natal["sun_sign"])
-        with row_one[1]:
-            moon_pressed = _tile_button(safe_key, "moon", natal["moon_symbol"], "Moon", natal["moon_sign"])
-        with row_one[2]:
-            rising_value = natal["rising_sign"] if natal.get("has_rising") else "Add time + coords"
-            rising_icon = natal["rising_symbol"] if natal.get("has_rising") else "↑"
-            rising_pressed = _tile_button(safe_key, "rising", rising_icon, "Rising", rising_value)
-
-        row_two = st.columns(3, gap="small")
-        with row_two[0]:
-            phase_pressed = _tile_button(safe_key, "birth_phase", natal["phase_emoji"], "Birth phase", natal["phase_name"])
-        with row_two[1]:
-            moons_pressed = _tile_button(safe_key, "full_moons", "◌", "Full Moons", str(card.get("full_moons_lived", 0)))
-        with row_two[2]:
-            dominant = card.get("dominant") or {"name": "Sun", "symbol": "☉"}
-            dominant_pressed = _tile_button(safe_key, "dominant", dominant["symbol"], "Dominant", dominant["name"])
-
-        pressed = {
-            "sun": sun_pressed, "moon": moon_pressed, "rising": rising_pressed,
-            "birth_phase": phase_pressed, "full_moons": moons_pressed, "dominant": dominant_pressed,
-        }
-        for detail_key, was_pressed in pressed.items():
-            if was_pressed:
-                st.session_state[f"card_detail_{safe_key}"] = detail_key
-                st.rerun()
-        _render_detail_panel(safe_key)
+    _render_detail_panel(safe_key)
 
 
 def render_profile_form(user_hash: str, key_prefix: str = "cards") -> None:
@@ -722,25 +696,44 @@ def _friend_label(card: dict) -> str:
     return f"{card['display_name']} ({natal['sun_symbol']} {natal['sun_sign']} · {natal['moon_symbol']} {natal['moon_sign']})"
 
 
+def _render_trade_initiation(user_hash: str) -> None:
+    """Compact top-of-screen trade action, replacing the retired Flip control."""
+    with st.popover("🤝 Trade Cards"):
+        st.caption("Send a card trade to add an accepted friend to your collection.")
+        discoverable_cards = list_users_with_cards(user_hash)
+        if not discoverable_cards:
+            st.caption("No other cards are available yet. Share LunaTicK so friends can create theirs.")
+            return
+        options = {_friend_label(card): card["profile_auth_subject"] for card in discoverable_cards}
+        selected = st.selectbox("Send card to", list(options), key="card_trade_target")
+        message = st.text_input("Optional message", max_chars=200, key="card_trade_message")
+        if st.button("Send card trade", key="send_card_trade", type="primary"):
+            ok, note = send_trade(user_hash, options[selected], message)
+            (st.success if ok else st.warning)(note)
+            if ok:
+                st.rerun()
+
+
 def render_cosmic_cards_tab() -> None:
-    """Render owner card, friend collection, and card-trade controls."""
+    """Render the compact owner card, its detail panel, and accepted-card collection."""
     init_cards_db()
     user_hash = st.session_state.get("user_hash", "anonymous")
-    st.markdown("### 🃏 Cosmic Cards")
-    st.caption("A visual collectible built from your saved birth inputs. Trade cards to collect accepted friends.")
-
     profile = get_or_create_profile(user_hash)
-    with st.expander("Your private birth inputs", expanded=not profile.get("birth_date")):
-        render_profile_form(user_hash, key_prefix="cards")
-
     my_card = build_card(user_hash)
-    if my_card:
-        render_collectible_card(my_card, is_owner=True, key_prefix="owner")
-    else:
-        st.info("Add your birth date above to unlock your Cosmic Card.")
 
-    st.markdown("---")
-    st.subheader("Your Collection")
+    # This occupies the exact light-weight top action role formerly used by Flip.
+    _render_trade_initiation(user_hash)
+
+    if not my_card:
+        st.info("Add your birth date to unlock your Cosmic Card.")
+        with st.expander("Add your private birth inputs", expanded=True):
+            render_profile_form(user_hash, key_prefix="cards")
+        return
+
+    render_collectible_card(my_card, is_owner=True, key_prefix="owner")
+
+    # The collection intentionally follows the owner-card explanation area.
+    st.markdown("#### Your Collection")
     friend_subjects = friends_of(user_hash)
     if not friend_subjects:
         st.caption("Your collection is waiting. Send a card trade to start collecting.")
@@ -749,21 +742,6 @@ def render_cosmic_cards_tab() -> None:
             friend_card = build_friend_card(user_hash, friend_subject)
             if friend_card:
                 render_collectible_card(friend_card, is_owner=False, key_prefix="friend")
-
-    st.markdown("---")
-    st.subheader("Send a Card Trade")
-    discoverable_cards = list_users_with_cards(user_hash)
-    if not discoverable_cards:
-        st.caption("No other cards are available yet. Share LunaTicK so friends can create theirs.")
-    else:
-        options = {_friend_label(card): card["profile_auth_subject"] for card in discoverable_cards}
-        selected = st.selectbox("Send card to", list(options))
-        message = st.text_input("Optional message", max_chars=200)
-        if st.button("Send card trade", key="send_card_trade"):
-            ok, note = send_trade(user_hash, options[selected], message)
-            (st.success if ok else st.warning)(note)
-            if ok:
-                st.rerun()
 
     st.markdown("---")
     st.subheader("Incoming Card Trades")
@@ -781,3 +759,6 @@ def render_cosmic_cards_tab() -> None:
         if columns[2].button("Decline", key=f"decline_trade_{trade['id']}"):
             resolve_trade(trade["id"], user_hash, False)
             st.rerun()
+
+    with st.expander("Update private birth inputs", expanded=False):
+        render_profile_form(user_hash, key_prefix="cards")
