@@ -10,12 +10,46 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Mapping, MutableMapping
 
 import requests
 
 VALID_BACKENDS = {"sqlite", "supabase"}
 PUBLIC_PROFILE_FIELDS = ("username", "display_name", "avatar", "bio")
+CARD_PROFILE_FIELDS = (
+    "auth_subject",
+    "user_hash",
+    "username",
+    "display_name",
+    "avatar",
+    "bio",
+    "birth_date",
+    "birth_time",
+    "birth_place",
+    "lat",
+    "lon",
+    "utc_offset",
+    "hd_profile",
+    "hd_authority",
+)
+PROFILE_MUTABLE_FIELDS = frozenset(
+    {
+        "username",
+        "display_name",
+        "avatar",
+        "bio",
+        "email",
+        "birth_date",
+        "birth_time",
+        "birth_place",
+        "lat",
+        "lon",
+        "utc_offset",
+        "hd_profile",
+        "hd_authority",
+    }
+)
 
 
 class StorageConfigurationError(RuntimeError):
@@ -174,6 +208,137 @@ class SupabaseStore:
             },
         )
         return rows[0] if rows else None
+
+    def update_profile_fields(
+        self, auth_subject: str, fields: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Patch approved profile fields by immutable subject without an identity upsert."""
+        subject = str(auth_subject or "").strip()
+        if not subject:
+            raise ValueError("auth_subject is required for a profile update.")
+        payload = {key: value for key, value in dict(fields).items() if key in PROFILE_MUTABLE_FIELDS}
+        if not payload:
+            raise ValueError("At least one approved profile field is required for an update.")
+        rows = self._request(
+            "PATCH",
+            "profiles",
+            params={"auth_subject": f"eq.{subject}"},
+            payload=payload,
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Profile update did not return exactly one profile row.")
+        return rows[0]
+
+    def list_card_profiles(self, exclude_auth_subject: str) -> list[dict[str, Any]]:
+        """Return private card inputs server-side for derived, non-identifying card summaries."""
+        subject = str(exclude_auth_subject or "").strip()
+        rows = self._request(
+            "GET",
+            "profiles",
+            params={
+                "select": ",".join(CARD_PROFILE_FIELDS),
+                "birth_date": "not.is.null",
+                "auth_subject": f"neq.{subject}",
+                "order": "created_at.asc",
+                "limit": "100",
+            },
+        )
+        return list(rows or [])
+
+    def has_pending_card_trade(self, sender_auth_subject: str, receiver_auth_subject: str) -> bool:
+        """Detect a duplicate pending card trade before creating another request."""
+        rows = self._request(
+            "GET",
+            "card_trades",
+            params={
+                "select": "id",
+                "sender_auth_subject": f"eq.{sender_auth_subject}",
+                "receiver_auth_subject": f"eq.{receiver_auth_subject}",
+                "status": "eq.pending",
+                "limit": "1",
+            },
+        )
+        return bool(rows)
+
+    def create_card_trade(
+        self, sender_auth_subject: str, receiver_auth_subject: str, message: str = ""
+    ) -> dict[str, Any]:
+        """Create one pending card trade using canonical immutable profile subjects."""
+        rows = self._request(
+            "POST",
+            "card_trades",
+            payload={
+                "sender_auth_subject": sender_auth_subject,
+                "receiver_auth_subject": receiver_auth_subject,
+                "message": message.strip(),
+                "status": "pending",
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Card trade creation did not return exactly one row.")
+        return rows[0]
+
+    def list_card_trades(self, auth_subject: str, direction: str = "all") -> list[dict[str, Any]]:
+        """List the active profile's card trades without joining private profile fields."""
+        filters: dict[str, str] = {
+            "select": "id,sender_auth_subject,receiver_auth_subject,message,status,created_at",
+            "order": "created_at.desc",
+            "limit": "100",
+        }
+        if direction == "incoming":
+            filters["receiver_auth_subject"] = f"eq.{auth_subject}"
+        elif direction == "outgoing":
+            filters["sender_auth_subject"] = f"eq.{auth_subject}"
+        elif direction == "all":
+            filters["or"] = (
+                f"(sender_auth_subject.eq.{auth_subject},receiver_auth_subject.eq.{auth_subject})"
+            )
+        else:
+            raise ValueError("Card-trade direction must be incoming, outgoing, or all.")
+        return list(self._request("GET", "card_trades", params=filters) or [])
+
+    def resolve_card_trade(
+        self, trade_id: int, receiver_auth_subject: str, accept: bool
+    ) -> bool:
+        """Resolve only the specified receiver's pending card trade."""
+        status = "accepted" if accept else "declined"
+        rows = self._request(
+            "PATCH",
+            "card_trades",
+            params={
+                "id": f"eq.{int(trade_id)}",
+                "receiver_auth_subject": f"eq.{receiver_auth_subject}",
+                "status": "eq.pending",
+            },
+            payload={"status": status, "resolved_at": datetime.now(timezone.utc).isoformat()},
+            prefer="return=representation",
+        )
+        return bool(rows)
+
+    def list_accepted_card_contacts(self, auth_subject: str) -> list[str]:
+        """Return counterpart subjects from accepted card trades for server-side card summaries."""
+        rows = self._request(
+            "GET",
+            "card_trades",
+            params={
+                "select": "sender_auth_subject,receiver_auth_subject",
+                "status": "eq.accepted",
+                "or": (
+                    f"(sender_auth_subject.eq.{auth_subject},receiver_auth_subject.eq.{auth_subject})"
+                ),
+                "limit": "100",
+            },
+        )
+        contacts: set[str] = set()
+        for row in rows or []:
+            sender = str(row.get("sender_auth_subject") or "")
+            receiver = str(row.get("receiver_auth_subject") or "")
+            counterpart = receiver if sender == auth_subject else sender
+            if counterpart:
+                contacts.add(counterpart)
+        return sorted(contacts)
 
     def get_public_profile_by_username(self, username: str) -> dict[str, Any] | None:
         """Return only fields approved by the public-profile privacy matrix."""

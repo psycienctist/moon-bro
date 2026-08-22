@@ -4,11 +4,57 @@
 import streamlit as st
 import sqlite3
 import ephem
+
+import supabase_store
 import math
 from datetime import datetime, timezone, timedelta, date, time as dtime
 from collections import Counter
 
 DB = "lunatick.db"
+
+
+def _using_supabase_backend():
+    """Return whether the approved Supabase card-storage path is active."""
+    return supabase_store.data_backend_from_streamlit_secrets() == "supabase"
+
+
+def _supabase():
+    """Create the server-only Supabase adapter on demand."""
+    return supabase_store.SupabaseStore(supabase_store.SupabaseSettings.from_streamlit_secrets())
+
+
+def _resolve_auth_subject(user_reference):
+    """Map the existing card API's user-hash parameter to a canonical subject.
+
+    Existing app call sites continue to pass ``user_hash`` for the signed-in
+    user. Under Supabase, other card operations pass an immutable Auth0 subject
+    directly. This keeps the UI wiring stable while moving authorization to the
+    canonical identity key.
+    """
+    reference = str(user_reference or "").strip()
+    current_subject = str(st.session_state.get("auth_subject", "")).strip()
+    current_hash = str(st.session_state.get("user_hash", "")).strip()
+    if current_subject and reference == current_hash:
+        return current_subject
+    if reference:
+        return reference
+    if current_subject:
+        return current_subject
+    raise ValueError("A signed-in LunaTicK identity is required for Cosmic Cards.")
+
+
+CARD_PROFILE_DEFAULTS = {
+    "display_name": "Moon Wanderer",
+    "birth_date": None,
+    "birth_time": None,
+    "birth_place": None,
+    "lat": None,
+    "lon": None,
+    "utc_offset": None,
+    "hd_profile": None,
+    "hd_authority": None,
+}
+
 
 ZODIAC = [
     ("Aries", "♈"), ("Taurus", "♉"), ("Gemini", "♊"), ("Cancer", "♋"),
@@ -109,6 +155,10 @@ def colored_sign(symbol, name, extra=""):
     return f'<span style="color:{c};font-weight:700;">{label}</span>'
 
 def init_cards_db():
+    """Initialize legacy local card tables only when the SQLite backend is selected."""
+    if _using_supabase_backend():
+        return
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
@@ -214,6 +264,16 @@ def _local_to_utc(birth_date, birth_time, utc_offset):
     return utc_naive.replace(tzinfo=timezone.utc)
 
 def get_or_create_profile(user_hash):
+    """Read the active user's private card inputs from the selected backend."""
+    if _using_supabase_backend():
+        subject = _resolve_auth_subject(user_hash)
+        row = _supabase().get_profile_by_auth_subject(subject) or {}
+        profile = dict(CARD_PROFILE_DEFAULTS)
+        profile.update({field: row.get(field) for field in CARD_PROFILE_DEFAULTS})
+        profile["auth_subject"] = subject
+        profile["user_hash"] = row.get("user_hash") or str(user_hash)
+        return profile
+
     init_cards_db()
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -230,13 +290,27 @@ def get_or_create_profile(user_hash):
             "birth_place": row[3], "lat": row[4], "lon": row[5], "utc_offset": row[6],
             "hd_profile": row[7], "hd_authority": row[8],
         }
-    return {
-        "display_name": "Moon Wanderer", "birth_date": None, "birth_time": None,
-        "birth_place": None, "lat": None, "lon": None, "utc_offset": None,
-        "hd_profile": None, "hd_authority": None,
-    }
+    return dict(CARD_PROFILE_DEFAULTS)
+
 
 def save_profile(user_hash, display_name, birth_date, birth_time=None, birth_place=None, lat=None, lon=None, utc_offset=None):
+    """Save private birth-chart inputs to the selected backend."""
+    if _using_supabase_backend():
+        subject = _resolve_auth_subject(user_hash)
+        _supabase().update_profile_fields(
+            subject,
+            {
+                "display_name": display_name,
+                "birth_date": birth_date,
+                "birth_time": birth_time,
+                "birth_place": birth_place,
+                "lat": lat,
+                "lon": lon,
+                "utc_offset": utc_offset,
+            },
+        )
+        return
+
     init_cards_db()
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -279,7 +353,9 @@ def build_card(user_hash):
         _save_hd_details(user_hash, hd_profile, hd_authority)
 
         return {
-            "user_hash": user_hash, "display_name": profile["display_name"],
+            "user_hash": profile.get("user_hash") or user_hash,
+            "profile_auth_subject": profile.get("auth_subject"),
+            "display_name": profile["display_name"],
             "birth_date": profile["birth_date"], "birth_time": profile.get("birth_time"),
             "birth_place": profile.get("birth_place"), "natal": natal, "dominant": dominant,
             "rarity": rarity, "full_moons_lived": full_moons, "hd_type": hd_type,
@@ -350,6 +426,15 @@ def _human_design_authority(hd_type):
 
 def _save_hd_details(user_hash, hd_profile, hd_authority):
     """Persist the computed simplified HD details for the user's card."""
+    if _using_supabase_backend():
+        subject = _resolve_auth_subject(user_hash)
+        if subject == str(st.session_state.get("auth_subject", "")).strip():
+            _supabase().update_profile_fields(
+                subject,
+                {"hd_profile": hd_profile, "hd_authority": hd_authority},
+            )
+        return
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute(
@@ -507,6 +592,16 @@ def render_card_back(card):
     """)
 
 def list_users_with_cards(exclude_hash):
+    """Return derived card summaries for profiles that have private chart inputs."""
+    if _using_supabase_backend():
+        current_subject = _resolve_auth_subject(exclude_hash)
+        out = []
+        for profile in _supabase().list_card_profiles(current_subject):
+            card = build_card(profile.get("auth_subject"))
+            if card:
+                out.append(card)
+        return out
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
@@ -522,7 +617,19 @@ def list_users_with_cards(exclude_hash):
             out.append(card)
     return out
 
+
 def send_trade(sender, receiver, message=""):
+    if _using_supabase_backend():
+        sender_subject = _resolve_auth_subject(sender)
+        receiver_subject = _resolve_auth_subject(receiver)
+        if sender_subject == receiver_subject:
+            return False, "You cannot send a card trade to yourself."
+        store = _supabase()
+        if store.has_pending_card_trade(sender_subject, receiver_subject):
+            return False, "Already have a pending trade with this person."
+        store.create_card_trade(sender_subject, receiver_subject, message)
+        return True, "Trade (friend request) sent!"
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
@@ -540,7 +647,22 @@ def send_trade(sender, receiver, message=""):
     conn.close()
     return True, "Trade (friend request) sent!"
 
+
 def list_trades(user_hash, direction="all"):
+    if _using_supabase_backend():
+        rows = _supabase().list_card_trades(_resolve_auth_subject(user_hash), direction)
+        return [
+            {
+                "id": row["id"],
+                "sender": row["sender_auth_subject"],
+                "receiver": row["receiver_auth_subject"],
+                "message": row.get("message"),
+                "status": row["status"],
+                "created_at": row.get("created_at"),
+            }
+            for row in rows
+        ]
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     if direction == "incoming":
@@ -565,7 +687,13 @@ def list_trades(user_hash, direction="all"):
     return [{"id": r[0], "sender": r[1], "receiver": r[2], "message": r[3],
              "status": r[4], "created_at": r[5]} for r in rows]
 
+
 def resolve_trade(trade_id, user_hash, accept):
+    if _using_supabase_backend():
+        return _supabase().resolve_card_trade(
+            trade_id, _resolve_auth_subject(user_hash), accept
+        )
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("SELECT receiver_hash, status FROM card_trades WHERE id=?", (trade_id,))
@@ -581,7 +709,11 @@ def resolve_trade(trade_id, user_hash, accept):
     conn.close()
     return True
 
+
 def friends_of(user_hash):
+    if _using_supabase_backend():
+        return _supabase().list_accepted_card_contacts(_resolve_auth_subject(user_hash))
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
@@ -663,7 +795,12 @@ def render_cosmic_cards_tab():
     if not others:
         st.caption("No other cards yet. Share the app so friends can create theirs.")
     else:
-        options = {f"{c['display_name']} ({c['natal']['sun_symbol']}{c['natal']['sun_sign']} · {c['natal']['moon_symbol']}{c['natal']['moon_sign']} · {c.get('rarity', '')})": c["user_hash"] for c in others}
+        options = {
+            f"{c['display_name']} ({c['natal']['sun_symbol']}{c['natal']['sun_sign']} · {c['natal']['moon_symbol']}{c['natal']['moon_sign']} · {c.get('rarity', '')})": (
+                c.get("profile_auth_subject") or c["user_hash"]
+            )
+            for c in others
+        }
         pick = st.selectbox("Send card to", list(options.keys()))
         msg = st.text_input("Optional message", max_chars=200)
         if st.button("🃏 Send Trade"):

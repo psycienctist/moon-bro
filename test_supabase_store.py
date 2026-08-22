@@ -107,6 +107,53 @@ def main() -> None:
         "limit": "1",
     }
 
+    fake_http.responses.append(FakeResponse(200, [{"auth_subject": "auth0|user-1", "birth_date": "1990-01-01"}]))
+    updated_profile = store.update_profile_fields(
+        "auth0|user-1", {"birth_date": "1990-01-01", "not_a_profile_field": "blocked"}
+    )
+    assert updated_profile["birth_date"] == "1990-01-01"
+    assert fake_http.calls[-1]["method"] == "PATCH"
+    assert fake_http.calls[-1]["params"] == {"auth_subject": "eq.auth0|user-1"}
+    assert fake_http.calls[-1]["json"] == {"birth_date": "1990-01-01"}
+
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.list_card_profiles("auth0|user-1") == []
+    card_query = fake_http.calls[-1]["params"]
+    assert card_query["birth_date"] == "not.is.null"
+    assert card_query["auth_subject"] == "neq.auth0|user-1"
+    assert "email" not in card_query["select"]
+
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.has_pending_card_trade("auth0|user-1", "auth0|user-2") is False
+    assert fake_http.calls[-1]["params"]["sender_auth_subject"] == "eq.auth0|user-1"
+    assert fake_http.calls[-1]["params"]["receiver_auth_subject"] == "eq.auth0|user-2"
+
+    fake_http.responses.append(FakeResponse(201, [{"id": 7}]))
+    trade = store.create_card_trade("auth0|user-1", "auth0|user-2", "Hello")
+    assert trade == {"id": 7}
+    assert fake_http.calls[-1]["json"] == {
+        "sender_auth_subject": "auth0|user-1",
+        "receiver_auth_subject": "auth0|user-2",
+        "message": "Hello",
+        "status": "pending",
+    }
+
+    fake_http.responses.append(FakeResponse(200, []))
+    assert store.list_card_trades("auth0|user-1", "incoming") == []
+    assert fake_http.calls[-1]["params"]["receiver_auth_subject"] == "eq.auth0|user-1"
+
+    fake_http.responses.append(FakeResponse(200, [{"id": 7}]))
+    assert store.resolve_card_trade(7, "auth0|user-2", True) is True
+    assert fake_http.calls[-1]["params"]["status"] == "eq.pending"
+    assert fake_http.calls[-1]["json"]["status"] == "accepted"
+    assert "resolved_at" in fake_http.calls[-1]["json"]
+
+    fake_http.responses.append(
+        FakeResponse(200, [{"sender_auth_subject": "auth0|user-2", "receiver_auth_subject": "auth0|user-1"}])
+    )
+    assert store.list_accepted_card_contacts("auth0|user-1") == ["auth0|user-2"]
+    assert fake_http.calls[-1]["params"]["status"] == "eq.accepted"
+
     fake_http.responses.append(FakeResponse(201))
     store.log_migration_event(
         run_id="run-001",

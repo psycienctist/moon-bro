@@ -421,6 +421,21 @@ def update_user_profile(username: str, display_name: str, birth_date: str | None
         str(st.session_state.get("user_hash", "moon"))
     )
     clean_name = (display_name or "Moon Wanderer").strip()[:48] or "Moon Wanderer"
+
+    if using_supabase_backend():
+        _supabase().update_profile_fields(
+            subject,
+            {"username": clean_username, "display_name": clean_name, "birth_date": birth_date},
+        )
+        st.session_state.username = clean_username
+        st.session_state.display_name = clean_name
+        if birth_date:
+            try:
+                st.session_state.birth_date = datetime.strptime(birth_date, "%Y-%m-%d").date()
+            except ValueError:
+                st.session_state.birth_date = birth_date
+        return
+
     conn = _connect()
     conn.execute(
         """
