@@ -43,6 +43,12 @@ if not all(
 ):
     community = importlib.reload(community)
 
+# A warm Streamlit worker can retain the former flippable Cosmic Card module
+# after app.py has updated. The single-face release exposes shareable_card;
+# its absence identifies the stale module without reloading on every run.
+if not hasattr(cosmic_cards, "shareable_card"):
+    cosmic_cards = importlib.reload(cosmic_cards)
+
 
 def init_session_state():
     defaults = {

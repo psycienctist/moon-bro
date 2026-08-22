@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 source = Path("cosmic_cards.py").read_text(encoding="utf-8")
+app_source = Path("app.py").read_text(encoding="utf-8")
 
 # The active experience is a one-face six-field card. Old back/flip pathways
 # and unsupported Human Design/rarity mechanics must not return.
@@ -37,5 +38,7 @@ assert "Your Collection" in source
 assert "Add time + coords" in source
 assert "use_loc = place.strip()" not in source
 assert "actual_coordinates = _has_actual_coordinates(latitude, longitude)" in source
+assert 'if not hasattr(cosmic_cards, "shareable_card")' in app_source
+assert "cosmic_cards = importlib.reload(cosmic_cards)" in app_source
 
-print("Cosmic Card single-face, six-tile, and share-safe static checks passed.")
+print("Cosmic Card single-face, six-tile, share-safe, and warm-reload checks passed.")
