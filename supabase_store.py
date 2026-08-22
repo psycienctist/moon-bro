@@ -53,6 +53,7 @@ CARD_PROFILE_FIELDS = (
     "lat",
     "lon",
     "utc_offset",
+    "public_card_values_visible",
 )
 PROFILE_MUTABLE_FIELDS = frozenset(
     {
@@ -67,6 +68,7 @@ PROFILE_MUTABLE_FIELDS = frozenset(
         "lat",
         "lon",
         "utc_offset",
+        "public_card_values_visible",
     }
 )
 
@@ -247,7 +249,7 @@ class SupabaseStore:
             "profiles",
             params={
                 "select": "auth_subject,user_hash,username,display_name,avatar,bio,email,"
-                "birth_date,birth_time,birth_place,lat,lon,utc_offset,hd_profile,hd_authority",
+                "birth_date,birth_time,birth_place,lat,lon,utc_offset,public_card_values_visible,hd_profile,hd_authority",
                 "auth_subject": f"eq.{auth_subject}",
                 "limit": "1",
             },
@@ -924,7 +926,6 @@ class SupabaseStore:
             params={
                 "select": ",".join(CARD_PROFILE_FIELDS),
                 "username": f"eq.{normalized_username}",
-                "birth_date": "not.is.null",
                 "limit": "1",
             },
         )

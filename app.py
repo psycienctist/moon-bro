@@ -46,7 +46,7 @@ if (
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
 # module version rather than checking only a helper that older releases share.
-if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "visual_trade_layout_v2":
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "public_value_privacy_v3":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 
@@ -1669,11 +1669,30 @@ def render_settings():
     )
 
     st.markdown("---")
-    st.markdown("### 🔒 Privacy & Consent")
-    if st.button("Opt in to community sharing"):
-        st.success("You have opted in to community sharing.")
-    if st.button("Opt out of community sharing"):
-        st.success("You have opted out of community sharing.")
+    st.markdown("### 🔒 Cosmic Card privacy")
+    st.caption(
+        "Your public profile always keeps its Cosmic Card. Control whether the card shows "
+        "your derived cosmic values or a private-details card state."
+    )
+    current_card_values_visible = cosmic_cards.public_card_values_visible(
+        st.session_state.get("user_hash", "anonymous")
+    )
+    with st.form("cosmic_card_visibility_form", clear_on_submit=False):
+        show_public_card_values = st.toggle(
+            "Show my cosmic values on my public profile",
+            value=current_card_values_visible,
+            help="When off, your visible profile card keeps its design but hides Sun, Moon, Rising, phase, full-moon count, and Dominant Planet.",
+        )
+        save_card_visibility = st.form_submit_button("Save Cosmic Card privacy", use_container_width=True)
+    if save_card_visibility:
+        cosmic_cards.set_public_card_values_visible(
+            st.session_state.get("user_hash", "anonymous"), show_public_card_values
+        )
+        if show_public_card_values:
+            st.success("Your public Cosmic Card now shows its derived values.")
+        else:
+            st.success("Your public Cosmic Card remains visible; its derived values are now private.")
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### 🔐 Password & Sign-in")

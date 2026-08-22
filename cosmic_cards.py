@@ -23,7 +23,7 @@ import supabase_store
 DB = "lunatick.db"
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "visual_trade_layout_v2"
+CARD_MODULE_VERSION = "public_value_privacy_v3"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -35,6 +35,7 @@ CARD_PROFILE_DEFAULTS = {
     "lat": None,
     "lon": None,
     "utc_offset": None,
+    "public_card_values_visible": True,
 }
 
 ZODIAC = [
@@ -250,6 +251,7 @@ def init_cards_db() -> None:
     for column, kind in [
         ("birth_time", "TEXT"), ("birth_place", "TEXT"), ("lat", "REAL"),
         ("lon", "REAL"), ("utc_offset", "REAL"),
+        ("public_card_values_visible", "INTEGER NOT NULL DEFAULT 1"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE user_profiles ADD COLUMN {column} {kind}")
@@ -285,7 +287,8 @@ def get_or_create_profile(user_hash: str) -> dict:
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT display_name, birth_date, birth_time, birth_place, lat, lon, utc_offset
+        SELECT display_name, birth_date, birth_time, birth_place, lat, lon, utc_offset,
+               public_card_values_visible
         FROM user_profiles WHERE user_hash=?
     """, (user_hash,))
     row = cursor.fetchone()
@@ -295,6 +298,7 @@ def get_or_create_profile(user_hash: str) -> dict:
         profile.update({
             "display_name": row[0], "birth_date": row[1], "birth_time": row[2],
             "birth_place": row[3], "lat": row[4], "lon": row[5], "utc_offset": row[6],
+            "public_card_values_visible": bool(row[7]),
             "user_hash": user_hash,
         })
     return profile
@@ -345,6 +349,28 @@ def save_profile(
             birth_time=excluded.birth_time, birth_place=excluded.birth_place,
             lat=excluded.lat, lon=excluded.lon, utc_offset=excluded.utc_offset
     """, (user_hash, display_name, birth_date, birth_time, birth_place, lat, lon, utc_offset))
+    conn.commit()
+    conn.close()
+
+
+def public_card_values_visible(user_hash: str) -> bool:
+    """Return the owner's default-on public Cosmic Card value visibility choice."""
+    return bool(get_or_create_profile(user_hash).get("public_card_values_visible", True))
+
+
+def set_public_card_values_visible(user_hash: str, visible: bool) -> None:
+    """Persist the owner's value-display choice without changing card presence."""
+    if _using_supabase_backend():
+        _supabase().update_profile_fields(
+            _resolve_auth_subject(user_hash), {"public_card_values_visible": bool(visible)}
+        )
+        return
+    init_cards_db()
+    conn = sqlite3.connect(DB)
+    conn.execute(
+        "UPDATE user_profiles SET public_card_values_visible=? WHERE user_hash=?",
+        (1 if visible else 0, user_hash),
+    )
     conn.commit()
     conn.close()
 
@@ -423,11 +449,22 @@ def build_friend_card(viewer_reference: str, friend_auth_subject: str) -> dict |
     return shareable_card(card) if card else None
 
 
-def build_public_card_by_username(username: str) -> dict | None:
-    """Build a share-safe featured card for an existing Community public profile.
+def _public_card_shell(source: dict, state: str) -> dict:
+    """Return a visible public card shell with no derived personal values."""
+    return {
+        "card_key": _safe_card_key(source.get("auth_subject")),
+        "display_name": source.get("display_name") or "Moon Wanderer",
+        "avatar": source.get("avatar") or "✦",
+        "public_card_state": state,
+    }
 
-    Private birth inputs are resolved server-side and are discarded by
-    ``shareable_card`` before this function returns data to a renderer.
+
+def build_public_card_by_username(username: str) -> dict | None:
+    """Build a visible public card with values shown only when its owner permits.
+
+    Private birth inputs are resolved server-side and discarded before this
+    function returns. A profile without inputs receives a base card; a member
+    who hides values receives a privacy-state card with the same visual presence.
     """
     if not _using_supabase_backend():
         return None
@@ -435,8 +472,12 @@ def build_public_card_by_username(username: str) -> dict | None:
     subject = str((source or {}).get("auth_subject") or "").strip()
     if not subject:
         return None
+    if not source.get("birth_date"):
+        return _public_card_shell(source, "awaiting")
+    if not bool(source.get("public_card_values_visible", True)):
+        return _public_card_shell(source, "private")
     card = build_card(subject)
-    return shareable_card(card) if card else None
+    return shareable_card(card) if card else _public_card_shell(source, "awaiting")
 
 
 def list_users_with_cards(exclude_hash: str) -> list[dict]:
@@ -629,6 +670,45 @@ def _render_detail_panel(card_key: str) -> None:
         st.rerun()
 
 
+def _render_public_card_state(card: dict, key_prefix: str) -> None:
+    """Render a compact public card presence without any derived personal values."""
+    _render_card_css()
+    safe_key = f"{key_prefix}_{card.get('card_key') or _safe_card_key(card.get('display_name'))}"
+    is_private = card.get("public_card_state") == "private"
+    title = "COSMIC DETAILS PRIVATE" if is_private else "COSMIC CARD READY"
+    note = (
+        "This member keeps their personal cosmic values private."
+        if is_private
+        else "Cosmic details appear here when this member activates their card."
+    )
+    value = "Private" if is_private else "Awaiting"
+    icon = "🔒" if is_private else "✦"
+    tiles = "".join(
+        f'''<div class="cosmic-card-tile cosmic-card-tile--private">
+          <span class="cosmic-card-tile-label">{label}</span>
+          <span class="cosmic-card-tile-symbol">{icon}</span>
+          <span class="cosmic-card-tile-value">{value}</span>
+        </div>'''
+        for label in ("Sun", "Moon", "Rising", "Birth Phase", "Full Moons", "Dominant")
+    )
+    with st.container(key=f"cosmic_card_{safe_key}", border=False):
+        st.html(f"""
+        <style>
+        .st-key-cosmic_card_{safe_key}{{border:2px solid #bc8cff!important;padding:.45rem .48rem .5rem!important;margin:.42rem 0 .28rem!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile{{min-height:66px!important;padding:.25rem .06rem .2rem!important;border-color:#8d7aa8!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile-label{{font-size:.44rem!important;letter-spacing:.7px!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile-symbol{{font-size:1.08rem!important;margin:.1rem 0 .06rem!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile-value{{font-size:.70rem!important;line-height:1.02!important;color:#c5a6ff!important;}}
+        </style>
+        <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;margin:.05rem 0 .24rem;">
+          <div style="font-size:.57rem;letter-spacing:2.2px;color:#83caff;font-weight:700;">{title}</div>
+          <div style="font-size:.58rem;color:#8b949e;">PROFILE CARD</div>
+        </div>
+        <div style="position:relative;z-index:1;font-size:.62rem;color:#a9b3c6;margin-bottom:.32rem;">{note}</div>
+        <div class="cosmic-card-grid">{tiles}</div>
+        """)
+
+
 def render_collectible_card(
     card: dict, *, is_owner: bool = True, key_prefix: str = "my", compact: bool = False
 ) -> None:
@@ -638,6 +718,9 @@ def render_collectible_card(
     treatment for a public profile that already renders the avatar, name, handle,
     and bio directly above it.
     """
+    if card.get("public_card_state"):
+        _render_public_card_state(card, key_prefix)
+        return
     _render_card_css()
     safe_key = f"{key_prefix}_{card.get('card_key') or _safe_card_key(card.get('profile_auth_subject') or card.get('user_hash'))}"
     natal = card["natal"]
