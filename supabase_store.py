@@ -911,6 +911,25 @@ class SupabaseStore:
         profile["display_name"] = public_display_name(profile.get("display_name"))
         return profile
 
+    def get_card_profile_by_username_server_only(self, username: str) -> dict[str, Any] | None:
+        """Resolve private card inputs server-side solely to derive a share-safe card.
+
+        Callers must convert the result through ``cosmic_cards.shareable_card``
+        before rendering. This method must never back a browser-facing profile API.
+        """
+        normalized_username = username.strip().lower().lstrip("@")
+        rows = self._request(
+            "GET",
+            "profiles",
+            params={
+                "select": ",".join(CARD_PROFILE_FIELDS),
+                "username": f"eq.{normalized_username}",
+                "birth_date": "not.is.null",
+                "limit": "1",
+            },
+        )
+        return dict(rows[0]) if rows else None
+
     def username_is_available(self, username: str, auth_subject: str) -> bool:
         """Check uniqueness server-side while allowing the owner to retain a handle."""
         normalized_username = username.strip().lower().lstrip("@")

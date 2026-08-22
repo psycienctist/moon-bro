@@ -423,6 +423,22 @@ def build_friend_card(viewer_reference: str, friend_auth_subject: str) -> dict |
     return shareable_card(card) if card else None
 
 
+def build_public_card_by_username(username: str) -> dict | None:
+    """Build a share-safe featured card for an existing Community public profile.
+
+    Private birth inputs are resolved server-side and are discarded by
+    ``shareable_card`` before this function returns data to a renderer.
+    """
+    if not _using_supabase_backend():
+        return None
+    source = _supabase().get_card_profile_by_username_server_only(username)
+    subject = str((source or {}).get("auth_subject") or "").strip()
+    if not subject:
+        return None
+    card = build_card(subject)
+    return shareable_card(card) if card else None
+
+
 def list_users_with_cards(exclude_hash: str) -> list[dict]:
     """Return derived discovery summaries for people eligible to receive a card trade."""
     if _using_supabase_backend():
@@ -613,8 +629,15 @@ def _render_detail_panel(card_key: str) -> None:
         st.rerun()
 
 
-def render_collectible_card(card: dict, *, is_owner: bool = True, key_prefix: str = "my") -> None:
-    """Render one non-flippable, visually compact Cosmic Card with public-safe contact mode."""
+def render_collectible_card(
+    card: dict, *, is_owner: bool = True, key_prefix: str = "my", compact: bool = False
+) -> None:
+    """Render one non-flippable, public-safe Cosmic Card.
+
+    ``compact`` retains the six direct card fields while omitting repeated identity
+    treatment for a public profile that already renders the avatar, name, handle,
+    and bio directly above it.
+    """
     _render_card_css()
     safe_key = f"{key_prefix}_{card.get('card_key') or _safe_card_key(card.get('profile_auth_subject') or card.get('user_hash'))}"
     natal = card["natal"]
@@ -634,17 +657,27 @@ def render_collectible_card(card: dict, *, is_owner: bool = True, key_prefix: st
         _card_tile(safe_key, "dominant", dominant["symbol"], "Dominant", dominant["name"], "#73dfbf"),
     ))
 
-    with st.container(key=f"cosmic_card_{safe_key}", border=False):
-        st.html(f"""
-        <style>.st-key-cosmic_card_{safe_key}{{border:2px solid {accent}!important;box-shadow:inset 0 0 36px rgba(0,0,0,.36),0 0 28px {accent}3d!important;}}</style>
-        <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;margin:0.05rem 0 .4rem;">
-          <div style="font-size:.57rem;letter-spacing:2.2px;color:#83caff;font-weight:700;">LUNATICK COSMIC CARD</div>
-          <div style="font-size:.58rem;color:#8b949e;">{'MY CARD' if is_owner else 'COLLECTED CARD'}</div>
-        </div>
-        <div style="position:relative;z-index:1;display:flex;gap:.42rem;align-items:center;margin-bottom:.56rem;">
+    card_label = "PUBLIC COSMIC CARD" if compact else ("MY CARD" if is_owner else "COLLECTED CARD")
+    identity_html = "" if compact else f'''<div style="position:relative;z-index:1;display:flex;gap:.42rem;align-items:center;margin-bottom:.56rem;">
           <div style="width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid {accent};display:flex;align-items:center;justify-content:center;color:{accent};font-size:.88rem;overflow:hidden;">{avatar}</div>
           <div style="font-size:1.05rem;font-weight:700;color:#f0f6fc;line-height:1.1;">{display_name}</div>
+        </div>'''
+    compact_css = "" if not compact else f"""
+        .st-key-cosmic_card_{safe_key}{{padding:.45rem .48rem .5rem!important;margin:.42rem 0 .28rem!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile{{min-height:66px!important;padding:.25rem .06rem .2rem!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile-label{{font-size:.44rem!important;letter-spacing:.7px!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile-symbol{{font-size:1.08rem!important;margin:.1rem 0 .06rem!important;}}
+        .st-key-cosmic_card_{safe_key} .cosmic-card-tile-value{{font-size:.70rem!important;line-height:1.02!important;}}
+        """
+
+    with st.container(key=f"cosmic_card_{safe_key}", border=False):
+        st.html(f"""
+        <style>.st-key-cosmic_card_{safe_key}{{border:2px solid {accent}!important;box-shadow:inset 0 0 36px rgba(0,0,0,.36),0 0 28px {accent}3d!important;}}{compact_css}</style>
+        <div style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;margin:0.05rem 0 .4rem;">
+          <div style="font-size:.57rem;letter-spacing:2.2px;color:#83caff;font-weight:700;">LUNATICK COSMIC CARD</div>
+          <div style="font-size:.58rem;color:#8b949e;">{card_label}</div>
         </div>
+        {identity_html}
         <div class="cosmic-card-grid">{tiles}</div>
         """)
     _render_detail_panel(safe_key)

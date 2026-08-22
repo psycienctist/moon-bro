@@ -35,11 +35,11 @@ if not all(
 if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
     supabase_store = importlib.reload(supabase_store)
 
-# The Community page is likewise an imported module. Reload only if a live
-# Streamlit update retained the older module that lacks public profile lookup.
-if not all(
-    hasattr(community, attribute)
-    for attribute in ("_render_public_profile_lookup", "moderation")
+# The Community page is likewise an imported module. Require the current
+# public-profile card version so a warm worker cannot retain the older lookup UI.
+if (
+    getattr(community, "COMMUNITY_MODULE_VERSION", None) != "public_profile_card_v1"
+    or not all(hasattr(community, attribute) for attribute in ("_render_public_profile_lookup", "moderation"))
 ):
     community = importlib.reload(community)
 

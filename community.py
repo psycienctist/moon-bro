@@ -11,6 +11,11 @@ import boards
 import chat_room
 import lunatick_talk_ui
 import moderation
+import cosmic_cards
+
+
+# Used by app.py to reload the complete public-profile experience on warm workers.
+COMMUNITY_MODULE_VERSION = "public_profile_card_v1"
 
 
 COMMUNITY_VIEWS = (
@@ -223,6 +228,17 @@ def _render_public_profile_lookup() -> None:
             """,
             unsafe_allow_html=True,
         )
+
+        # This derives the card server-side and returns only the share-safe card
+        # payload. No birth inputs or account identifiers enter the Community UI.
+        featured_card = cosmic_cards.build_public_card_by_username(profile["username"])
+        if featured_card:
+            cosmic_cards.render_collectible_card(
+                featured_card,
+                is_owner=False,
+                key_prefix=f"public_{profile['username']}",
+                compact=True,
+            )
         if st.button("Close profile", key="close_public_profile"):
             _clear_profile_lookup()
             st.rerun()
