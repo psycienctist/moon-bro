@@ -340,6 +340,279 @@ class SupabaseStore:
                 contacts.add(counterpart)
         return sorted(contacts)
 
+    def get_public_profile_summaries(
+        self, auth_subjects: list[str] | tuple[str, ...] | set[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Return minimal display-safe profile fields for server-rendered Community authors."""
+        subjects = sorted({str(subject).strip() for subject in auth_subjects if str(subject).strip()})
+        if not subjects:
+            return {}
+        rows = self._request(
+            "GET",
+            "profiles",
+            params={
+                "select": "auth_subject,username,display_name,avatar",
+                "auth_subject": f"in.({','.join(subjects)})",
+                "limit": str(min(len(subjects), 100)),
+            },
+        )
+        return {
+            str(row["auth_subject"]): {
+                "username": row.get("username"),
+                "display_name": row.get("display_name"),
+                "avatar": row.get("avatar"),
+            }
+            for row in rows or []
+        }
+
+    def seed_boards(self, boards: list[Mapping[str, str]] | tuple[Mapping[str, str], ...]) -> None:
+        """Create or refresh the fixed Community board catalog without importing SQLite data."""
+        payload = [
+            {
+                "slug": str(board["slug"]),
+                "name": str(board["name"]),
+                "description": str(board.get("description") or ""),
+            }
+            for board in boards
+        ]
+        if not payload:
+            return
+        self._request(
+            "POST",
+            "boards",
+            params={"on_conflict": "slug"},
+            payload=payload,
+            prefer="resolution=merge-duplicates,return=minimal",
+        )
+
+    def list_boards(self) -> list[dict[str, Any]]:
+        """Return the fixed board catalog in a stable server-side order."""
+        return list(
+            self._request(
+                "GET",
+                "boards",
+                params={"select": "slug,name,description", "order": "slug.asc", "limit": "100"},
+            )
+            or []
+        )
+
+    def list_board_post_slugs(self) -> list[str]:
+        """Return visible post board slugs for server-side board-count calculation."""
+        rows = self._request(
+            "GET",
+            "board_posts",
+            params={"select": "board_slug", "is_hidden": "eq.false", "limit": "1000"},
+        )
+        return [str(row.get("board_slug") or "") for row in rows or []]
+
+    def create_board_post(
+        self, board_slug: str, profile_auth_subject: str, title: str, content: str
+    ) -> dict[str, Any]:
+        """Create a board post with only the immutable profile subject as author identity."""
+        rows = self._request(
+            "POST",
+            "board_posts",
+            payload={
+                "board_slug": board_slug,
+                "profile_auth_subject": profile_auth_subject,
+                "title": title,
+                "content": content,
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Board post creation did not return exactly one row.")
+        return rows[0]
+
+    def list_board_posts(self, board_slug: str | None = None, limit: int = 30) -> list[dict[str, Any]]:
+        """List visible board posts without joining private profile columns."""
+        params: dict[str, str] = {
+            "select": "id,board_slug,profile_auth_subject,title,content,created_at",
+            "is_hidden": "eq.false",
+            "order": "created_at.desc",
+            "limit": str(max(1, min(int(limit), 100))),
+        }
+        if board_slug:
+            params["board_slug"] = f"eq.{board_slug}"
+        return list(self._request("GET", "board_posts", params=params) or [])
+
+    def create_chat_message(self, profile_auth_subject: str, content: str) -> dict[str, Any]:
+        """Create one Community chat message tied only to its canonical profile subject."""
+        rows = self._request(
+            "POST",
+            "chat_messages",
+            payload={"profile_auth_subject": profile_auth_subject, "content": content},
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Chat message creation did not return exactly one row.")
+        return rows[0]
+
+    def list_chat_messages(self, limit: int = 50) -> list[dict[str, Any]]:
+        """List visible chat messages in chronological display order."""
+        return list(
+            self._request(
+                "GET",
+                "chat_messages",
+                params={
+                    "select": "id,profile_auth_subject,content,created_at",
+                    "is_hidden": "eq.false",
+                    "order": "created_at.desc",
+                    "limit": str(max(1, min(int(limit), 100))),
+                },
+            )
+            or []
+        )
+
+    def create_talk_post(
+        self,
+        profile_auth_subject: str,
+        content: str,
+        user_moon_sign: str | None,
+        current_moon_phase: str | None,
+        is_anonymous: bool,
+        image_path: str | None = None,
+    ) -> dict[str, Any]:
+        """Create one LunaTicK Talk post without persisting a display-name snapshot."""
+        rows = self._request(
+            "POST",
+            "lunatick_talk_posts",
+            payload={
+                "profile_auth_subject": profile_auth_subject,
+                "content": content,
+                "user_moon_sign": user_moon_sign,
+                "current_moon_phase": current_moon_phase,
+                "is_anonymous": bool(is_anonymous),
+                "image_path": image_path,
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("LunaTicK Talk post creation did not return exactly one row.")
+        return rows[0]
+
+    def list_talk_posts(
+        self, limit: int = 20, phase_filter: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List visible LunaTicK Talk posts, including only server-side author subjects."""
+        params: dict[str, str] = {
+            "select": (
+                "id,profile_auth_subject,user_moon_sign,current_moon_phase,content,image_path,"
+                "upvotes,downvotes,created_at,is_anonymous,is_hidden"
+            ),
+            "is_hidden": "eq.false",
+            "order": "created_at.desc",
+            "limit": str(max(1, min(int(limit), 100))),
+        }
+        if phase_filter:
+            params["current_moon_phase"] = f"eq.{phase_filter}"
+        return list(self._request("GET", "lunatick_talk_posts", params=params) or [])
+
+    def create_talk_comment(
+        self, post_id: int, profile_auth_subject: str, content: str, is_anonymous: bool
+    ) -> dict[str, Any]:
+        """Create one Talk comment linked to the post and immutable author subject."""
+        rows = self._request(
+            "POST",
+            "lunatick_talk_comments",
+            payload={
+                "post_id": int(post_id),
+                "profile_auth_subject": profile_auth_subject,
+                "content": content,
+                "is_anonymous": bool(is_anonymous),
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("LunaTicK Talk comment creation did not return exactly one row.")
+        return rows[0]
+
+    def list_talk_comments(self, post_id: int) -> list[dict[str, Any]]:
+        """List visible comments for one Talk post in chronological order."""
+        return list(
+            self._request(
+                "GET",
+                "lunatick_talk_comments",
+                params={
+                    "select": (
+                        "id,post_id,profile_auth_subject,content,created_at,upvotes,downvotes,"
+                        "is_anonymous,is_hidden"
+                    ),
+                    "post_id": f"eq.{int(post_id)}",
+                    "is_hidden": "eq.false",
+                    "order": "created_at.asc",
+                    "limit": "200",
+                },
+            )
+            or []
+        )
+
+    def get_talk_vote(self, profile_auth_subject: str, post_id: int) -> str | None:
+        """Return the active profile's vote on one post, if present."""
+        rows = self._request(
+            "GET",
+            "user_votes",
+            params={
+                "select": "vote_type",
+                "profile_auth_subject": f"eq.{profile_auth_subject}",
+                "post_id": f"eq.{int(post_id)}",
+                "limit": "1",
+            },
+        )
+        return str(rows[0].get("vote_type")) if rows else None
+
+    def set_talk_vote(
+        self, profile_auth_subject: str, post_id: int, vote_type: str | None
+    ) -> tuple[int, int]:
+        """Replace one profile's post vote and reconcile denormalized vote counts server-side."""
+        if vote_type not in {"up", "down", None}:
+            raise ValueError("vote_type must be up, down, or None")
+        self._request(
+            "DELETE",
+            "user_votes",
+            params={
+                "profile_auth_subject": f"eq.{profile_auth_subject}",
+                "post_id": f"eq.{int(post_id)}",
+            },
+            prefer="return=minimal",
+        )
+        if vote_type:
+            self._request(
+                "POST",
+                "user_votes",
+                payload={
+                    "profile_auth_subject": profile_auth_subject,
+                    "post_id": int(post_id),
+                    "vote_type": vote_type,
+                },
+                prefer="return=minimal",
+            )
+        votes = self._request(
+            "GET",
+            "user_votes",
+            params={"select": "vote_type", "post_id": f"eq.{int(post_id)}", "limit": "1000"},
+        )
+        upvotes = sum(1 for vote in votes or [] if vote.get("vote_type") == "up")
+        downvotes = sum(1 for vote in votes or [] if vote.get("vote_type") == "down")
+        self._request(
+            "PATCH",
+            "lunatick_talk_posts",
+            params={"id": f"eq.{int(post_id)}"},
+            payload={"upvotes": upvotes, "downvotes": downvotes},
+            prefer="return=minimal",
+        )
+        return upvotes, downvotes
+
+    def hide_talk_post(self, post_id: int) -> None:
+        """Mark one Talk post hidden through the server-only moderation path."""
+        self._request(
+            "PATCH",
+            "lunatick_talk_posts",
+            params={"id": f"eq.{int(post_id)}"},
+            payload={"is_hidden": True},
+            prefer="return=minimal",
+        )
+
     def get_public_profile_by_username(self, username: str) -> dict[str, Any] | None:
         """Return only fields approved by the public-profile privacy matrix."""
         normalized_username = username.strip().lower().lstrip("@")

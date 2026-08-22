@@ -154,6 +154,49 @@ def main() -> None:
     assert store.list_accepted_card_contacts("auth0|user-1") == ["auth0|user-2"]
     assert fake_http.calls[-1]["params"]["status"] == "eq.accepted"
 
+    fake_http.responses.append(
+        FakeResponse(
+            200,
+            [{"auth_subject": "auth0|user-2", "username": "other_moon", "display_name": "Other Moon", "avatar": "🪐", "email": "private@example.test"}],
+        )
+    )
+    author_summaries = store.get_public_profile_summaries(["auth0|user-2"])
+    assert author_summaries == {
+        "auth0|user-2": {"username": "other_moon", "display_name": "Other Moon", "avatar": "🪐"}
+    }
+    assert fake_http.calls[-1]["params"]["select"] == "auth_subject,username,display_name,avatar"
+
+    fake_http.responses.append(FakeResponse(201))
+    store.seed_boards([{"slug": "general", "name": "General", "description": "Open discussion"}])
+    assert fake_http.calls[-1]["json"] == [{"slug": "general", "name": "General", "description": "Open discussion"}]
+
+    fake_http.responses.append(FakeResponse(201, [{"id": 22}]))
+    board_post = store.create_board_post("general", "auth0|user-1", "Title", "Body")
+    assert board_post == {"id": 22}
+    assert fake_http.calls[-1]["json"]["profile_auth_subject"] == "auth0|user-1"
+
+    fake_http.responses.append(FakeResponse(201, [{"id": 23}]))
+    chat_message = store.create_chat_message("auth0|user-1", "Hello")
+    assert chat_message == {"id": 23}
+    assert fake_http.calls[-1]["json"] == {"profile_auth_subject": "auth0|user-1", "content": "Hello"}
+
+    fake_http.responses.append(FakeResponse(201, [{"id": 24}]))
+    talk_post = store.create_talk_post("auth0|user-1", "A reflection", "Cancer", "Full Moon", True)
+    assert talk_post == {"id": 24}
+    assert "display_name" not in fake_http.calls[-1]["json"]
+    assert fake_http.calls[-1]["json"]["profile_auth_subject"] == "auth0|user-1"
+
+    fake_http.responses.append(FakeResponse(204))
+    fake_http.responses.append(FakeResponse(201))
+    fake_http.responses.append(FakeResponse(200, [{"vote_type": "up"}, {"vote_type": "down"}, {"vote_type": "up"}]))
+    fake_http.responses.append(FakeResponse(204))
+    assert store.set_talk_vote("auth0|user-1", 24, "up") == (2, 1)
+    assert fake_http.calls[-1]["json"] == {"upvotes": 2, "downvotes": 1}
+
+    fake_http.responses.append(FakeResponse(204))
+    store.hide_talk_post(24)
+    assert fake_http.calls[-1]["json"] == {"is_hidden": True}
+
     fake_http.responses.append(FakeResponse(201))
     store.log_migration_event(
         run_id="run-001",

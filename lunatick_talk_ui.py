@@ -37,9 +37,15 @@ def render_talk_tab():
 
     # --- Create a New Post ---
     with st.expander("🌙 Share something with the community"):
-        display_name = st.text_input("Your display name", value=st.session_state.get("display_name", "Moon Wanderer"))
+        if db._using_supabase_backend():
+            display_name = st.session_state.get("display_name", "Moon Wanderer")
+            st.caption("Your public Community name is managed in Settings. Private server identity is never posted to the feed.")
+            uploaded_image = None
+            st.caption("Image attachments will return with private persistent media storage in a later phase.")
+        else:
+            display_name = st.text_input("Your display name", value=st.session_state.get("display_name", "Moon Wanderer"))
+            uploaded_image = st.file_uploader("Attach an image (optional)", type=["jpg", "jpeg", "png", "webp"])
         content = st.text_area("Your post", max_chars=1000, placeholder="What's on your mind under tonight's moon?")
-        uploaded_image = st.file_uploader("Attach an image (optional)", type=["jpg", "jpeg", "png", "webp"])
         is_anonymous = st.checkbox("Post anonymously", value=True)
 
         if st.button("Share"):
