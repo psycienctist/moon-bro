@@ -247,6 +247,11 @@ def _render_audit_log(store: supabase_store.SupabaseStore) -> None:
         )
 
 
+def visible_console_sections(role: str) -> tuple[str, ...]:
+    """Return the protected console views allowed for a moderation role."""
+    return ("Review", "Moderation team", "Audit") if role == "founder" else ("Review",)
+
+
 def render_moderation_console() -> None:
     """Render a role-gated public-content console; no private Journal access exists here."""
     role = current_role()
@@ -260,13 +265,14 @@ def render_moderation_console() -> None:
             "Public Community responsibility center. It can review Boards, Chat, LunaTicK Talk posts, "
             "and Talk comments. Private Journals and private profile data are not available here."
         )
-        review_tab, team_tab, audit_tab = st.tabs(["Review", "Moderation team", "Audit"])
-        with review_tab:
-            _render_content_review(store, role, actor_subject)
-        with team_tab:
-            if role == "founder":
+        if role == "founder":
+            review_tab, team_tab, audit_tab = st.tabs(visible_console_sections(role))
+            with review_tab:
+                _render_content_review(store, role, actor_subject)
+            with team_tab:
                 _render_team_management(store, actor_subject)
-            else:
-                st.info("Only the founder can grant or revoke moderation roles.")
-        with audit_tab:
-            _render_audit_log(store)
+            with audit_tab:
+                _render_audit_log(store)
+        else:
+            st.caption("Moderator access is limited to reviewing, hiding, and restoring public Community content.")
+            _render_content_review(store, role, actor_subject)

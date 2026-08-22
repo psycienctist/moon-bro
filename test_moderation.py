@@ -80,5 +80,7 @@ assert "journal" not in " ".join(str(item) for item in store.actions).lower()
 
 assert moderation._record_title("talk_post", {"is_anonymous": True}, "Private Name") == "Talk post · Anonymous"
 assert moderation._record_title("talk_comment", {"is_anonymous": False}, "Public Name") == "Talk comment · Public Name"
+assert moderation.visible_console_sections("founder") == ("Review", "Moderation team", "Audit")
+assert moderation.visible_console_sections("moderator") == ("Review",)
 
-print("Founder moderation roles, public-content actions, and Journal exclusion passed.")
+print("Founder moderation roles, public-content actions, Journal exclusion, and founder-only audit access passed.")
