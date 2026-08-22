@@ -27,7 +27,10 @@ assert "def set_public_card_values_visible" in card_source
 assert "def get_card_profile_by_username_server_only" in store_source
 assert "public_card_values_visible" in store_source
 assert '"Show my cosmic values on my public profile"' in app_source
-assert "Save Cosmic Card privacy" in app_source
+assert 'key="public_card_values_visible_toggle"' in app_source
+assert "if show_public_card_values != current_card_values_visible:" in app_source
+assert "set_public_card_values_visible" in app_source
+assert "Save Cosmic Card privacy" not in app_source
 assert 'COMMUNITY_MODULE_VERSION = "public_profile_card_v1"' in community_source
 assert 'getattr(community, "COMMUNITY_MODULE_VERSION", None) != "public_profile_card_v1"' in app_source
 

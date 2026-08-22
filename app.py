@@ -1677,21 +1677,23 @@ def render_settings():
     current_card_values_visible = cosmic_cards.public_card_values_visible(
         st.session_state.get("user_hash", "anonymous")
     )
-    with st.form("cosmic_card_visibility_form", clear_on_submit=False):
-        show_public_card_values = st.toggle(
-            "Show my cosmic values on my public profile",
-            value=current_card_values_visible,
-            help="When off, your visible profile card keeps its design but hides Sun, Moon, Rising, phase, full-moon count, and Dominant Planet.",
-        )
-        save_card_visibility = st.form_submit_button("Save Cosmic Card privacy", use_container_width=True)
-    if save_card_visibility:
+    show_public_card_values = st.toggle(
+        "Show my cosmic values on my public profile",
+        value=current_card_values_visible,
+        key="public_card_values_visible_toggle",
+        help="When off, your visible profile card keeps its design but hides Sun, Moon, Rising, phase, full-moon count, and Dominant Planet.",
+    )
+    if show_public_card_values != current_card_values_visible:
         cosmic_cards.set_public_card_values_visible(
             st.session_state.get("user_hash", "anonymous"), show_public_card_values
         )
+        # Reset the widget state before the rerun so the saved database value is
+        # always the single source of truth after a restart or later Settings visit.
+        st.session_state.pop("public_card_values_visible_toggle", None)
         if show_public_card_values:
-            st.success("Your public Cosmic Card now shows its derived values.")
+            st.toast("Your public Cosmic Card now shows its derived values.")
         else:
-            st.success("Your public Cosmic Card remains visible; its derived values are now private.")
+            st.toast("Your public Cosmic Card remains visible; its derived values are now private.")
         st.rerun()
 
     st.markdown("---")
