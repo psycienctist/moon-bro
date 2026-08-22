@@ -18,6 +18,9 @@ assert "☾ MOON IN ENERGY" not in home_source
 assert "YOUR COSMIC MOON COMPANION" not in home_source
 assert "AI + I = All. Always." not in home_source
 assert "Moon in {current['moon_sign']}" in home_source
+assert "st.html(LUNATICK_CSS)" in app_source
+assert "margin-bottom: 0.5rem;\n        box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);" in app_source
+assert "margin: 0 0 0.5rem;" in app_source
 assert "import daily_reflection as reflection_ui" in journal_source
 assert 'JOURNAL_MODULE_VERSION = "daily_reflection_v1"' in journal_source
 assert "reflection_ui.render_daily_reflection()" in journal_source

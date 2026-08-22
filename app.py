@@ -130,7 +130,7 @@ LUNATICK_CSS = """
         justify-content: center;
         align-items: center;
         gap: 0.8rem;
-        margin: 0.5rem 0;
+        margin: 0 0 0.5rem;
         flex-wrap: nowrap;
     }
 
@@ -179,7 +179,7 @@ LUNATICK_CSS = """
         border: 1px solid #1f6feb;
         border-radius: 16px;
         padding: 1rem;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
         box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);
     }
 
@@ -558,7 +558,7 @@ LUNATICK_CSS = """
     ::-webkit-scrollbar { width: 6px; }
 </style>
 """
-st.markdown(LUNATICK_CSS, unsafe_allow_html=True)
+st.html(LUNATICK_CSS)
 
 # ---------------------------------------------------------------------------
 # Init DBs early (needed for auth profiles)
