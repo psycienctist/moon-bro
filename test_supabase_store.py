@@ -71,6 +71,8 @@ def main() -> None:
         "Content-Type": "application/json",
     }
     assert "Authorization" not in secret_store._headers
+    assert supabase_store.public_display_name("someone@example.test") == "Moon Wanderer"
+    assert supabase_store.public_display_name("Public Moon") == "Public Moon"
 
     fake_http.responses.append(
         FakeResponse(
@@ -96,6 +98,15 @@ def main() -> None:
     }
     assert "email" not in public_profile
     assert fake_http.calls[-1]["params"]["select"] == "username,display_name,avatar,bio"
+
+    fake_http.responses.append(
+        FakeResponse(
+            200,
+            [{"username": "moon_orbit", "display_name": "someone@example.test", "avatar": "🌙", "bio": ""}],
+        )
+    )
+    sanitized_public_profile = store.get_public_profile_by_username("moon_orbit")
+    assert sanitized_public_profile["display_name"] == "Moon Wanderer"
 
     fake_http.responses.append(FakeResponse(200, []))
     assert store.username_is_available("moon_orbit", "auth0|user-1") is True
@@ -165,6 +176,12 @@ def main() -> None:
         "auth0|user-2": {"username": "other_moon", "display_name": "Other Moon", "avatar": "🪐"}
     }
     assert fake_http.calls[-1]["params"]["select"] == "auth_subject,username,display_name,avatar"
+
+    fake_http.responses.append(
+        FakeResponse(200, [{"auth_subject": "auth0|user-2", "username": "other_moon", "display_name": "someone@example.test", "avatar": "🪐"}])
+    )
+    sanitized_summary = store.get_public_profile_summaries(["auth0|user-2"])
+    assert sanitized_summary["auth0|user-2"]["display_name"] == "Moon Wanderer"
 
     fake_http.responses.append(FakeResponse(201))
     store.seed_boards([{"slug": "general", "name": "General", "description": "Open discussion"}])

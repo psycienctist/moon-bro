@@ -53,6 +53,12 @@ with tempfile.TemporaryDirectory() as temp_dir:
     assert first["display_name"] == "Moon Wanderer"
     assert first["auth_subject"] == "auth0|alpha-user-001"
 
+    fake_streamlit.user["name"] = "moon.wanderer@example.test"
+    assert auth._display_name_from_claims("moon.wanderer@example.test") == "Moon Wanderer"
+    fake_streamlit.user["name"] = "moon.wanderer"
+    assert auth._display_name_from_claims("moon.wanderer@example.test") == "Moon Wanderer"
+    fake_streamlit.user["name"] = "Moon Wanderer"
+
     auth.apply_user_to_session(first)
     auth.update_user_profile(
         first["username"], "Luna Alpha", "1990-01-01"

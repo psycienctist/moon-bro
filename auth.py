@@ -169,19 +169,24 @@ def _default_username(user_hash: str) -> str:
     return f"moon_{user_hash[:6]}"
 
 
+def _public_display_name(value: Any, email: str = "") -> str:
+    """Normalize a public label and reject full-email or legacy local-part fallbacks."""
+    name = supabase_store.public_display_name(value)
+    email_local_part = (email or "").strip().lower().partition("@")[0]
+    if email_local_part and name.lower() == email_local_part:
+        return supabase_store.PUBLIC_DISPLAY_NAME_FALLBACK
+    return name
+
+
 def _display_name_from_claims(email: str) -> str:
-    """Choose an initial profile label without exposing the raw provider ID."""
+    """Choose an initial public label without deriving one from an email address."""
     display_name = (
         _claim("name")
         or _claim("nickname")
         or _claim("preferred_username")
         or ""
     )
-    if display_name:
-        return str(display_name).strip()[:48]
-    if email and "@" in email:
-        return email.split("@", 1)[0][:48]
-    return "Moon Wanderer"
+    return _public_display_name(display_name, email)
 
 
 def _clean_username(username: str) -> str:
@@ -219,7 +224,7 @@ def _presence_from_row(
         )
 
     username = _clean_username(row["username"] or default_username)
-    display_name = (row["display_name"] or _display_name_from_claims(email)).strip()[:48]
+    display_name = _public_display_name(row["display_name"] or _display_name_from_claims(email), email)
     avatar = (row["avatar"] or DEFAULT_AVATAR).strip()[:8] or DEFAULT_AVATAR
     bio = (row["bio"] or "").strip()[:240]
     birth_date = row["birth_date"]
@@ -391,7 +396,7 @@ def get_public_profile(username: str) -> dict[str, str] | None:
 
     return {
         "username": _clean_username(row["username"]),
-        "display_name": (row["display_name"] or "Moon Wanderer").strip()[:48],
+        "display_name": _public_display_name(row["display_name"]),
         "avatar": (row["avatar"] or DEFAULT_AVATAR).strip()[:8] or DEFAULT_AVATAR,
         "bio": (row["bio"] or "").strip()[:240],
     }
@@ -417,6 +422,11 @@ def update_presence_profile(
         return False, "Username must be 3–24 lowercase letters, numbers, or underscores."
     if not clean_display_name:
         return False, "Display name cannot be empty."
+    if "@" in clean_display_name:
+        return False, "Display name cannot contain an email address."
+    email_local_part = str(st.session_state.get("email", "")).strip().lower().partition("@")[0]
+    if email_local_part and clean_display_name.lower() == email_local_part:
+        return False, "Choose a display name that is different from your email address."
     if len(clean_display_name) > 48:
         return False, "Display name must be 48 characters or fewer."
     if len(clean_bio) > 240:
@@ -473,7 +483,7 @@ def update_user_profile(username: str, display_name: str, birth_date: str | None
     clean_username = _clean_username(username) or _default_username(
         str(st.session_state.get("user_hash", "moon"))
     )
-    clean_name = (display_name or "Moon Wanderer").strip()[:48] or "Moon Wanderer"
+    clean_name = _public_display_name(display_name)
 
     if using_supabase_backend():
         _supabase().update_profile_fields(

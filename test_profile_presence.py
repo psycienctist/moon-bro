@@ -64,6 +64,7 @@ def main() -> None:
         fake_streamlit.session_state.clear()
         fake_streamlit.session_state.auth_subject = "auth0|alpha"
         fake_streamlit.session_state.user_hash = "abc123def456"
+        fake_streamlit.session_state.email = "alpha@example.test"
 
         saved, message = auth.update_presence_profile(
             "alpha_orbit", "Alpha Moon", "🪐", "Listening to the tides."
@@ -99,6 +100,16 @@ def main() -> None:
         )
         conn.commit()
         conn.close()
+
+        saved, message = auth.update_presence_profile(
+            "alpha_orbit", "alpha@example.test", "🪐", ""
+        )
+        assert not saved and "email address" in message
+
+        saved, message = auth.update_presence_profile(
+            "alpha_orbit", "alpha", "🪐", ""
+        )
+        assert not saved and "different from your email" in message
 
         saved, message = auth.update_presence_profile(
             "taken_name", "Alpha Moon", "🪐", ""

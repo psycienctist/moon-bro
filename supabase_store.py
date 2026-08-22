@@ -17,6 +17,13 @@ import requests
 
 VALID_BACKENDS = {"sqlite", "supabase"}
 PUBLIC_PROFILE_FIELDS = ("username", "display_name", "avatar", "bio")
+PUBLIC_DISPLAY_NAME_FALLBACK = "Moon Wanderer"
+
+
+def public_display_name(value: Any) -> str:
+    """Return a public-safe display name, never an email-like value."""
+    name = str(value or "").strip()[:48]
+    return name if name and "@" not in name else PUBLIC_DISPLAY_NAME_FALLBACK
 BACKUP_TABLES = frozenset(
     {
         "profiles",
@@ -401,7 +408,7 @@ class SupabaseStore:
         return {
             str(row["auth_subject"]): {
                 "username": row.get("username"),
-                "display_name": row.get("display_name"),
+                "display_name": public_display_name(row.get("display_name")),
                 "avatar": row.get("avatar"),
             }
             for row in rows or []
@@ -904,7 +911,9 @@ class SupabaseStore:
         )
         if not rows:
             return None
-        return {field: rows[0].get(field) for field in PUBLIC_PROFILE_FIELDS}
+        profile = {field: rows[0].get(field) for field in PUBLIC_PROFILE_FIELDS}
+        profile["display_name"] = public_display_name(profile.get("display_name"))
+        return profile
 
     def username_is_available(self, username: str, auth_subject: str) -> bool:
         """Check uniqueness server-side while allowing the owner to retain a handle."""
