@@ -27,6 +27,11 @@ import supabase_store
 if not all(hasattr(auth, method) for method in ("update_presence_profile", "get_public_profile")):
     auth = importlib.reload(auth)
 
+# The backup Settings view can be updated before its server-only adapter in a
+# warm Streamlit process. Reload only when the required snapshot reader is absent.
+if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
+    supabase_store = importlib.reload(supabase_store)
+
 # The Community page is likewise an imported module. Reload only if a live
 # Streamlit update retained the older module that lacks public profile lookup.
 if not hasattr(community, "_render_public_profile_lookup"):
