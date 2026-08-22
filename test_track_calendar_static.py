@@ -21,6 +21,10 @@ assert "Total Lunar Eclipse" in track_source
 assert "Partial Lunar Eclipse" in track_source
 assert "Add to device calendar" in track_source
 assert "track-event-strip" in track_source
+assert 'st.container(key="track-month-nav")' in track_source
+assert '.st-key-track-month-nav [data-testid="stHorizontalBlock"]' in track_source
+assert "upcoming_events = sorted(" in track_source
+assert "if event_day >= today" in track_source
 assert "Add a private note" in track_source
 assert "BEGIN:VALARM" in track_source
 assert "entry_date" in track_source
