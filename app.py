@@ -396,22 +396,10 @@ LUNATICK_CSS = """
         opacity: 1 !important;
     }
 
-    /* Fill the lower-right space behind Streamlit's own control with the
-       same lunar-glass strip as the permanent Home and Settings controls. */
+    /* The lower-right area belongs to Streamlit's optional hosted control.
+       Leave it as the native app background when that control is not mounted,
+       rather than drawing a full-width lunar-glass panel that can look broken. */
     @media (max-width: 480px) {
-        .stApp::after {
-            content: "";
-            position: fixed;
-            z-index: 999;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 2.625rem;
-            background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
-            border-top: 1px solid rgba(188, 140, 255, 0.62);
-            pointer-events: none;
-        }
-
         [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
             width: 50vw !important;
             height: 2.625rem !important;

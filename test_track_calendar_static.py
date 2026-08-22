@@ -14,7 +14,8 @@ assert 'st.session_state.nav_page = "Calendar"' in app_source
 assert 'if page_name != "Calendar":\n        st.query_params.pop("track_day", None)' in app_source
 assert "html, body, .stApp" in app_source
 assert "overflow-x: hidden;" in app_source
-assert ".stApp::after" in app_source
+assert ".stApp::after" not in app_source
+assert "The lower-right area belongs to Streamlit's optional hosted control." in app_source
 assert 'mobile_grid_private_entries_v2' in app_source
 assert "header_cols = st.columns(7)" not in app_source
 assert 'TRACK_MODULE_VERSION = "mobile_grid_private_entries_v2"' in track_source
