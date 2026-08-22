@@ -24,7 +24,10 @@ import supabase_store
 # Streamlit can retain imported helper modules across a live-code update. If
 # the Settings UI has been refreshed before auth.py, reload this one module so
 # the paired profile-save and public-profile interfaces are both available.
-if not all(hasattr(auth, method) for method in ("update_presence_profile", "get_public_profile")):
+if not all(
+    hasattr(auth, method)
+    for method in ("update_presence_profile", "get_public_profile", "request_password_reset")
+):
     auth = importlib.reload(auth)
 
 # The backup Settings view can be updated before its server-only adapter in a
