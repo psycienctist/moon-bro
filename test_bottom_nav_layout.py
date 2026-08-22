@@ -16,10 +16,13 @@ journal_selector = ".st-key-lunatick-bottom-nav .st-key-bottom_nav_journal butto
 assert journal_selector in source
 journal_rule = source[source.index(journal_selector):source.index(journal_selector) + 500]
 assert "font-size: 0.56rem !important;" in journal_rule
-assert "white-space: nowrap !important;" in journal_rule
+assert "white-space: pre-line !important;" in journal_rule
+assert "white-space: nowrap !important;" not in journal_rule
 assert "word-break: keep-all !important;" in journal_rule
 
 community_selector = ".st-key-lunatick-bottom-nav .st-key-bottom_nav_community button"
 assert community_selector in source
+assert 'if page_name in ("Community", "Journal")' in source
+assert 'f"{icon}\\n{compact_label}"' in source
 
-print("Fixed five-tab rail and Journal no-wrap mobile guard passed.")
+print("Fixed five-tab rail and Journal two-line mobile layout guard passed.")

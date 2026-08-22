@@ -519,7 +519,7 @@ LUNATICK_CSS = """
             overflow-wrap: normal !important;
             padding-left: 0.04rem !important;
             padding-right: 0.04rem !important;
-            white-space: nowrap !important;
+            white-space: pre-line !important;
             word-break: keep-all !important;
         }
     }
@@ -1868,9 +1868,14 @@ with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-        # Community is the only longer label. An explicit line break preserves
-        # the shared icon-over-label treatment without breaking “Connect”.
-        nav_label = f"{icon}\n{compact_label}" if page_name == "Community" else f"{icon} {compact_label}"
+        # Community and Journal use explicit icon-over-label line breaks. This
+        # preserves the shared tab height and prevents their longer labels from
+        # wrapping into an unwanted third line on narrow phones.
+        nav_label = (
+            f"{icon}\n{compact_label}"
+            if page_name in ("Community", "Journal")
+            else f"{icon} {compact_label}"
+        )
         with column:
             st.button(
                 nav_label,
