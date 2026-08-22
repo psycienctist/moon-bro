@@ -723,8 +723,7 @@ class SupabaseStore:
                 params={
                     "select": "entry_date,note,cycle_marker,severity,updated_at",
                     "profile_auth_subject": f"eq.{profile_auth_subject}",
-                    "entry_date": f"gte.{start_date}",
-                    "entry_date": f"lt.{end_date}",
+                    "and": f"(entry_date.gte.{start_date},entry_date.lt.{end_date})",
                     "order": "entry_date.asc",
                     "limit": "42",
                 },

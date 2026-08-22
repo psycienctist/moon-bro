@@ -52,7 +52,7 @@ if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "public_value_privacy_v
 
 # The phone-first Track renderer is also an imported module. Reload it only
 # when a warm worker retained the prior calendar implementation.
-if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "mobile_grid_private_entries_v1":
+if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "mobile_grid_private_entries_v2":
     track_calendar = importlib.reload(track_calendar)
 
 
@@ -388,7 +388,22 @@ LUNATICK_CSS = """
         opacity: 1 !important;
     }
 
+    /* Fill the lower-right space behind Streamlit's own control with the
+       same lunar-glass strip as the permanent Home and Settings controls. */
     @media (max-width: 480px) {
+        .stApp::after {
+            content: "";
+            position: fixed;
+            z-index: 999;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 2.625rem;
+            background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
+            border-top: 1px solid rgba(188, 140, 255, 0.62);
+            pointer-events: none;
+        }
+
         [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
             width: 50vw !important;
             height: 2.625rem !important;
@@ -1778,6 +1793,12 @@ except Exception:
 # first-run default.
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
+
+# A calendar day uses a lightweight query route so the compact HTML grid stays
+# horizontal on phones. Preserve Track on that route even if Streamlit creates
+# a fresh script session for the browser navigation.
+if str(st.query_params.get("track_day", "")).strip():
+    st.session_state.nav_page = "Calendar"
 
 # Existing sessions may still point to a former standalone social tab. Move
 # those users directly into the unified Community destination on the next run.

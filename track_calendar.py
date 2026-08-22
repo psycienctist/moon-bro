@@ -18,7 +18,7 @@ import streamlit as st
 import cosmic_cards
 import supabase_store
 
-TRACK_MODULE_VERSION = "mobile_grid_private_entries_v1"
+TRACK_MODULE_VERSION = "mobile_grid_private_entries_v2"
 _SQLITE_DB = Path("lunatick.db")
 
 # NASA Eclipse Web Site 2026 catalog dates/times (UT). Descriptions deliberately
@@ -265,6 +265,8 @@ def _render_css() -> None:
         .track-dot--cycle-start { color:#f05d6e; font-size:.85rem; }
         .track-dot--cycle-end { color:#63d99d; font-size:.85rem; }
         .track-selected { border:1px solid rgba(188,140,255,.35); border-radius:11px; background:rgba(30,22,52,.58); padding:.72rem .76rem; margin:.7rem 0; }
+        .track-event-strip { border:1px solid rgba(255,211,110,.52); border-radius:8px; background:rgba(112,82,23,.20); color:#f6dda2; font-size:.68rem; padding:.35rem .5rem; margin:.28rem 0 .32rem; }
+        .st-key-track_previous_month button, .st-key-track_next_month button { min-height:1.72rem!important; height:1.72rem!important; min-width:1.72rem!important; width:1.72rem!important; padding:0!important; border-radius:.48rem!important; font-size:.66rem!important; line-height:1!important; }
         .track-legend { display:flex; flex-wrap:wrap; gap:.42rem .78rem; color:#9ba9bf; font-size:.62rem; margin:.42rem 0 .08rem; }
         @media (max-width: 480px) {
           .track-day { min-height:42px; border-radius:7px; }
@@ -350,22 +352,41 @@ def render_track_tab() -> None:
     month_start = date(year, month, 1)
     next_month = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
 
+    month_events = [
+        (event_day, event)
+        for event_day, event in LUNAR_EVENTS.items()
+        if event_day.year == year and event_day.month == month
+    ]
+    selected = _selected_day(month_start)
+    entries = list_private_entries(month_start, next_month)
+
     st.markdown(
-        """
-        <div style="font-family:Orbitron,sans-serif;font-size:.8rem;letter-spacing:3px;color:#bc8cff;text-transform:uppercase;margin-bottom:.2rem;">📅 Track</div>
-        <div style="font-family:'Crimson Pro',serif;font-size:1rem;color:#8b949e;margin-bottom:.65rem;font-style:italic;">Moon phases, lunar events, and your private calendar.</div>
-        """,
+        "<div style=\"font-family:Orbitron,sans-serif;font-size:.76rem;letter-spacing:2.6px;color:#bc8cff;text-transform:uppercase;margin-bottom:.08rem;\">📅 Track</div>",
         unsafe_allow_html=True,
     )
-    left, center, right = st.columns([1, 1.35, 1])
+    left, center, right = st.columns([0.32, 2.1, 0.32], vertical_alignment="center")
     with left:
-        st.button("◀", key="track_previous_month", use_container_width=True, on_click=_set_month, args=(-1,))
+        st.button("◀", key="track_previous_month", on_click=_set_month, args=(-1,))
     with center:
-        st.markdown(f"<div style='text-align:center;font-family:Orbitron,sans-serif;font-size:.78rem;color:#f1f5ff;padding:.4rem 0;'>{month_start.strftime('%B %Y')}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='text-align:center;font-family:Orbitron,sans-serif;font-size:.72rem;color:#f1f5ff;padding:.1rem 0;'>{month_start.strftime('%B %Y')}</div>",
+            unsafe_allow_html=True,
+        )
     with right:
-        st.button("▶", key="track_next_month", use_container_width=True, on_click=_set_month, args=(1,))
+        st.button("▶", key="track_next_month", on_click=_set_month, args=(1,))
 
-    entries = list_private_entries(month_start, next_month)
+    if month_events:
+        event_day, event = month_events[0]
+        st.markdown(
+            f"<div class='track-event-strip'>✦ {event_day.strftime('%b')} {event_day.day} · {html.escape(event['title'])}</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("Daily moon phases and your private calendar.")
+
+    with st.expander(f"✎ Add a private note · {selected.strftime('%b')} {selected.day}", expanded=False):
+        _render_selected_day(selected, entries.get(selected.isoformat(), {}))
+
     st.markdown(f'<div class="track-grid">{_month_grid_html(month_start, entries)}</div>', unsafe_allow_html=True)
     st.markdown(
         "<div class='track-legend'>"
@@ -374,14 +395,3 @@ def render_track_tab() -> None:
         "</div>",
         unsafe_allow_html=True,
     )
-
-    selected = _selected_day(month_start)
-    _render_selected_day(selected, entries.get(selected.isoformat(), {}))
-
-    month_events = [(event_day, event) for event_day, event in LUNAR_EVENTS.items() if event_day.year == year and event_day.month == month]
-    if month_events:
-        st.markdown("#### 🔭 Lunar events")
-        for event_day, event in month_events:
-            st.caption(f"{event_day.strftime('%b')} {event_day.day} · {event['title']} · {event['source']}")
-    else:
-        st.caption("No catalogued eclipse event in this month. Daily moon phases remain available above.")

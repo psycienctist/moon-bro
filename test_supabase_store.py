@@ -291,7 +291,7 @@ def main() -> None:
     assert store.list_calendar_entries("auth0|user-1", "2026-08-01", "2026-09-01") == []
     calendar_query = fake_http.calls[-1]["params"]
     assert calendar_query["profile_auth_subject"] == "eq.auth0|user-1"
-    assert calendar_query["entry_date"] == "lt.2026-09-01"
+    assert calendar_query["and"] == "(entry_date.gte.2026-08-01,entry_date.lt.2026-09-01)"
     assert calendar_query["select"] == "entry_date,note,cycle_marker,severity,updated_at"
     assert "email" not in calendar_query["select"]
 

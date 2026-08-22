@@ -9,12 +9,19 @@ migration_source = Path("supabase/migrations/20260822_009_private_calendar_entri
 backup_source = Path("supabase_backup.py").read_text(encoding="utf-8")
 
 assert "track_calendar.render_track_tab()" in app_source
+assert 'if str(st.query_params.get("track_day", "")).strip():' in app_source
+assert 'st.session_state.nav_page = "Calendar"' in app_source
+assert ".stApp::after" in app_source
+assert 'mobile_grid_private_entries_v2' in app_source
 assert "header_cols = st.columns(7)" not in app_source
+assert 'TRACK_MODULE_VERSION = "mobile_grid_private_entries_v2"' in track_source
 assert "grid-template-columns:repeat(7,minmax(0,1fr))" in track_source
 assert "aspect-ratio:1/1" in track_source
 assert "Total Lunar Eclipse" in track_source
 assert "Partial Lunar Eclipse" in track_source
 assert "Add to device calendar" in track_source
+assert "track-event-strip" in track_source
+assert "Add a private note" in track_source
 assert "BEGIN:VALARM" in track_source
 assert "entry_date" in track_source
 assert "cycle_marker" in track_source
