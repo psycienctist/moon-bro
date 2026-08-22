@@ -88,6 +88,10 @@ LUNATICK_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
+    html, body, .stApp {
+        overflow-x: hidden;
+    }
+
     .stApp {
         background-color: #05070a;
         color: #e6edf3;
@@ -1758,8 +1762,14 @@ if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk"}:
 
 
 def set_nav_page(page_name: str) -> None:
-    """Switch destinations before the next normal Streamlit script run."""
+    """Switch destinations and clear a date-selection route when leaving Track."""
     st.session_state.nav_page = page_name
+    # Calendar dates use a query route only to preserve the selected private
+    # entry after their lightweight HTML-grid navigation. Once the user chooses
+    # another destination, remove that route so it cannot force Calendar back
+    # onto the page during the following Streamlit rerun.
+    if page_name != "Calendar":
+        st.query_params.pop("track_day", None)
 
 
 # Render one destination in the normal page body. The navigation itself is

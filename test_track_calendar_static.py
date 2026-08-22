@@ -11,6 +11,9 @@ backup_source = Path("supabase_backup.py").read_text(encoding="utf-8")
 assert "track_calendar.render_track_tab()" in app_source
 assert 'if str(st.query_params.get("track_day", "")).strip():' in app_source
 assert 'st.session_state.nav_page = "Calendar"' in app_source
+assert 'if page_name != "Calendar":\n        st.query_params.pop("track_day", None)' in app_source
+assert "html, body, .stApp" in app_source
+assert "overflow-x: hidden;" in app_source
 assert ".stApp::after" in app_source
 assert 'mobile_grid_private_entries_v2' in app_source
 assert "header_cols = st.columns(7)" not in app_source
