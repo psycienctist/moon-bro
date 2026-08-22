@@ -28,7 +28,6 @@ BACKUP_TABLES = frozenset(
     {
         "profiles",
         "journal_entries",
-        "journal_practice_days",
         "calendar_entries",
         "boards",
         "board_posts",
@@ -682,42 +681,6 @@ class SupabaseStore:
                     "profile_auth_subject": f"eq.{profile_auth_subject}",
                     "order": "created_at.desc",
                     "limit": str(max(1, min(int(limit), 100))),
-                },
-            )
-            or []
-        )
-
-    def record_journal_practice_day(
-        self, profile_auth_subject: str, practice_date: str
-    ) -> dict[str, Any]:
-        """Record one owner-only UTC journal-practice day without journal content."""
-        rows = self._request(
-            "POST",
-            "journal_practice_days",
-            params={"on_conflict": "profile_auth_subject,practice_date"},
-            payload={
-                "profile_auth_subject": profile_auth_subject,
-                "practice_date": practice_date,
-            },
-            prefer="resolution=merge-duplicates,return=representation",
-        )
-        if not isinstance(rows, list) or len(rows) != 1:
-            raise SupabaseRequestError("Journal practice-day upsert did not return exactly one row.")
-        return rows[0]
-
-    def list_journal_practice_days(
-        self, profile_auth_subject: str, limit: int = 730
-    ) -> list[dict[str, Any]]:
-        """List only one owner's private practice dates, newest first, without entry text."""
-        return list(
-            self._request(
-                "GET",
-                "journal_practice_days",
-                params={
-                    "select": "practice_date,created_at",
-                    "profile_auth_subject": f"eq.{profile_auth_subject}",
-                    "order": "practice_date.desc",
-                    "limit": str(max(1, min(int(limit), 730))),
                 },
             )
             or []

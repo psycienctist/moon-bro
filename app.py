@@ -30,9 +30,9 @@ if not all(
 ):
     auth = importlib.reload(auth)
 
-# Reload Journal only when a warm Streamlit worker retained the previous
-# module and would otherwise omit the relocated Daily Reflection block.
-if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "daily_reflection_v1":
+# Reload Journal when a warm Streamlit worker retained the former
+# reflection/prompt renderer instead of the approved private free-writing view.
+if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "private_freewrite_v1":
     journal_ui = importlib.reload(journal_ui)
 
 # The backup Settings view can be updated before its server-only adapter in a
@@ -66,10 +66,7 @@ def init_session_state():
         "is_authenticated": False,
         "current_phase": "Waxing Gibbous",
         "current_tab": "Journal",
-        "journal_prompt_mode": "🌙 Phase Reflection",
-        "journal_phase_input": "",
-        "journal_chart_input": "",
-        "journal_free_input": "",
+        "journal_freewrite_input": "",
         "display_name": "Moon Wanderer",
     }
     for key, value in defaults.items():
