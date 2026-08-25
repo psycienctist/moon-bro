@@ -1,4 +1,8 @@
-"""Unified Community surface for LunaTicK."""
+"""Unified Community surface for LunaTicK.
+
+This module intentionally combines the live chat and message boards into one
+Community page. The former LunaTicK Talk surface is no longer rendered here.
+"""
 
 from __future__ import annotations
 
@@ -9,21 +13,12 @@ import streamlit as st
 import auth
 import boards
 import chat_room
-import lunatick_talk_ui
 import moderation
 import cosmic_cards
 
 
-# Used by app.py to reload the complete public-profile experience on warm workers.
+# Keep this value compatible with app.py's warm-worker reload guard.
 COMMUNITY_MODULE_VERSION = "public_profile_card_v1"
-
-
-COMMUNITY_VIEWS = (
-    ("Chat", "💬", "Chat"),
-    ("Boards", "📋", "Boards"),
-    ("Lunatick Talk", "🗣️", "Talk"),
-)
-DEFAULT_VIEW = "Boards"
 
 
 COMMUNITY_CSS = """
@@ -61,6 +56,30 @@ COMMUNITY_CSS = """
         font-size: 0.88rem;
         line-height: 1.45;
         margin: 0.45rem 0 1rem;
+    }
+
+    .community-section {
+        background: linear-gradient(145deg, rgba(20, 29, 52, 0.54), rgba(63, 35, 107, 0.20));
+        border: 1px solid rgba(188, 140, 255, 0.20);
+        border-radius: 16px;
+        box-shadow: 0 0 22px rgba(110, 64, 201, 0.08);
+        margin: 0 0 1rem;
+        padding: 0.95rem 1rem 0.45rem;
+    }
+
+    .community-section-title {
+        color: #f0f6fc;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.05rem;
+        letter-spacing: 0.04em;
+        margin: 0;
+        text-transform: uppercase;
+    }
+
+    .community-section-caption {
+        color: #8b949e;
+        font-size: 0.82rem;
+        margin: 0.25rem 0 0.8rem;
     }
 
     .public-profile-card {
@@ -118,47 +137,13 @@ COMMUNITY_CSS = """
         margin-top: 0.85rem;
     }
 
-    .st-key-community-subnav [data-testid="stButton"] > button {
-        background: rgba(255, 255, 255, 0.045);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 0.8rem;
-        color: #aab6ca;
-        font-size: 0.78rem;
-        min-height: 2.7rem;
-        transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
-    }
-
-    .st-key-community-subnav [data-testid="stButton"] > button:hover,
-    .st-key-community-subnav [data-testid="stButton"] > button:focus-visible {
-        border-color: rgba(188, 140, 255, 0.72);
-        color: #f0e6ff;
-        outline: none;
-        transform: translateY(-1px);
-    }
-
-    .st-key-community-subnav [data-testid="stButton"] > button[kind="primary"] {
-        background: linear-gradient(135deg, #7841c7, #aa70f0);
-        border-color: #bc8cff;
-        color: #ffffff;
-        box-shadow: 0 0 16px rgba(188, 140, 255, 0.20);
-    }
-
     @media (max-width: 480px) {
         .community-shell { padding: 0.85rem 0.7rem 0.25rem; }
+        .community-section { padding: 0.85rem 0.7rem 0.25rem; }
         .public-profile-card { padding: 0.85rem; }
-        .st-key-community-subnav [data-testid="stButton"] > button {
-            font-size: 0.67rem;
-            padding-left: 0.2rem;
-            padding-right: 0.2rem;
-        }
     }
 </style>
 """
-
-
-def _set_community_view(view_name: str) -> None:
-    """Persist the selected in-page Community view across Streamlit reruns."""
-    st.session_state["community_view"] = view_name
 
 
 def _set_profile_lookup(username: str) -> None:
@@ -171,9 +156,11 @@ def _clear_profile_lookup() -> None:
 
 
 def _render_public_profile_lookup() -> None:
-    """Render a direct username lookup with a deliberately minimal public card."""
+    """Render a direct username lookup with a minimal public card."""
     with st.expander("🔭 View a LunaTicK profile", expanded=False):
-        st.caption("Look up a public profile by @username. Email, birth data, and account details remain private.")
+        st.caption(
+            "Look up a public profile by @username. Email, birth data, and account details remain private."
+        )
         with st.form("public_profile_lookup_form", clear_on_submit=False):
             lookup_username = st.text_input(
                 "Username",
@@ -189,7 +176,7 @@ def _render_public_profile_lookup() -> None:
             if requested_handle:
                 _set_profile_lookup(requested_handle)
             else:
-                st.warning("Enter a username to view a public profile.")
+                st.warning("Enter a username to view a profile.")
 
         requested_handle = st.session_state.get("public_profile_lookup", "")
         if not requested_handle:
@@ -203,15 +190,16 @@ def _render_public_profile_lookup() -> None:
                 st.rerun()
             return
 
-        avatar = html.escape(profile["avatar"])
-        display_name = html.escape(profile["display_name"])
-        username = html.escape(profile["username"])
-        bio = html.escape(profile["bio"]).replace("\n", "<br>")
+        avatar = html.escape(str(profile.get("avatar") or "🌙"))
+        display_name = html.escape(str(profile.get("display_name") or "Moon Wanderer"))
+        username = html.escape(str(profile.get("username") or requested_handle))
+        bio = html.escape(str(profile.get("bio") or "")).replace("\n", "<br>")
         bio_html = (
             f'<p class="public-profile-bio">{bio}</p>'
             if bio
             else '<p class="public-profile-bio" style="color:#7d8794;font-style:italic;">No bio shared yet.</p>'
         )
+
         st.markdown(
             f"""
             <div class="public-profile-card">
@@ -229,8 +217,7 @@ def _render_public_profile_lookup() -> None:
             unsafe_allow_html=True,
         )
 
-        # This derives the card server-side and returns only the share-safe card
-        # payload. No birth inputs or account identifiers enter the Community UI.
+        # The card is derived server-side and contains only share-safe values.
         featured_card = cosmic_cards.build_public_card_by_username(profile["username"])
         if featured_card:
             cosmic_cards.render_collectible_card(
@@ -239,39 +226,38 @@ def _render_public_profile_lookup() -> None:
                 key_prefix=f"public_{profile['username']}",
                 compact=True,
             )
+
         if st.button("Close profile", key="close_public_profile"):
             _clear_profile_lookup()
             st.rerun()
 
 
-def _render_community_nav(active_view: str) -> None:
-    """Render the non-sticky, page-local Community subnavigation."""
-    with st.container(key="community-subnav"):
-        columns = st.columns(len(COMMUNITY_VIEWS), gap="small")
-        for column, (view_name, icon, short_label) in zip(columns, COMMUNITY_VIEWS):
-            with column:
-                button_type = "primary" if view_name == active_view else "secondary"
-                st.button(
-                    f"{icon} {short_label}",
-                    key=f"community_view_{short_label.lower().replace(' ', '_')}",
-                    type=button_type,
-                    use_container_width=True,
-                    on_click=_set_community_view,
-                    args=(view_name,),
-                )
+def _render_unified_community() -> None:
+    """Render live chat and message boards together on one Community surface."""
+    st.markdown(
+        '<div class="community-section">'
+        '<h2 class="community-section-title">💬 Live chat</h2>'
+        '<p class="community-section-caption">A quick-moving lounge for the community. Refresh to see new messages.</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    chat_room.render_chat_tab()
+
+    st.markdown(
+        '<div class="community-section">'
+        '<h2 class="community-section-title">📋 Message boards</h2>'
+        '<p class="community-section-caption">Start a lasting conversation in a topic-specific board.</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    boards.render_boards_tab()
 
 
 def render_community() -> None:
-    """Render the unified Community page without changing top-level routing."""
+    """Render the Community page without the former LunaTicK Talk section."""
+    auth.init_auth_db()
     boards.init_boards_db()
     chat_room.init_chat_db()
-    auth.init_auth_db()
-
-    active_view = st.session_state.get("community_view", DEFAULT_VIEW)
-    valid_views = {view_name for view_name, _, _ in COMMUNITY_VIEWS}
-    if active_view not in valid_views:
-        active_view = DEFAULT_VIEW
-        st.session_state["community_view"] = active_view
 
     st.markdown(COMMUNITY_CSS, unsafe_allow_html=True)
     with st.container(key="community-page"):
@@ -279,20 +265,14 @@ def render_community() -> None:
             '<div class="community-shell">'
             '<div class="community-kicker">Lunatick social orbit</div>'
             '<h1 class="community-title">Community</h1>'
-            '<p class="community-subtitle">Share openly. Listen deeply. Find your people.</p>'
+            '<p class="community-subtitle">Chat in the moment. Share lasting thoughts. Find your people.</p>'
             '</div>',
             unsafe_allow_html=True,
         )
         _render_public_profile_lookup()
         moderation.render_moderation_console()
-        _render_community_nav(active_view)
 
-    if active_view == "Chat":
-        chat_room.render_chat_tab()
-    elif active_view == "Lunatick Talk":
-        lunatick_talk_ui.render_talk_tab()
-    else:
-        boards.render_boards_tab()
+    _render_unified_community()
 
 
 __all__ = ["render_community"]
