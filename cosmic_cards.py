@@ -11,6 +11,10 @@ import hashlib
 import html
 import math
 import sqlite3
+import requests
+import swisseph as swe
+from timezonefinder import TimezoneFinder
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from collections import Counter
 from datetime import date, datetime, time as dtime, timedelta, timezone
 
@@ -20,10 +24,20 @@ import streamlit as st
 import supabase_store
 
 
+def _cache_data(*args, **kwargs):
+    cache = getattr(st, "cache_data", None)
+    if cache is not None:
+        return cache(*args, **kwargs)
+    return lambda function: function
+
+
 DB = "lunatick.db"
+GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
+GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository maintainer)"
+_TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "public_value_privacy_v3"
+CARD_MODULE_VERSION = "accurate_ascendant_zip_location_v1"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -77,7 +91,7 @@ TERM_EXPLANATIONS = {
         "title": "Rising sign",
         "what": "The zodiac sector rising on the eastern horizon at your recorded birth moment and location.",
         "how": "LunaTicK combines your birth time, UTC offset, latitude, and longitude to calculate the Ascendant.",
-        "note": "This field stays unavailable until actual coordinates are provided. The app does not yet resolve city time zones or historical daylight-saving rules automatically.",
+        "note": "Coordinates and the historical timezone are resolved from a confirmed city or postal/ZIP-code result.",
     },
     "birth_phase": {
         "title": "Birth phase",
@@ -147,6 +161,63 @@ def _has_actual_coordinates(lat: object, lon: object) -> bool:
         return False
 
 
+@_cache_data(ttl=86400, show_spinner=False)
+def _geocode_place(query: str) -> list[dict]:
+    """Resolve one explicit city/postal-code search; never run as autocomplete."""
+    normalized = " ".join(str(query or "").split())
+    if not normalized:
+        return []
+    response = requests.get(
+        GEOCODER_URL,
+        params={"q": normalized, "format": "jsonv2", "addressdetails": 1, "limit": 5},
+        headers={"User-Agent": GEOCODER_USER_AGENT, "Accept-Language": "en"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    results = []
+    for item in response.json():
+        try:
+            lat = float(item["lat"])
+            lon = float(item["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        timezone_name = _TIMEZONE_FINDER.timezone_at(lng=lon, lat=lat)
+        if timezone_name:
+            results.append({
+                "label": str(item.get("display_name") or normalized),
+                "lat": lat,
+                "lon": lon,
+                "timezone": timezone_name,
+            })
+    return results
+
+
+def _local_to_utc(
+    birth_date: str,
+    birth_time: str | None,
+    utc_offset: float | None = None,
+    timezone_name: str | None = None,
+) -> datetime:
+    """Convert local wall time using historical IANA rules when available."""
+    parsed_date = date.fromisoformat(birth_date[:10])
+    if birth_time:
+        try:
+            parts = birth_time.strip().split(":")
+            local_time = dtime(int(parts[0]) % 24, int(parts[1]) % 60 if len(parts) > 1 else 0)
+        except (TypeError, ValueError):
+            local_time = dtime(12, 0)
+    else:
+        local_time = dtime(12, 0)
+    naive = datetime.combine(parsed_date, local_time)
+    if timezone_name:
+        try:
+            return naive.replace(tzinfo=ZoneInfo(timezone_name)).astimezone(timezone.utc)
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    offset = float(utc_offset) if utc_offset is not None else 0.0
+    return (naive - timedelta(hours=offset)).replace(tzinfo=timezone.utc)
+
+
 def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None) -> dict:
     """Calculate card astronomy from a UTC instant and optional actual coordinates."""
     observer = ephem.Observer()
@@ -196,42 +267,18 @@ def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None)
 
     if lat is not None and lon is not None:
         try:
-            local_sidereal_time = float(observer.sidereal_time())
-            latitude_radians = math.radians(float(lat))
-            obliquity = math.radians(23.4392911)
-            y = -math.cos(local_sidereal_time)
-            x = (
-                math.sin(local_sidereal_time) * math.cos(obliquity)
-                + math.tan(latitude_radians) * math.sin(obliquity)
+            # Swiss Ephemeris is the reference calculation for the Ascendant.
+            jd_ut = swe.julday(
+                dt_utc.year, dt_utc.month, dt_utc.day,
+                dt_utc.hour + dt_utc.minute / 60 + dt_utc.second / 3600,
             )
-            # The earlier implementation returned the point opposite the
-            # Ascendant. The independent Swiss Ephemeris audit showed that
-            # adding 180° yields the actual eastern-horizon Ascendant.
-            ascendant = (math.degrees(math.atan2(y, x)) + 180.0) % 360
+            _cusps, ascmc = swe.houses_ex(jd_ut, float(lat), float(lon), b"P", 0)
+            ascendant = float(ascmc[0]) % 360.0
             rising_sign, rising_symbol = _sign_from_lon(ascendant)
-            out.update({
-                "has_rising": True,
-                "rising_sign": rising_sign,
-                "rising_symbol": rising_symbol,
-            })
-        except (TypeError, ValueError, OverflowError):
+            out.update({"has_rising": True, "rising_sign": rising_sign, "rising_symbol": rising_symbol})
+        except (TypeError, ValueError, OverflowError, swe.Error):
             pass
     return out
-
-
-def _local_to_utc(birth_date: str, birth_time: str | None, utc_offset: float | None) -> datetime:
-    """Convert the user-supplied local wall time using their supplied offset."""
-    parsed_date = date.fromisoformat(birth_date[:10])
-    if birth_time:
-        try:
-            parts = birth_time.strip().split(":")
-            local_time = dtime(int(parts[0]) % 24, int(parts[1]) % 60 if len(parts) > 1 else 0)
-        except (TypeError, ValueError):
-            local_time = dtime(12, 0)
-    else:
-        local_time = dtime(12, 0)
-    offset = float(utc_offset) if utc_offset is not None else 0.0
-    return (datetime.combine(parsed_date, local_time) - timedelta(hours=offset)).replace(tzinfo=timezone.utc)
 
 
 def init_cards_db() -> None:
@@ -395,6 +442,15 @@ def _full_moons_lived(birth_date: str) -> int:
         return 0
 
 
+def _timezone_for_coordinates(lat: float | None, lon: float | None) -> str | None:
+    if lat is None or lon is None:
+        return None
+    try:
+        return _TIMEZONE_FINDER.timezone_at(lng=float(lon), lat=float(lat))
+    except (TypeError, ValueError):
+        return None
+
+
 def build_card(user_hash: str) -> dict | None:
     """Build the private owner card; callers must not render private inputs for contacts."""
     profile = get_or_create_profile(user_hash)
@@ -403,7 +459,12 @@ def build_card(user_hash: str) -> dict | None:
     try:
         has_coordinates = _has_actual_coordinates(profile.get("lat"), profile.get("lon"))
         natal = _chart(
-            _local_to_utc(profile["birth_date"], profile.get("birth_time"), profile.get("utc_offset")),
+            _local_to_utc(
+                profile["birth_date"],
+                profile.get("birth_time"),
+                profile.get("utc_offset"),
+                _timezone_for_coordinates(profile.get("lat"), profile.get("lon")),
+            ),
             float(profile["lat"]) if has_coordinates else None,
             float(profile["lon"]) if has_coordinates else None,
         )
@@ -773,8 +834,8 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards") -> None:
     default_birth_date = date.fromisoformat(profile["birth_date"]) if profile.get("birth_date") else date(1990, 1, 1)
     birth_date = st.date_input("Birth date", value=default_birth_date, min_value=date(1920, 1, 1), max_value=date.today(), key=f"{key_prefix}_bd")
 
-    st.caption("Birth time and actual coordinates unlock Rising. LunaTicK does not infer coordinates from a city label.")
-    time_column, offset_column = st.columns(2)
+    st.caption("Enter a city and region/country or a postal/ZIP code. LunaTicK resolves the coordinates and historical timezone for you.")
+    time_column, location_column = st.columns(2)
     with time_column:
         raw_time = profile.get("birth_time") or "12:00"
         try:
@@ -783,32 +844,47 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards") -> None:
         except (TypeError, ValueError):
             time_value = dtime(12, 0)
         birth_time = st.time_input("Birth time (local)", value=time_value, key=f"{key_prefix}_bt")
-    with offset_column:
-        offset_default = float(profile["utc_offset"]) if profile.get("utc_offset") is not None else 0.0
-        utc_offset = st.number_input(
-            "UTC offset (hours)", min_value=-12.0, max_value=14.0, value=offset_default, step=0.5,
-            help="Enter the historical local UTC offset for the birth moment, including daylight-saving time where applicable.",
-            key=f"{key_prefix}_off",
+    with location_column:
+        location_query = st.text_input(
+            "Birth city or postal/ZIP code",
+            value=profile.get("birth_place") or "",
+            placeholder="e.g. 10001 or New York, NY, USA",
+            key=f"{key_prefix}_place",
         )
 
-    place = st.text_input("Birth place (optional label)", value=profile.get("birth_place") or "", placeholder="e.g. New York, NY", key=f"{key_prefix}_place")
-    latitude_column, longitude_column = st.columns(2)
-    with latitude_column:
-        latitude = st.number_input("Latitude", min_value=-90.0, max_value=90.0, value=float(profile.get("lat") or 0.0), step=0.0001, format="%.4f", key=f"{key_prefix}_lat")
-    with longitude_column:
-        longitude = st.number_input("Longitude", min_value=-180.0, max_value=180.0, value=float(profile.get("lon") or 0.0), step=0.0001, format="%.4f", key=f"{key_prefix}_lon")
+    results_key = f"{key_prefix}_geo_results"
+    if st.button("Find birth location", key=f"{key_prefix}_find_location"):
+        try:
+            st.session_state[results_key] = _geocode_place(location_query)
+        except requests.RequestException:
+            st.session_state[results_key] = []
+            st.error("The location service is temporarily unavailable. Please try again.")
+
+    results = st.session_state.get(results_key, [])
+    selected = None
+    if results:
+        labels = [f"{item['label']} — {item['timezone']}" for item in results]
+        selected_index = st.selectbox("Confirm the matching birthplace", range(len(labels)), format_func=lambda index: labels[index], key=f"{key_prefix}_geo_choice")
+        selected = results[selected_index]
+        st.caption(f"Resolved coordinates: {selected['lat']:.4f}, {selected['lon']:.4f}. The timezone is determined from those coordinates.")
+    elif location_query:
+        st.info("Search for the birthplace, then select the matching result before saving.")
 
     if st.button("Save birth inputs", type="primary", key=f"{key_prefix}_save"):
-        actual_coordinates = _has_actual_coordinates(latitude, longitude)
+        if not selected:
+            st.error("Please search for and confirm a city or postal/ZIP-code match before saving.")
+            return
+        birth_datetime = datetime.combine(birth_date, birth_time).replace(tzinfo=ZoneInfo(selected["timezone"]))
+        utc_offset = birth_datetime.utcoffset().total_seconds() / 3600
         save_profile(
             user_hash,
             name.strip() or "Moon Wanderer",
             birth_date.isoformat(),
             birth_time=f"{birth_time.hour:02d}:{birth_time.minute:02d}",
-            birth_place=place.strip() or None,
-            lat=float(latitude) if actual_coordinates else None,
-            lon=float(longitude) if actual_coordinates else None,
-            utc_offset=float(utc_offset),
+            birth_place=selected["label"],
+            lat=selected["lat"],
+            lon=selected["lon"],
+            utc_offset=utc_offset,
         )
         st.session_state.display_name = name.strip() or "Moon Wanderer"
         st.session_state.birth_date = birth_date
