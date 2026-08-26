@@ -488,7 +488,10 @@ LUNATICK_CSS = """
     }
 
     /* Inactive nav buttons are bordered with the Cosmic Chart blue (#1f6feb).
-       Active (primary) buttons keep their existing Streamlit red style. */
+       Active (primary) buttons keep their existing Streamlit red style. Both
+       possible Streamlit attribute conventions are matched, mirroring the
+       primary-state overrides above. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="secondary"],
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-secondary"] {
         border-color: #1f6feb !important;
     }
