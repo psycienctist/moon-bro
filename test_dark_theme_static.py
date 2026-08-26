@@ -8,6 +8,9 @@ assert 'base = "dark"' in theme_config
 assert 'backgroundColor = "#05070a"' in theme_config
 assert 'textColor = "#e6edf3"' in theme_config
 assert 'color-scheme: dark !important;' in app_source
+assert '[data-testid="stAppViewContainer"],\n    [data-testid="stMain"]' in app_source
+assert '[data-testid="stHeader"],\n    [data-testid="stMain"]' not in app_source
+assert '[data-testid="stHeader"] {\n        background: transparent !important;' in app_source
 assert '[data-testid="stTextArea"] textarea' in app_source
 assert 'color: #f0f6fc !important;' in app_source
 assert '-webkit-text-fill-color: #f0f6fc !important;' in app_source

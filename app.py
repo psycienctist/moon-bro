@@ -99,7 +99,6 @@ LUNATICK_CSS = """
     }
 
     [data-testid="stAppViewContainer"],
-    [data-testid="stHeader"],
     [data-testid="stMain"] {
         background-color: #05070a !important;
         color: #e6edf3 !important;
@@ -313,8 +312,10 @@ LUNATICK_CSS = """
         display: none !important;
     }
 
+    /* Preserve the original header overlay so no dark bar consumes space
+       above the Moon Monitor on phone screens. */
     [data-testid="stHeader"] {
-        background: transparent;
+        background: transparent !important;
     }
 
     @media (prefers-reduced-motion: reduce) {
