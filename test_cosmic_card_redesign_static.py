@@ -31,13 +31,17 @@ for required_tile in (
 ):
     assert required_tile in source, required_tile
 
-assert "ascendant = (math.degrees(math.atan2(y, x)) + 180.0) % 360" in source
+assert "swe.houses_ex" in source
+assert "_geocode_place" in source
+assert "TimezoneFinder" in source
 assert "def shareable_card" in source
 assert "def build_friend_card" in source
 assert "Your Collection" in source
 assert "Add coords" in source
+assert "Birth city or postal/ZIP code" in source
+assert "Confirm the matching birthplace" in source
 assert "use_loc = place.strip()" not in source
-assert "actual_coordinates = _has_actual_coordinates(latitude, longitude)" in source
+assert "actual_coordinates = _has_actual_coordinates(latitude, longitude)" not in source
 assert "grid-template-columns:repeat(3,minmax(0,1fr))" in source
 assert "cosmic-card-tile-label" in source
 assert "cosmic-card-tile-symbol" in source
@@ -50,10 +54,10 @@ assert "def _render_trade_initiation" in source
 assert 'with st.popover("🤝 Trade Cards")' in source
 assert source.index("render_collectible_card(my_card") < source.index('st.markdown("#### Your Collection")')
 assert "cosmic_detail" in source
-assert 'CARD_MODULE_VERSION = "public_value_privacy_v3"' in source
+assert 'CARD_MODULE_VERSION = "accurate_ascendant_zip_location_v1"' in source
 for tile_class in ("cosmic-card-tile--sun", "cosmic-card-tile--moon", "cosmic-card-tile--rising", "cosmic-card-tile--birth_phase", "cosmic-card-tile--full_moons", "cosmic-card-tile--dominant"):
     assert tile_class in source, tile_class
-assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "public_value_privacy_v3"' in app_source
+assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "accurate_ascendant_zip_location_v1"' in app_source
 assert "cosmic_cards = importlib.reload(cosmic_cards)" in app_source
 
 print("Cosmic Card single-face, six-tile, share-safe, and warm-reload checks passed.")
