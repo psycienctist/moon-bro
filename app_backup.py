@@ -487,11 +487,20 @@ LUNATICK_CSS = """
         white-space: nowrap;
     }
 
+    /* Inactive nav buttons are bordered with the Cosmic Chart blue (#1f6feb).
+       Active (primary) buttons keep their existing Streamlit red style. Both
+       possible Streamlit attribute conventions are matched, mirroring the
+       primary-state overrides above. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="secondary"],
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-secondary"] {
+        border-color: #1f6feb !important;
+    }
+
     /* Keep the longer Connect label compact on one line without changing
        any other bottom-navigation button. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
         /* Preserve the shared tab typography and height. Only the horizontal
-           padding is tightened so “Connect” fits as a complete second line. */
+           padding is tightened so "Connect" fits as a complete second line. */
         letter-spacing: -0.01em;
         overflow-wrap: normal;
         padding-left: 0.06rem !important;
@@ -531,7 +540,7 @@ LUNATICK_CSS = """
         }
 
         /* Journal is the widest remaining compact label on narrow iPhones.
-           Tighten only its own typography and padding so the final “l” cannot
+           Tighten only its own typography and padding so the final "l" cannot
            create a third line or stretch the otherwise fixed-height rail. */
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_journal button {
             font-size: 0.56rem !important;
@@ -1578,8 +1587,6 @@ def render_settings():
         cosmic_cards.set_public_card_values_visible(
             st.session_state.get("user_hash", "anonymous"), show_public_card_values
         )
-        # Reset the widget state before the rerun so the saved database value is
-        # always the single source of truth after a restart or later Settings visit.
         st.session_state.pop("public_card_values_visible_toggle", None)
         if show_public_card_values:
             st.toast("Your public Cosmic Card now shows its derived values.")
@@ -1729,8 +1736,6 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Main App — Fixed Bottom Navigation
 # ---------------------------------------------------------------------------
-# Persist the selected destination across Streamlit reruns. Home remains the
-# first-run default.
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
 
@@ -1749,16 +1754,11 @@ if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk"}:
 def set_nav_page(page_name: str) -> None:
     """Switch destinations and clear a date-selection route when leaving Track."""
     st.session_state.nav_page = page_name
-    # Calendar dates use a query route only to preserve the selected private
-    # entry after their lightweight HTML-grid navigation. Once the user chooses
-    # another destination, remove that route so it cannot force Calendar back
-    # onto the page during the following Streamlit rerun.
     if page_name != "Calendar":
         st.query_params.pop("track_day", None)
 
 
-# Render one destination in the normal page body. The navigation itself is
-# emitted after this content, but the CSS above fixes it to the viewport.
+# Render one destination in the normal page body.
 current_page = st.session_state.nav_page
 
 if current_page == "Home":
@@ -1776,13 +1776,9 @@ elif current_page == "Tones":
 elif current_page == "Settings":
     render_settings()
 else:
-    # Defensive fallback for an old or unexpected session value.
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# The bottom rail now contains only the five primary destinations. Home and
-# Settings remain available through their approved persistent controls, while
-# Community contains the former Chat, Boards, and LunaTicK Talk experiences.
 NAV_ITEMS = [
     ("Community", "👥", "Connect"),
     ("Journal", "📓", "Journal"),
@@ -1791,16 +1787,10 @@ NAV_ITEMS = [
     ("Tones", "🎵", "Heal"),
 ]
 
-# `key` gives this container the `.st-key-lunatick-bottom-nav` class. The
-# scoped CSS above keeps this one `st.columns` row horizontal on mobile and
-# makes it fixed at the bottom of the viewport from launch.
 with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-        # Community and Journal use explicit icon-over-label line breaks. This
-        # preserves the shared tab height and prevents their longer labels from
-        # wrapping into an unwanted third line on narrow phones.
         nav_label = (
             f"{icon}\n{compact_label}"
             if page_name in ("Community", "Journal")
@@ -1817,10 +1807,6 @@ with st.container(key="lunatick-bottom-nav"):
                 args=(page_name,),
             )
 
-# The footer remains in normal document flow. The main-container bottom padding
-# added in CSS keeps it fully scrollable above the persistent navigation.
-# This separate control is a permanent, lower-left Home shortcut. It uses the
-# existing navigation callback but does not add or alter any NAV_ITEMS entry.
 with st.container(key="lunatick-home-logo"):
     st.button(
         "🌙 LUNATICK",
@@ -1831,8 +1817,6 @@ with st.container(key="lunatick-home-logo"):
         args=("Home",),
     )
 
-# Small adjacent Settings shortcut. This is intentionally separate from the
-# navigation rail and preserves the existing Settings route unchanged.
 with st.container(key="lunatick-settings-gear"):
     st.button(
         "⚙️",
