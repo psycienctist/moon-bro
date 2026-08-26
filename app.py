@@ -85,14 +85,71 @@ LUNATICK_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
-    html, body, .stApp {
+    /* Keep LunaTicK dark regardless of the device's OS/browser preference.
+       This also makes native form controls advertise a dark color scheme. */
+    :root, html, body, .stApp {
+        color-scheme: dark !important;
+        background-color: #05070a !important;
+        color: #e6edf3 !important;
         overflow-x: hidden;
     }
 
     .stApp {
-        background-color: #05070a;
-        color: #e6edf3;
         font-family: 'Inter', sans-serif;
+    }
+
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    [data-testid="stMain"] {
+        background-color: #05070a !important;
+        color: #e6edf3 !important;
+    }
+
+    /* Streamlit widgets can otherwise inherit a light OS color scheme on
+       mobile browsers. Set foreground, surface, placeholder, caret, and
+       border colors explicitly so Journal entries are always readable. */
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTimeInput"] input,
+    [data-testid="stSelectbox"] input,
+    [data-testid="stMultiSelect"] input {
+        background-color: #0d1117 !important;
+        color: #f0f6fc !important;
+        -webkit-text-fill-color: #f0f6fc !important;
+        caret-color: #bc8cff !important;
+        border-color: #4c3a78 !important;
+    }
+
+    [data-testid="stTextInput"] [data-baseweb="input"],
+    [data-testid="stTextArea"] [data-baseweb="textarea"],
+    [data-testid="stNumberInput"] [data-baseweb="input"],
+    [data-testid="stDateInput"] [data-baseweb="input"],
+    [data-testid="stTimeInput"] [data-baseweb="input"],
+    [data-testid="stSelectbox"] [data-baseweb="select"],
+    [data-testid="stMultiSelect"] [data-baseweb="select"] {
+        background-color: #0d1117 !important;
+        border-color: #4c3a78 !important;
+    }
+
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder,
+    [data-testid="stNumberInput"] input::placeholder,
+    [data-testid="stDateInput"] input::placeholder,
+    [data-testid="stTimeInput"] input::placeholder {
+        color: #9aa7bd !important;
+        -webkit-text-fill-color: #9aa7bd !important;
+        opacity: 1 !important;
+    }
+
+    [data-testid="stTextInput"] input:focus,
+    [data-testid="stTextArea"] textarea:focus,
+    [data-testid="stNumberInput"] input:focus,
+    [data-testid="stDateInput"] input:focus,
+    [data-testid="stTimeInput"] input:focus {
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 0 1px #bc8cff !important;
     }
 
     h1, h2, h3, h4 {
