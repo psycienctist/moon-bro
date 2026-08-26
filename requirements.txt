@@ -2,6 +2,7 @@ streamlit>=1.48.1
 Authlib>=1.3.2
 httpx>=0.27.0
 ephem>=4.1.0
-pyswisseph>=2.10.3.2
+# pysweph retains the `import swisseph as swe` API and ships Linux wheels for current Python versions.
+pysweph==2.10.3.6
 timezonefinder>=8.3.0
 requests>=2.31.0
