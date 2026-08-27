@@ -47,14 +47,15 @@ assert "CARD_MODULE_VERSION\", None) != \"accurate_ascendant_zip_location_v2\"" 
 # The five primary destinations follow the approved compact order and labels.
 assert "NAV_ITEMS = [\n    (\"Calendar\", \"📅\", \"Inspect\"),\n    (\"Cosmic Cards\", \"🃏\", \"Collect\"),\n    (\"Community\", \"👥\", \"Connect\"),\n    (\"Journal\", \"📓\", \"Reflect\"),\n    (\"Tones\", \"🎵\", \"Correct\"),\n]" in app_source
 
-# Five distinct Cosmic Card tile accents style inactive destinations; all
-# selected destinations and the two utility controls retain the purple state.
+# Five distinct Cosmic Card tile accents style inactive destinations. Any
+# selected destination, Home, or Settings control uses the shared Rising gold.
 for accent in ("#f7d25c", "#9c7bff", "#66a8ff", "#c5a6ff", "#73dfbf"):
     assert accent in app_source
 assert "--nav-card-accent" in app_source
 assert "button[kind=\"primary\"]" in app_source
 assert "button[kind=\"secondary\"]" in app_source
-assert "background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;" in app_source
+assert "background: linear-gradient(135deg, #3d2f0a 0%, #6b5015 55%, #221804 100%) !important;" in app_source
+assert "border-color: #f7d25c !important;" in app_source
 
 assert "import auth" in cards_source
 assert "def _render_trade_profile_lookup" in cards_source

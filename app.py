@@ -469,16 +469,15 @@ LUNATICK_CSS = """
         outline: none;
     }
 
-    /* A selected Home or Settings control adopts the same purple selected
-       treatment as the active destination tab. */
+    /* Selected utility destinations use the shared Rising-card gold state. */
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
-        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
-        border-color: #bc8cff !important;
-        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
-        color: #f0e6ff !important;
+        background: linear-gradient(135deg, #3d2f0a 0%, #6b5015 55%, #221804 100%) !important;
+        border-color: #f7d25c !important;
+        box-shadow: 0 0 18px rgba(247, 210, 92, 0.42) !important;
+        color: #fff3c4 !important;
         opacity: 1 !important;
     }
 
@@ -640,18 +639,18 @@ LUNATICK_CSS = """
         color: var(--nav-card-accent) !important;
     }
 
-    /* A selected destination keeps the app's clearly differentiated purple
-       active state; every other destination retains its assigned Card accent. */
+    /* Whichever of the seven controls is selected uses the shared Rising-card
+       gold state. Other primary destinations retain their own Card accent. */
     [class*="st-key-bottom_nav_"] button[kind="primary"],
     [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick_home_logo_button"] button[kind="primary"],
     [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick_settings_gear_button"] button[kind="primary"],
     [class*="st-key-lunatick_settings_gear_button"] button[data-testid="stBaseButton-primary"] {
-        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
-        border-color: #bc8cff !important;
-        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
-        color: #f0e6ff !important;
+        background: linear-gradient(135deg, #3d2f0a 0%, #6b5015 55%, #221804 100%) !important;
+        border-color: #f7d25c !important;
+        box-shadow: 0 0 18px rgba(247, 210, 92, 0.42) !important;
+        color: #fff3c4 !important;
     }
 
     /* Keep the longer Connect label compact on one line without changing
