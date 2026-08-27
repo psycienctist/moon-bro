@@ -61,6 +61,7 @@ assert "@keyframes lunatick-nav-active-arrival" in app_source
 assert "animation: lunatick-nav-active-arrival 760ms" in app_source
 assert "button:active" in app_source
 assert "transform: scale(0.92) !important;" in app_source
+assert 'if page_name in ("Community", "Journal", "Tones")' in app_source
 assert "st-key-bottom_nav_tones button" in app_source
 assert "word-break: keep-all !important;" in app_source
 assert "@media (prefers-reduced-motion: reduce)" in app_source

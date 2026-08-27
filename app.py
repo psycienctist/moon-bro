@@ -2004,7 +2004,7 @@ with st.container(key="lunatick-bottom-nav"):
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
         nav_label = (
             f"{icon}\n{compact_label}"
-            if page_name in ("Community", "Journal")
+            if page_name in ("Community", "Journal", "Tones")
             else f"{icon} {compact_label}"
         )
         with column:
