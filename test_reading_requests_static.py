@@ -10,8 +10,10 @@ assert 'READING_REQUESTS_MODULE_VERSION' in app_source
 assert 'reading_requests.init_reading_requests_db()' in app_source
 assert 'elif current_page == "Reading Requests":' in app_source
 assert '✦ Reading Requests' in app_source
+assert 'Moon in {current[\'moon_sign\']}' in app_source
 assert 'current[\'moon_vibe\']' not in app_source
-assert 'st-key-home-reading-entry' in app_source
+assert 'home-reading-request-button' in app_source
+assert 'href="?reading_requests=1"' in app_source
 assert 'min-height: 2.1rem' in app_source
 
 assert 'MESSAGE_REFRESH_SECONDS = 5' in feature_source

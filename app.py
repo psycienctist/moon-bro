@@ -102,12 +102,26 @@ LUNATICK_CSS = """
 
     /* The Home Reading Requests entry replaces the taller Moon-status copy,
        preserving the existing no-scroll phone composition. */
-    .st-key-home-reading-entry {
-        margin: 0.28rem 0 !important;
+    .home-reading-request-button {
+        align-items: center;
+        background: rgba(188, 140, 255, 0.14);
+        border: 1px solid rgba(188, 140, 255, 0.68);
+        border-radius: 8px;
+        color: #f0f6fc !important;
+        display: flex;
+        font-size: 0.8rem;
+        font-weight: 700;
+        justify-content: center;
+        letter-spacing: 0.04em;
+        margin-top: 0.48rem;
+        min-height: 2.1rem;
+        padding: 0.28rem 0.7rem;
+        text-decoration: none !important;
     }
-    .st-key-home-reading-entry button {
-        min-height: 2.1rem !important;
-        padding: 0.28rem 0.7rem !important;
+    .home-reading-request-button:hover {
+        background: rgba(188, 140, 255, 0.28);
+        border-color: #bc8cff;
+        color: #ffffff !important;
     }
 
     [data-testid="stAppViewContainer"],
@@ -825,19 +839,12 @@ def render_home():
             <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
             <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
         </div>
+        <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
+            <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
+            <a class="home-reading-request-button" href="?reading_requests=1" aria-label="Open Reading Requests">✦ Reading Requests</a>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-
-    with st.container(key="home-reading-entry"):
-        if st.button(
-            "✦ Reading Requests",
-            key="home_reading_requests",
-            type="secondary",
-            use_container_width=True,
-            help="Request or volunteer a free private community reading.",
-        ):
-            st.session_state.nav_page = "Reading Requests"
-            st.rerun()
 
     st.markdown(f"""
     <div class="stats-row">
@@ -1815,6 +1822,10 @@ if "current_phase" not in st.session_state:
 # ---------------------------------------------------------------------------
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
+
+if st.query_params.get("reading_requests") == "1":
+    st.session_state.nav_page = "Reading Requests"
+    st.query_params.pop("reading_requests", None)
 
 # A calendar day uses a lightweight query route so the compact HTML grid stays
 # horizontal on phones. Preserve Track on that route even if Streamlit creates
