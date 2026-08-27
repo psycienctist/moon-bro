@@ -11,10 +11,8 @@ import supabase_store
 
 
 CONTENT_TYPES = {
-    "Boards": "board_post",
-    "Chat": "chat_message",
-    "Talk posts": "talk_post",
-    "Talk comments": "talk_comment",
+    "Message board": "board_post",
+    "Live chat": "chat_message",
 }
 
 
@@ -262,8 +260,8 @@ def render_moderation_console() -> None:
     actor_subject = _current_subject()
     with st.expander("🛡️ Community moderation", expanded=False):
         st.caption(
-            "Public Community responsibility center. It can review Boards, Chat, LunaTicK Talk posts, "
-            "and Talk comments. Private Journals and private profile data are not available here."
+            "Review public LunaTicK Talk board posts and live-chat messages. "
+            "Private Journals and private profile data are not available here."
         )
         if role == "founder":
             review_tab, team_tab, audit_tab = st.tabs(visible_console_sections(role))

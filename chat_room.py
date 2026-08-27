@@ -1,15 +1,17 @@
-# chat_room.py
-# Lightweight chat for Streamlit (refresh-based, no websockets)
+"""Lightweight auto-refreshing chat for the LunaTicK Talk screen."""
 
 from __future__ import annotations
 
+import html
 import sqlite3
 
 import streamlit as st
 
 import supabase_store
 
+
 DB = "lunatick.db"
+LIVE_CHAT_REFRESH_SECONDS = 5
 
 
 def _using_supabase_backend() -> bool:
@@ -40,23 +42,25 @@ def init_chat_db() -> None:
         return
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            author_hash TEXT,
-            author_name TEXT,
-            content TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                author_hash TEXT,
+                author_name TEXT,
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def post_message(author_hash: str, author_name: str, content: str) -> bool:
+    """Store one short community-chat message."""
     content = content.strip()
     if not content or len(content) > 1000:
         return False
@@ -66,23 +70,24 @@ def post_message(author_hash: str, author_name: str, content: str) -> bool:
         return True
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO chat_messages (author_hash, author_name, content) VALUES (?, ?, ?)",
-        (author_hash, author_name, content),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            "INSERT INTO chat_messages (author_hash, author_name, content) VALUES (?, ?, ?)",
+            (author_hash, author_name, content),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 
-def recent_messages(limit: int = 50) -> list:
+def recent_messages(limit: int = 50) -> list[dict]:
+    """Return visible messages in chronological order."""
     if _using_supabase_backend():
         rows = _supabase().list_chat_messages(limit)
         profiles = _supabase().get_public_profile_summaries(
             [row["profile_auth_subject"] for row in rows]
         )
-        # PostgREST returns newest first; restore the original chronological chat display.
         return [
             {
                 "author": (
@@ -97,53 +102,69 @@ def recent_messages(limit: int = 50) -> list:
         ]
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        """
-        SELECT author_name, content, created_at FROM chat_messages
-        ORDER BY id DESC LIMIT ?
-        """,
-        (limit,),
-    )
-    rows = list(reversed(c.fetchall()))
-    conn.close()
-    return [{"author": row[0], "content": row[1], "created_at": row[2]} for row in rows]
+    try:
+        rows = conn.execute(
+            """
+            SELECT author_name, content, created_at FROM chat_messages
+            ORDER BY id DESC LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {"author": row[0], "content": row[1], "created_at": row[2]}
+        for row in reversed(rows)
+    ]
 
 
-def render_chat_tab() -> None:
-    init_chat_db()
+def _render_chat_panel() -> None:
+    """Render the refreshed portion of the Talk view."""
     user_hash = st.session_state.get("user_hash", "anonymous")
     display_name = st.session_state.get("display_name", "Moon Wanderer")
-
-    st.markdown("### 💬 LunaTick Chat")
-    st.caption("Community lounge — refresh to see new messages.")
-
-    if st.button("🔄 Refresh"):
-        st.rerun()
-
     messages = recent_messages(40)
-    box = st.container(height=360)
-    with box:
+
+    with st.container(height=195, border=True):
         if not messages:
-            st.caption("Silence under the moon… say something.")
+            st.caption("No messages yet. Be the first voice in the room.")
         for message in messages:
-            timestamp = str(message["created_at"])[11:16] if message["created_at"] else ""
+            timestamp = str(message.get("created_at") or "")[11:16]
+            author = html.escape(str(message.get("author") or "Moon Wanderer"))
+            content = html.escape(str(message.get("content") or "")).replace("\n", "<br>")
             st.markdown(
-                f"**{message['author']}** "
-                f"<span style='color:#484f58;font-size:0.7rem'>{timestamp}</span>  \n"
-                f"{message['content']}",
+                f"<div style='margin:0 0 .5rem;'>"
+                f"<span style='color:#bc8cff;font-weight:700;'>@{author}</span> "
+                f"<span style='color:#8b949e;font-size:.68rem;'>{timestamp}</span><br>"
+                f"<span style='color:#e6edf3;'>{content}</span></div>",
                 unsafe_allow_html=True,
             )
 
-    with st.form("chat_form", clear_on_submit=True):
+    with st.form("lunatick_talk_live_chat_form", clear_on_submit=True):
         text = st.text_input(
             "Message",
             max_chars=500,
             label_visibility="collapsed",
-            placeholder="Type a message…",
+            placeholder="Say something to the room…",
+            key="lunatick_talk_message",
         )
-        if st.form_submit_button("Send"):
-            if post_message(user_hash, display_name, text):
-                st.rerun()
-            else:
-                st.warning("Empty or too long.")
+        send = st.form_submit_button("Send", type="primary", use_container_width=True)
+    if send:
+        if post_message(user_hash, display_name, text):
+            st.rerun()
+        else:
+            st.warning("Write a message of up to 500 characters.")
+
+
+def render_chat_tab() -> None:
+    """Render a client-visible chat feed that refreshes every few seconds."""
+    init_chat_db()
+    fragment = getattr(st, "fragment", None)
+    if fragment is None:
+        _render_chat_panel()
+        return
+
+    @fragment(run_every=LIVE_CHAT_REFRESH_SECONDS)
+    def _live_chat_fragment() -> None:
+        _render_chat_panel()
+
+    _live_chat_fragment()

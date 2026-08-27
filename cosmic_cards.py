@@ -21,6 +21,7 @@ from datetime import date, datetime, time as dtime, timedelta, timezone
 import ephem
 import streamlit as st
 
+import auth
 import supabase_store
 
 
@@ -37,7 +38,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "accurate_ascendant_zip_location_v1"
+CARD_MODULE_VERSION = "accurate_ascendant_zip_location_v2"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -897,9 +898,57 @@ def _friend_label(card: dict) -> str:
     return f"{card['display_name']} ({natal['sun_symbol']} {natal['sun_sign']} · {natal['moon_symbol']} {natal['moon_sign']})"
 
 
+def _render_trade_profile_lookup() -> None:
+    """Render a privacy-safe public-profile lookup inside Cosmic Card trading."""
+    with st.expander("Find a LunaTicK member", expanded=False):
+        st.caption("Look up a public @username to view their share-safe profile and Cosmic Card.")
+        with st.form("card_profile_lookup_form", clear_on_submit=False):
+            lookup_username = st.text_input(
+                "Username",
+                value=st.session_state.get("card_profile_lookup", ""),
+                max_chars=24,
+                placeholder="e.g. moon_orbit",
+                label_visibility="collapsed",
+            )
+            search_profile = st.form_submit_button("View profile", use_container_width=True)
+        if search_profile:
+            st.session_state["card_profile_lookup"] = lookup_username.strip().lstrip("@")
+
+        requested_handle = str(st.session_state.get("card_profile_lookup", "")).strip()
+        if not requested_handle:
+            return
+        profile = auth.get_public_profile(requested_handle)
+        if profile is None:
+            st.info(f"No public LunaTicK profile was found for @{html.escape(requested_handle)}.")
+        else:
+            avatar = html.escape(str(profile.get("avatar") or "🌙"))
+            display_name = html.escape(str(profile.get("display_name") or "Moon Wanderer"))
+            username = html.escape(str(profile.get("username") or requested_handle))
+            bio = html.escape(str(profile.get("bio") or "")).replace("\n", "<br>")
+            st.markdown(
+                f"<div style='border:1px solid rgba(188,140,255,.32);border-radius:12px;padding:.7rem;margin:.55rem 0;'>"
+                f"<div style='color:#f0f6fc;font-weight:700;'>{avatar} {display_name}</div>"
+                f"<div style='color:#bc8cff;font-size:.8rem;'>@{username}</div>"
+                f"<div style='color:#c9d1d9;font-size:.84rem;margin-top:.28rem;'>{bio or 'No bio shared yet.'}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            public_card = build_public_card_by_username(str(profile.get("username") or requested_handle))
+            if public_card:
+                render_collectible_card(public_card, is_owner=False, key_prefix=f"trade_lookup_{username}", compact=True)
+            else:
+                st.caption("This member has not activated a public Cosmic Card yet.")
+
+        if st.button("Clear profile", key="clear_card_profile_lookup"):
+            st.session_state.pop("card_profile_lookup", None)
+            st.rerun()
+
+
 def _render_trade_initiation(user_hash: str) -> None:
-    """Compact top-of-screen trade action, replacing the retired Flip control."""
+    """Compact top-of-screen trade action and public card discovery."""
     with st.popover("🤝 Trade Cards"):
+        _render_trade_profile_lookup()
+        st.markdown("---")
         st.caption("Send a card trade to add an accepted friend to your collection.")
         discoverable_cards = list_users_with_cards(user_hash)
         if not discoverable_cards:

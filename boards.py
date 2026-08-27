@@ -1,17 +1,18 @@
-# boards.py
-# Simple message boards for Streamlit moon-bro
+"""Compact, Reddit-style discussion board for the LunaTicK Talk screen."""
 
 from __future__ import annotations
 
 from collections import Counter
+import html
+import sqlite3
 
 import streamlit as st
-import sqlite3
 
 import supabase_store
 
-DB = "lunatick.db"
 
+DB = "lunatick.db"
+DEFAULT_BOARD_SLUG = "general"
 DEFAULT_BOARDS = [
     ("general", "🌙 General", "Open discussion"),
     ("rituals", "🕯️ Full Moon Rituals", "Share practices"),
@@ -53,39 +54,40 @@ def init_boards_db() -> None:
         return
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS boards (
-            slug TEXT PRIMARY KEY,
-            name TEXT,
-            description TEXT
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS boards (
+                slug TEXT PRIMARY KEY,
+                name TEXT,
+                description TEXT
+            )
+            """
         )
-        """
-    )
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS board_posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            board_slug TEXT,
-            author_hash TEXT,
-            author_name TEXT,
-            title TEXT,
-            content TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS board_posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                board_slug TEXT,
+                author_hash TEXT,
+                author_name TEXT,
+                title TEXT,
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
-    for slug, name, desc in DEFAULT_BOARDS:
-        c.execute(
-            "INSERT OR IGNORE INTO boards (slug, name, description) VALUES (?, ?, ?)",
-            (slug, name, desc),
-        )
-    conn.commit()
-    conn.close()
+        for slug, name, desc in DEFAULT_BOARDS:
+            conn.execute(
+                "INSERT OR IGNORE INTO boards (slug, name, description) VALUES (?, ?, ?)",
+                (slug, name, desc),
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def list_boards() -> list:
+def list_boards() -> list[dict]:
     if _using_supabase_backend():
         store = _supabase()
         boards = store.list_boards()
@@ -101,17 +103,20 @@ def list_boards() -> list:
         ]
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT slug, name, description FROM boards")
-    boards = [{"slug": r[0], "name": r[1], "description": r[2]} for r in c.fetchall()]
-    for board in boards:
-        c.execute("SELECT COUNT(*) FROM board_posts WHERE board_slug=?", (board["slug"],))
-        board["post_count"] = c.fetchone()[0]
-    conn.close()
-    return boards
+    try:
+        rows = conn.execute("SELECT slug, name, description FROM boards").fetchall()
+        boards = [{"slug": row[0], "name": row[1], "description": row[2]} for row in rows]
+        for board in boards:
+            board["post_count"] = conn.execute(
+                "SELECT COUNT(*) FROM board_posts WHERE board_slug=?", (board["slug"],)
+            ).fetchone()[0]
+        return boards
+    finally:
+        conn.close()
 
 
 def create_post(board_slug: str, author_hash: str, author_name: str, title: str, content: str) -> None:
+    """Create one lasting message-board post."""
     if _using_supabase_backend():
         _supabase().create_board_post(
             board_slug, _resolve_auth_subject(author_hash), title.strip(), content.strip()
@@ -119,19 +124,20 @@ def create_post(board_slug: str, author_hash: str, author_name: str, title: str,
         return
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute(
-        """
-        INSERT INTO board_posts (board_slug, author_hash, author_name, title, content)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (board_slug, author_hash, author_name, title.strip(), content.strip()),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            """
+            INSERT INTO board_posts (board_slug, author_hash, author_name, title, content)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (board_slug, author_hash, author_name, title.strip(), content.strip()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def list_posts(board_slug: str | None = None, limit: int = 30) -> list:
+def list_posts(board_slug: str | None = None, limit: int = 30) -> list[dict]:
     if _using_supabase_backend():
         rows = _supabase().list_board_posts(board_slug, limit)
         profiles = _supabase().get_public_profile_summaries(
@@ -154,72 +160,80 @@ def list_posts(board_slug: str | None = None, limit: int = 30) -> list:
         ]
 
     conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    if board_slug:
-        c.execute(
-            """
-            SELECT id, board_slug, author_name, title, content, created_at
-            FROM board_posts WHERE board_slug=? ORDER BY created_at DESC LIMIT ?
-            """,
-            (board_slug, limit),
-        )
-    else:
-        c.execute(
-            """
-            SELECT id, board_slug, author_name, title, content, created_at
-            FROM board_posts ORDER BY created_at DESC LIMIT ?
-            """,
-            (limit,),
-        )
-    rows = c.fetchall()
-    conn.close()
+    try:
+        if board_slug:
+            rows = conn.execute(
+                """
+                SELECT id, board_slug, author_name, title, content, created_at
+                FROM board_posts WHERE board_slug=? ORDER BY created_at DESC LIMIT ?
+                """,
+                (board_slug, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, board_slug, author_name, title, content, created_at
+                FROM board_posts ORDER BY created_at DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+    finally:
+        conn.close()
     return [
-        {"id": r[0], "board": r[1], "author": r[2], "title": r[3], "content": r[4], "created_at": r[5]}
-        for r in rows
+        {
+            "id": row[0],
+            "board": row[1],
+            "author": row[2],
+            "title": row[3],
+            "content": row[4],
+            "created_at": row[5],
+        }
+        for row in rows
     ]
 
 
+def _board_label(slug: str) -> str:
+    return next((name for key, name, _ in DEFAULT_BOARDS if key == slug), "🌙 Discussion")
+
+
 def render_boards_tab() -> None:
+    """Render a simple all-discussions feed with one destination for new posts."""
     init_boards_db()
     user_hash = st.session_state.get("user_hash", "anonymous")
     display_name = st.session_state.get("display_name", "Moon Wanderer")
 
-    st.markdown("### 📋 Message Boards")
-    boards = list_boards()
-    board_labels = {board["name"]: board["slug"] for board in boards}
-    board_labels["🌐 All Boards"] = None
-
-    choice = st.selectbox("Board", list(board_labels.keys()))
-    slug = board_labels[choice]
-
-    with st.expander("✍️ New post", expanded=False):
-        if slug is None:
-            post_board = st.selectbox("Post to", [board["name"] for board in boards], key="post_board_pick")
-            post_slug = board_labels[post_board]
-        else:
-            post_slug = slug
-        title = st.text_input("Title", max_chars=120)
-        body = st.text_area("Content", height=120, max_chars=3000)
-        if st.button("Post", type="primary"):
+    with st.expander("Start a discussion", expanded=False):
+        with st.form("lunatick_talk_board_post", clear_on_submit=True):
+            title = st.text_input(
+                "Title", max_chars=120, placeholder="What is on your mind?"
+            )
+            body = st.text_area(
+                "Post", height=92, max_chars=3000, placeholder="Share a thought with the community…"
+            )
+            post = st.form_submit_button("Post to the board", type="primary", use_container_width=True)
+        if post:
             if title.strip() and body.strip():
-                create_post(post_slug, user_hash, display_name, title, body)
-                st.success("Posted.")
+                create_post(DEFAULT_BOARD_SLUG, user_hash, display_name, title, body)
+                st.success("Posted to the board.")
                 st.rerun()
             else:
-                st.warning("Title and content required.")
+                st.warning("Add a title and message before posting.")
 
-    posts = list_posts(slug)
-    if not posts:
-        st.info("No posts yet. Be the first signal.")
-    for post in posts:
-        st.markdown(
-            f"""
-            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
-                        padding:0.9rem 1rem;margin-bottom:0.7rem;">
-              <div style="font-size:0.7rem;color:#8b949e;">{post['board']} · @{post['author']} · {str(post['created_at'])[:16]}</div>
-              <div style="font-weight:700;color:#f0f6fc;margin:0.25rem 0;">{post['title']}</div>
-              <div style="color:#c9d1d9;font-size:0.95rem;white-space:pre-wrap;">{post['content']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    posts = list_posts(limit=12)
+    with st.container(height=245, border=True):
+        if not posts:
+            st.caption("No discussions yet. Start the first thread.")
+        for post in posts:
+            board = html.escape(_board_label(str(post.get("board") or "")))
+            author = html.escape(str(post.get("author") or "Moon Wanderer"))
+            title = html.escape(str(post.get("title") or "Untitled"))
+            content = html.escape(str(post.get("content") or "")).replace("\n", "<br>")
+            created_at = html.escape(str(post.get("created_at") or "")[:16])
+            st.markdown(
+                f"<article style='border-bottom:1px solid #30363d;padding:.5rem 0 .58rem;'>"
+                f"<div style='color:#8b949e;font-size:.65rem;'>{board} · @{author} · {created_at}</div>"
+                f"<div style='color:#f0f6fc;font-weight:700;margin:.18rem 0;'>{title}</div>"
+                f"<div style='color:#c9d1d9;font-size:.88rem;line-height:1.42;'>{content}</div>"
+                f"</article>",
+                unsafe_allow_html=True,
+            )

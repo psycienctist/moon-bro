@@ -9,13 +9,12 @@ from datetime import datetime, timezone, timedelta
 # Import modules
 # ---------------------------------------------------------------------------
 import journal as journal_ui
-import lunatick_talk_ui as talk_ui
-import lunatick_talk_db as talk_db
 import cosmic_cards
 import track_calendar
 import boards
 import chat_room
 import community
+import moderation
 import auth
 import database_backup
 import supabase_backup
@@ -40,18 +39,15 @@ if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "private_freewrite_v1"
 if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
     supabase_store = importlib.reload(supabase_store)
 
-# The Community page is likewise an imported module. Require the current
-# public-profile card version so a warm worker cannot retain the older lookup UI.
-if (
-    getattr(community, "COMMUNITY_MODULE_VERSION", None) != "public_profile_card_v1"
-    or not all(hasattr(community, attribute) for attribute in ("_render_public_profile_lookup", "moderation"))
-):
+# The Connect page is an imported module. Require the focused Talk surface so
+# a warm worker cannot retain the former profile and moderation-heavy Community UI.
+if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_split_surface_v1":
     community = importlib.reload(community)
 
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
 # module version rather than checking only a helper that older releases share.
-if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "accurate_ascendant_zip_location_v1":
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "accurate_ascendant_zip_location_v2":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 # The phone-first Track renderer is also an imported module. Reload it only
@@ -620,7 +616,6 @@ st.html(LUNATICK_CSS)
 # Init DBs early (needed for auth profiles)
 # ---------------------------------------------------------------------------
 journal_ui.init_db()
-talk_db.init_db()
 cosmic_cards.init_cards_db()
 boards.init_boards_db()
 chat_room.init_chat_db()
@@ -1652,6 +1647,12 @@ def render_settings():
             st.toast("Your public Cosmic Card remains visible; its derived values are now private.")
         st.rerun()
 
+    if moderation.is_moderator():
+        st.markdown("---")
+        st.markdown("### 🛡️ Community moderation")
+        st.caption("Review and manage public LunaTicK Talk content. Private Journals remain unavailable.")
+        moderation.render_moderation_console()
+
     st.markdown("---")
     st.markdown("### 🔐 Password & Sign-in")
     account_email = str(st.session_state.get("email", "")).strip().lower()
@@ -1785,12 +1786,6 @@ def render_settings():
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
-# Soft seed for talk (safe if already done)
-try:
-    talk_db.seed_talk_posts()
-except Exception:
-    pass
-
 # ---------------------------------------------------------------------------
 # Main App — Fixed Bottom Navigation
 # ---------------------------------------------------------------------------
@@ -1805,7 +1800,7 @@ if str(st.query_params.get("track_day", "")).strip():
 
 # Existing sessions may still point to a former standalone social tab. Move
 # those users directly into the unified Community destination on the next run.
-if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk"}:
+if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
     st.session_state.nav_page = "Community"
 
 
