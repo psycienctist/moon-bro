@@ -62,6 +62,10 @@ assert "animation: lunatick-nav-active-arrival 760ms" in app_source
 assert "button:active" in app_source
 assert "transform: scale(0.92) !important;" in app_source
 assert 'if page_name in ("Community", "Journal", "Tones")' in app_source
+assert "@media (min-width: 769px)" in app_source
+assert "bottom: 2.625rem;" in app_source
+assert ".stAppViewContainer:has([data-testid=\"stSidebar\"][aria-expanded=\"true\"]) .st-key-lunatick-bottom-nav" in app_source
+assert "left: 18.75rem;" in app_source
 assert "st-key-bottom_nav_tones button" in app_source
 assert "word-break: keep-all !important;" in app_source
 assert "@media (prefers-reduced-motion: reduce)" in app_source

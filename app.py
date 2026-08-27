@@ -689,16 +689,14 @@ LUNATICK_CSS = """
         }
     }
 
-    /* Keep the longer Connect label compact on one line without changing
-       any other bottom-navigation button. */
+    /* Keep the longer Connect label compact without changing the shared
+       desktop tab height. Its icon-over-label layout is enabled only on
+       narrow phones below. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
-        /* Preserve the shared tab typography and height. Only the horizontal
-           padding is tightened so "Connect" fits as a complete second line. */
         letter-spacing: -0.01em;
         overflow-wrap: normal;
         padding-left: 0.06rem !important;
         padding-right: 0.06rem !important;
-        white-space: pre-line !important;
         word-break: keep-all;
     }
 
@@ -730,6 +728,8 @@ LUNATICK_CSS = """
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
             padding-left: 0.04rem !important;
             padding-right: 0.04rem !important;
+            white-space: pre-line !important;
+            word-break: keep-all !important;
         }
 
         /* Keep the musical-tone destination as one intact compact label,
@@ -755,6 +755,39 @@ LUNATICK_CSS = """
             padding-right: 0.04rem !important;
             white-space: pre-line !important;
             word-break: keep-all !important;
+        }
+    }
+
+    /* On tablet and desktop, the persistent sidebar occupies 18.75rem.
+       Keep both navigation rows wholly inside the remaining content region.
+       The mobile rail below 769px deliberately retains its existing geometry. */
+    @media (min-width: 769px) {
+        .st-key-lunatick-bottom-nav {
+            bottom: 2.625rem;
+        }
+
+        [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
+            left: 0 !important;
+            width: calc(100vw - 2.625rem) !important;
+        }
+
+        [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
+            left: calc(100vw - 2.625rem) !important;
+        }
+
+        .stAppViewContainer:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-lunatick-bottom-nav {
+            left: 18.75rem;
+            right: 0;
+            width: auto;
+        }
+
+        .stAppViewContainer:has([data-testid="stSidebar"][aria-expanded="true"]) [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
+            left: 18.75rem !important;
+            width: calc(100vw - 21.375rem) !important;
+        }
+
+        .stAppViewContainer:has([data-testid="stSidebar"][aria-expanded="true"]) [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
+            left: calc(100vw - 2.625rem) !important;
         }
     }
 
