@@ -1247,9 +1247,9 @@ def render_tones():
 
         .intro {
           color: var(--muted);
-          font-size: 0.88rem;
-          line-height: 1.5;
-          margin: 0.55rem 0 1.15rem;
+          font-size: 0.82rem;
+          line-height: 1.38;
+          margin: 0.42rem 0 0.72rem;
         }
 
         .section-label {
@@ -1264,9 +1264,9 @@ def render_tones():
 
         .presets {
           display: grid;
-          gap: 0.5rem;
+          gap: 0.4rem;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          margin-bottom: 1rem;
+          margin-bottom: 0.62rem;
         }
 
         button, input, select { font: inherit; }
@@ -1282,8 +1282,8 @@ def render_tones():
 
         .preset {
           background: rgba(255, 255, 255, 0.045);
-          min-height: 3.45rem;
-          padding: 0.55rem 0.65rem;
+          min-height: 2.65rem;
+          padding: 0.4rem 0.55rem;
           text-align: left;
         }
 
@@ -1314,9 +1314,9 @@ def render_tones():
 
         .controls {
           display: grid;
-          gap: 0.85rem;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          margin: 0.7rem 0 1rem;
+          gap: 0.52rem;
+          grid-template-columns: 1fr;
+          margin: 0.46rem 0 0.62rem;
         }
 
         .control { min-width: 0; }
@@ -1354,7 +1354,7 @@ def render_tones():
 
         .actions {
           display: grid;
-          gap: 0.65rem;
+          gap: 0.52rem;
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
@@ -1394,10 +1394,10 @@ def render_tones():
 
         .status {
           color: var(--muted);
-          font-size: 0.78rem;
-          line-height: 1.45;
-          margin: 0.85rem 0 0;
-          min-height: 1.15rem;
+          font-size: 0.72rem;
+          line-height: 1.32;
+          margin: 0.5rem 0 0;
+          min-height: 1rem;
         }
 
         .status[data-state="playing"] { color: var(--mint); }
@@ -1405,13 +1405,30 @@ def render_tones():
 
         .note {
           color: #72809b;
-          font-size: 0.67rem;
-          line-height: 1.42;
-          margin: 0.45rem 0 0;
+          font-size: 0.61rem;
+          line-height: 1.32;
+          margin: 0.28rem 0 0;
+        }
+
+        @media (max-width: 480px) {
+          .tone-space { padding: 0.75rem; }
+          .eyebrow { font-size: 0.56rem; margin-bottom: 0.24rem; }
+          h1 { font-size: 1.2rem; }
+          .intro { font-size: 0.76rem; margin: 0.3rem 0 0.48rem; }
+          .section-label { font-size: 0.58rem; margin-bottom: 0.3rem; }
+          .presets { gap: 0.32rem; margin-bottom: 0.45rem; }
+          .preset { min-height: 2.35rem; padding: 0.3rem 0.45rem; }
+          .preset-name { font-size: 0.72rem; }
+          .preset-frequency { font-size: 0.59rem; margin-top: 0.08rem; }
+          .controls { gap: 0.38rem; margin: 0.35rem 0 0.5rem; }
+          select, input[type="number"] { min-height: 2.22rem; }
+          .action { min-height: 2.42rem; font-size: 0.78rem; padding: 0.42rem 0.5rem; }
+          .status { font-size: 0.66rem; margin-top: 0.38rem; }
+          .note { font-size: 0.55rem; margin-top: 0.22rem; }
         }
 
         @media (max-width: 360px) {
-          .controls { grid-template-columns: 1fr; }
+          .actions { gap: 0.42rem; }
         }
       </style>
     </head>
@@ -1419,7 +1436,7 @@ def render_tones():
       <main class="tone-space" aria-labelledby="tones-title">
         <div class="eyebrow">Lunatick sound space</div>
         <h1 id="tones-title">Healing tones</h1>
-        <p class="intro">Choose a tone, set a gentle listening level, and take a moment for yourself.</p>
+        <p class="intro">Binaural sine tones shift gently every 11 seconds. Use headphones and set a comfortable listening level.</p>
 
         <span class="section-label">Tone presets</span>
         <div class="presets" aria-label="Tone presets">
@@ -1443,42 +1460,10 @@ def render_tones():
           </button>
         </div>
 
-        <!-- Mode Toggle (Standard / Binaural only) -->
-        <div class="mode-toggle" role="group" aria-label="Audio mode">
-          <button id="mode-standard" class="active">Standard</button>
-          <button id="mode-binaural">Binaural (Headphones)</button>
-        </div>
-
         <div class="controls">
           <div class="control">
             <label class="section-label" for="frequency">Base frequency</label>
             <input id="frequency" type="number" min="100" max="1000" step="1" value="432" inputmode="numeric">
-          </div>
-          <div class="control" id="beat-control" style="display: none;">
-            <label class="section-label" for="beat">Beat frequency (Hz)</label>
-            <input id="beat" type="number" min="0" max="20" step="0.01" value="7.83" inputmode="decimal">
-          </div>
-          <div class="control">
-            <label class="section-label" for="waveform">Waveform</label>
-            <select id="waveform">
-              <option value="sine">Sine — soft</option>
-              <option value="triangle">Triangle — warm</option>
-              <option value="sawtooth">Sawtooth — bright</option>
-            </select>
-          </div>
-          <div class="control">
-            <label class="section-label" for="cycle-mode">Cycle mode</label>
-            <select id="cycle-mode">
-              <option value="random">Random</option>
-              <option value="sweep">Chakra Sweep</option>
-            </select>
-          </div>
-          <div class="control">
-            <label class="section-label" for="speed">Cycle speed (seconds)</label>
-            <div class="volume-line">
-              <input id="speed" type="range" min="2" max="12" step="1" value="5" aria-describedby="speed-value">
-              <output id="speed-value" for="speed">5s</output>
-            </div>
           </div>
           <div class="control">
             <label class="section-label" for="volume">Listening volume</label>
@@ -1494,7 +1479,7 @@ def render_tones():
           <button id="stop" class="action stop" type="button" disabled>Stop tone</button>
         </div>
 
-        <p id="status" class="status" role="status" aria-live="polite" data-state="idle">Ready — Moon is selected at 432 Hz.</p>
+        <p id="status" class="status" role="status" aria-live="polite" data-state="idle">Ready — Moon is selected for binaural sine playback.</p>
         <p class="note">For personal relaxation only. This feature is not medical treatment or a substitute for professional care.</p>
       </main>
 
@@ -1503,35 +1488,26 @@ def render_tones():
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           const presetButtons = [...document.querySelectorAll(".preset")];
           const frequencyInput = document.getElementById("frequency");
-          const beatInput = document.getElementById("beat");
-          const waveform = document.getElementById("waveform");
           const volume = document.getElementById("volume");
           const volumeValue = document.getElementById("volume-value");
-          const speedInput = document.getElementById("speed");
-          const speedValue = document.getElementById("speed-value");
-          const cycleModeSelect = document.getElementById("cycle-mode");
           const startButton = document.getElementById("start");
           const stopButton = document.getElementById("stop");
           const status = document.getElementById("status");
-          const modeStandard = document.getElementById("mode-standard");
-          const modeBinaural = document.getElementById("mode-binaural");
-          const beatControl = document.getElementById("beat-control");
+
+          const LOCKED_WAVEFORM = "sine";
+          const BINAURAL_BEAT_HZ = 7.83;
+          const AUTO_SHIFT_INTERVAL_MS = 11000;
+          const GLIDE_DURATION_SECONDS = 2.5;
+          const presetFrequencies = [174, 285, 432, 528, 639, 741];
 
           let audioContext = null;
           let leftOsc = null;
           let rightOsc = null;
           let leftGain = null;
           let rightGain = null;
-          let isBinaural = false;
-          let isRandom = false; // true if any cyclic mode (random or sweep)
-          let beatFrequency = 7.83;
           let selectedFrequency = 432;
-          let randomInterval = null;
-          let cycleDelay = 5000; // Default 5 seconds
-          const glideDuration = 2.5; // Fixed 2.5 second glide
-          let sequenceIndex = 0;
-          let sequenceDirection = 1; // 1 for ascending, -1 for descending
-          const presetFrequencies = [174, 285, 432, 528, 639, 741];
+          let shiftInterval = null;
+          let sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
 
           function setStatus(message, state = "idle") {
             status.textContent = message;
@@ -1539,7 +1515,7 @@ def render_tones():
           }
 
           function selectedPresetName(freq) {
-            const button = presetButtons.find(b => Number(b.dataset.frequency) === freq);
+            const button = presetButtons.find((item) => Number(item.dataset.frequency) === freq);
             return button ? button.querySelector(".preset-name").textContent : "Custom";
           }
 
@@ -1550,95 +1526,75 @@ def render_tones():
           function setPlayingUI(isPlaying) {
             startButton.disabled = isPlaying;
             stopButton.disabled = !isPlaying;
-            presetButtons.forEach(btn => btn.disabled = isPlaying && isRandom);
           }
 
           function updateVolumeLabel() {
             volumeValue.textContent = `${volume.value}%`;
           }
 
-          function updateSpeedLabel() {
-            cycleDelay = Number(speedInput.value) * 1000;
-            speedValue.textContent = `${speedInput.value}s`;
-            // If cyclic mode is running, reset interval with new delay
-            if (isRandom && randomInterval) {
-              clearInterval(randomInterval);
-              randomInterval = setInterval(() => {
-                cycleNext();
-              }, cycleDelay);
-            }
-          }
-
           function highlightPreset(freq) {
-            presetButtons.forEach(btn => {
-              const isActive = Number(btn.dataset.frequency) === freq;
-              btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+            presetButtons.forEach((button) => {
+              button.setAttribute("aria-pressed", String(Number(button.dataset.frequency) === freq));
             });
           }
 
-          function setFrequency(freq) {
-            selectedFrequency = freq;
-            highlightPreset(freq);
-            const now = audioContext.currentTime;
-            if (isBinaural && leftOsc && rightOsc && audioContext) {
+          function applyFrequency(freq, announce = true) {
+            selectedFrequency = Math.min(1000, Math.max(100, Number(freq) || 432));
+            frequencyInput.value = selectedFrequency;
+            sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
+            highlightPreset(selectedFrequency);
+
+            if (audioContext && leftOsc && rightOsc) {
+              const now = audioContext.currentTime;
               leftOsc.frequency.cancelScheduledValues(now);
-              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
+              leftOsc.frequency.exponentialRampToValueAtTime(selectedFrequency, now + GLIDE_DURATION_SECONDS);
               rightOsc.frequency.cancelScheduledValues(now);
-              rightOsc.frequency.exponentialRampToValueAtTime(freq + beatFrequency, now + glideDuration);
-            } else if (leftOsc && audioContext) {
-              leftOsc.frequency.cancelScheduledValues(now);
-              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
+              rightOsc.frequency.exponentialRampToValueAtTime(
+                selectedFrequency + BINAURAL_BEAT_HZ,
+                now + GLIDE_DURATION_SECONDS,
+              );
             }
-            // Update status
-            const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
-            if (isRandom) {
-              setStatus(`${modeName}: ${selectedPresetName(freq)} (${freq} Hz)${isBinaural ? ` + ${beatFrequency} Hz beat` : ''}`, "playing");
-            } else {
-              setStatus(`Playing ${selectedPresetName(freq)} at ${freq} Hz.`, "playing");
+
+            if (announce) {
+              const state = leftOsc && rightOsc ? "playing" : "idle";
+              setStatus(
+                `${state === "playing" ? "Playing" : "Ready"} binaural sine — ${selectedPresetName(selectedFrequency)} ` +
+                `(${selectedFrequency} Hz + ${BINAURAL_BEAT_HZ} Hz beat). Shifts every 11 seconds.`,
+                state,
+              );
             }
           }
 
-          function cycleNext() {
-            let nextFreq;
-            if (cycleModeSelect.value === 'random') {
-              // Random pick
-              const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-              nextFreq = presetFrequencies[randomIndex];
-            } else {
-              // Chakra Sweep: sequential up and down
-              nextFreq = presetFrequencies[sequenceIndex];
-              sequenceIndex += sequenceDirection;
-              if (sequenceIndex >= presetFrequencies.length - 1) {
-                sequenceDirection = -1;
-              } else if (sequenceIndex <= 0) {
-                sequenceDirection = 1;
-              }
-            }
-            setFrequency(nextFreq);
+          function shiftToNextPreset() {
+            const currentIndex = presetFrequencies.indexOf(selectedFrequency);
+            const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % presetFrequencies.length : 0;
+            applyFrequency(presetFrequencies[nextIndex]);
           }
 
           function stopTone() {
             const now = audioContext ? audioContext.currentTime : 0;
-            if (randomInterval) {
-              clearInterval(randomInterval);
-              randomInterval = null;
+            if (shiftInterval) {
+              clearInterval(shiftInterval);
+              shiftInterval = null;
             }
-            if (leftOsc) {
+            if (leftOsc && leftGain) {
               leftGain.gain.cancelScheduledValues(now);
               leftGain.gain.setValueAtTime(Math.max(leftGain.gain.value, 0), now);
               leftGain.gain.linearRampToValueAtTime(0, now + 0.10);
               leftOsc.stop(now + 0.11);
-              leftOsc = null; leftGain = null;
             }
-            if (rightOsc) {
+            if (rightOsc && rightGain) {
               rightGain.gain.cancelScheduledValues(now);
               rightGain.gain.setValueAtTime(Math.max(rightGain.gain.value, 0), now);
               rightGain.gain.linearRampToValueAtTime(0, now + 0.10);
               rightOsc.stop(now + 0.11);
-              rightOsc = null; rightGain = null;
             }
+            leftOsc = null;
+            rightOsc = null;
+            leftGain = null;
+            rightGain = null;
             setPlayingUI(false);
-            setStatus("Tone stopped. Ready when you are.");
+            setStatus("Tone stopped. Ready for binaural sine playback.");
           }
 
           async function startTone() {
@@ -1654,209 +1610,77 @@ def render_tones():
               if (audioContext.state === "suspended") {
                 await audioContext.resume();
               }
-
               if (leftOsc || rightOsc) {
                 stopTone();
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100));
               }
 
-              // Determine starting frequency
-              let startFreq = selectedFrequency;
-              if (isRandom) {
-                // Reset sequence for sweep
-                sequenceIndex = 0;
-                sequenceDirection = 1;
-                if (cycleModeSelect.value === 'random') {
-                  const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-                  startFreq = presetFrequencies[randomIndex];
-                } else {
-                  startFreq = presetFrequencies[0];
-                }
-                highlightPreset(startFreq);
-                // Start the interval
-                randomInterval = setInterval(() => {
-                  cycleNext();
-                }, cycleDelay);
-              }
+              const now = audioContext.currentTime;
+              leftOsc = audioContext.createOscillator();
+              leftGain = audioContext.createGain();
+              const leftPanner = audioContext.createStereoPanner();
+              leftPanner.pan.value = -1;
+              leftOsc.type = LOCKED_WAVEFORM;
+              leftOsc.frequency.setValueAtTime(selectedFrequency, now);
+              leftGain.gain.setValueAtTime(0, now);
+              leftGain.gain.linearRampToValueAtTime(currentGain(), now + 0.12);
+              leftOsc.connect(leftGain);
+              leftGain.connect(leftPanner);
+              leftPanner.connect(audioContext.destination);
+              leftOsc.start();
 
-              if (isBinaural) {
-                // Left channel
-                leftOsc = audioContext.createOscillator();
-                leftGain = audioContext.createGain();
-                const leftPanner = audioContext.createStereoPanner();
-                leftPanner.pan.value = -1;
-                leftOsc.type = waveform.value;
-                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
-                leftGain.gain.setValueAtTime(0, audioContext.currentTime);
-                leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-                leftOsc.connect(leftGain);
-                leftGain.connect(leftPanner);
-                leftPanner.connect(audioContext.destination);
-                leftOsc.start();
+              rightOsc = audioContext.createOscillator();
+              rightGain = audioContext.createGain();
+              const rightPanner = audioContext.createStereoPanner();
+              rightPanner.pan.value = 1;
+              rightOsc.type = LOCKED_WAVEFORM;
+              rightOsc.frequency.setValueAtTime(selectedFrequency + BINAURAL_BEAT_HZ, now);
+              rightGain.gain.setValueAtTime(0, now);
+              rightGain.gain.linearRampToValueAtTime(currentGain(), now + 0.12);
+              rightOsc.connect(rightGain);
+              rightGain.connect(rightPanner);
+              rightPanner.connect(audioContext.destination);
+              rightOsc.start();
 
-                // Right channel
-                const rightFreq = startFreq + beatFrequency;
-                rightOsc = audioContext.createOscillator();
-                rightGain = audioContext.createGain();
-                const rightPanner = audioContext.createStereoPanner();
-                rightPanner.pan.value = 1;
-                rightOsc.type = waveform.value;
-                rightOsc.frequency.setValueAtTime(rightFreq, audioContext.currentTime);
-                rightGain.gain.setValueAtTime(0, audioContext.currentTime);
-                rightGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-                rightOsc.connect(rightGain);
-                rightGain.connect(rightPanner);
-                rightPanner.connect(audioContext.destination);
-                rightOsc.start();
-
-                leftOsc.onended = () => { leftOsc = null; };
-                rightOsc.onended = () => { rightOsc = null; };
-
-                setPlayingUI(true);
-                const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
-                setStatus(`${modeName}: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
-              } else {
-                // Standard mono
-                leftOsc = audioContext.createOscillator();
-                leftGain = audioContext.createGain();
-                leftOsc.type = waveform.value;
-                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
-                leftGain.gain.setValueAtTime(0, audioContext.currentTime);
-                leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-                leftOsc.connect(leftGain);
-                leftGain.connect(audioContext.destination);
-                leftOsc.start();
-
-                leftOsc.onended = () => { leftOsc = null; };
-
-                setPlayingUI(true);
-                const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
-                setStatus(`${modeName}: ${selectedPresetName(startFreq)} (${startFreq} Hz)`, "playing");
-              }
+              shiftInterval = setInterval(shiftToNextPreset, AUTO_SHIFT_INTERVAL_MS);
+              setPlayingUI(true);
+              applyFrequency(selectedFrequency);
             } catch (error) {
               console.error("Unable to start tone", error);
-              leftOsc = null; rightOsc = null;
+              leftOsc = null;
+              rightOsc = null;
+              leftGain = null;
+              rightGain = null;
               setPlayingUI(false);
               setStatus("The tone could not start. Check browser audio permissions and try again.", "error");
             }
           }
 
-          function updateActiveFrequency() {
-            const rawValue = Number(frequencyInput.value);
-            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
-            frequencyInput.value = selectedFrequency;
-            highlightPreset(selectedFrequency);
-            if (!isRandom && leftOsc) {
-              setFrequency(selectedFrequency);
-            } else if (!isRandom) {
-              setStatus(`Ready — ${selectedPresetName(selectedFrequency)} is selected at ${selectedFrequency} Hz.`);
-            }
-          }
-
-          function updateBeat() {
-            const rawValue = Number(beatInput.value);
-            beatFrequency = Math.min(20, Math.max(0, Number.isFinite(rawValue) ? rawValue : 7.83));
-            beatInput.value = beatFrequency;
-            if (isBinaural && leftOsc && rightOsc && audioContext) {
-              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
-              rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
-              setStatus(`Binaural: ${selectedPresetName(selectedFrequency)} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
-            } else {
-              setStatus(`Binaural mode ready. Beat set to ${beatFrequency} Hz.`);
-            }
-          }
-
-          function clearPresetSelection() {
-            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
-          }
-
-          // Preset Buttons
-          presetButtons.forEach(button => {
-            button.addEventListener("click", () => {
-              if (isRandom) return;
-              selectedFrequency = Number(button.dataset.frequency);
-              frequencyInput.value = selectedFrequency;
-              presetButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
-              updateActiveFrequency();
-            });
+          presetButtons.forEach((button) => {
+            button.addEventListener("click", () => applyFrequency(Number(button.dataset.frequency)));
           });
 
-          // Cycle mode selector (activates cyclic mode)
-          cycleModeSelect.addEventListener("change", () => {
-            isRandom = true;
-            if (leftOsc) {
-              clearInterval(randomInterval);
-              sequenceIndex = 0;
-              sequenceDirection = 1;
-              if (cycleModeSelect.value === 'random') {
-                const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-                setFrequency(presetFrequencies[randomIndex]);
-              } else {
-                setFrequency(presetFrequencies[0]);
-              }
-              randomInterval = setInterval(() => {
-                cycleNext();
-              }, cycleDelay);
-            } else {
-              setStatus(`Cycle mode: ${cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep'}`);
-            }
-          });
-
-          // Mode Toggle (Standard/Binaural)
-          modeStandard.addEventListener("click", () => {
-            isBinaural = false;
-            isRandom = false;
-            modeStandard.classList.add("active");
-            modeBinaural.classList.remove("active");
-            beatControl.style.display = "none";
-            if (leftOsc || rightOsc) stopTone();
-            setPlayingUI(false);
-            setStatus("Standard mode. Select a frequency.");
-          });
-
-          modeBinaural.addEventListener("click", () => {
-            isBinaural = true;
-            isRandom = false;
-            modeBinaural.classList.add("active");
-            modeStandard.classList.remove("active");
-            beatControl.style.display = "block";
-            if (leftOsc || rightOsc) stopTone();
-            setPlayingUI(false);
-            setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
-          });
-
-          frequencyInput.addEventListener("change", updateActiveFrequency);
-          beatInput.addEventListener("change", updateBeat);
-
-          waveform.addEventListener("change", () => {
-            if (leftOsc) leftOsc.type = waveform.value;
-            if (rightOsc) rightOsc.type = waveform.value;
-          });
-
+          frequencyInput.addEventListener("change", () => applyFrequency(frequencyInput.value));
           volume.addEventListener("input", () => {
             updateVolumeLabel();
-            const currentGainValue = currentGain();
+            const gain = currentGain();
             if (leftGain && audioContext) {
               leftGain.gain.cancelScheduledValues(audioContext.currentTime);
-              leftGain.gain.setTargetAtTime(currentGainValue, audioContext.currentTime, 0.025);
+              leftGain.gain.setTargetAtTime(gain, audioContext.currentTime, 0.025);
             }
             if (rightGain && audioContext) {
               rightGain.gain.cancelScheduledValues(audioContext.currentTime);
-              rightGain.gain.setTargetAtTime(currentGainValue, audioContext.currentTime, 0.025);
+              rightGain.gain.setTargetAtTime(gain, audioContext.currentTime, 0.025);
             }
           });
-
-          speedInput.addEventListener("input", updateSpeedLabel);
-
           startButton.addEventListener("click", startTone);
           stopButton.addEventListener("click", stopTone);
 
           window.addEventListener("pagehide", () => {
+            if (shiftInterval) clearInterval(shiftInterval);
             if (leftOsc) { try { leftOsc.stop(); } catch (_) {} }
             if (rightOsc) { try { rightOsc.stop(); } catch (_) {} }
-            if (audioContext && audioContext.state !== "closed") {
-              audioContext.close();
-            }
+            if (audioContext && audioContext.state !== "closed") audioContext.close();
           });
         })();
       </script>
@@ -1864,7 +1688,7 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=800, scrolling=False)
+    components.html(tone_generator_html, height=520, scrolling=False)
 
 
 def render_calendar():
