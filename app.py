@@ -603,8 +603,14 @@ LUNATICK_CSS = """
     }
 
     /* Streamlit portals fixed controls through their own keyed element
-       wrappers. Apply the same visual states directly to all seven visible
-       button instances, not only the structural bottom-rail container. */
+       wrappers. Keep Home and Settings in the established blue/purple system
+       while the five destinations inherit distinct Cosmic Card tile accents. */
+    [class*="st-key-bottom_nav_calendar"] { --nav-card-accent: #f7d25c; --nav-card-glow: rgba(247, 210, 92, 0.22); }
+    [class*="st-key-bottom_nav_cosmic_cards"] { --nav-card-accent: #9c7bff; --nav-card-glow: rgba(156, 123, 255, 0.22); }
+    [class*="st-key-bottom_nav_community"] { --nav-card-accent: #66a8ff; --nav-card-glow: rgba(102, 168, 255, 0.22); }
+    [class*="st-key-bottom_nav_journal"] { --nav-card-accent: #c5a6ff; --nav-card-glow: rgba(197, 166, 255, 0.20); }
+    [class*="st-key-bottom_nav_tones"] { --nav-card-accent: #73dfbf; --nav-card-glow: rgba(115, 223, 191, 0.20); }
+
     [class*="st-key-bottom_nav_"] button,
     [class*="st-key-lunatick_home_logo_button"] button,
     [class*="st-key-lunatick_settings_gear_button"] button {
@@ -614,6 +620,28 @@ LUNATICK_CSS = """
         color: #dbeeff !important;
     }
 
+    /* The five destination buttons use the established Cosmic Card border,
+       inset glow, and deep panel surface associated with their tile accent. */
+    [class*="st-key-bottom_nav_"] button[kind="secondary"],
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"] {
+        background: linear-gradient(145deg, rgba(31, 46, 78, 0.92), rgba(8, 14, 29, 0.96)) !important;
+        border-color: var(--nav-card-accent) !important;
+        box-shadow: inset 0 0 18px var(--nav-card-glow), 0 0 11px var(--nav-card-glow) !important;
+        color: var(--nav-card-accent) !important;
+    }
+
+    [class*="st-key-bottom_nav_"] button[kind="secondary"]:hover,
+    [class*="st-key-bottom_nav_"] button[kind="secondary"]:focus-visible,
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"]:hover,
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"]:focus-visible {
+        background: linear-gradient(145deg, rgba(42, 59, 99, 0.92), rgba(13, 24, 48, 0.94)) !important;
+        border-color: var(--nav-card-accent) !important;
+        box-shadow: inset 0 0 18px var(--nav-card-glow), 0 0 18px var(--nav-card-glow) !important;
+        color: var(--nav-card-accent) !important;
+    }
+
+    /* A selected destination keeps the app's clearly differentiated purple
+       active state; every other destination retains its assigned Card accent. */
     [class*="st-key-bottom_nav_"] button[kind="primary"],
     [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick_home_logo_button"] button[kind="primary"],
@@ -1916,11 +1944,11 @@ else:
     st.rerun()
 
 NAV_ITEMS = [
+    ("Calendar", "📅", "Inspect"),
+    ("Cosmic Cards", "🃏", "Collect"),
     ("Community", "👥", "Connect"),
-    ("Journal", "📓", "Journal"),
-    ("Calendar", "📅", "Track"),
-    ("Cosmic Cards", "🃏", "Deal"),
-    ("Tones", "🎵", "Heal"),
+    ("Journal", "📓", "Reflect"),
+    ("Tones", "🎵", "Correct"),
 ]
 
 with st.container(key="lunatick-bottom-nav"):
