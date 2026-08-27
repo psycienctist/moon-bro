@@ -57,6 +57,9 @@ assert "button[kind=\"primary\"]" in app_source
 assert "button[kind=\"secondary\"]" in app_source
 assert "background: linear-gradient(135deg, #3d2f0a 0%, #6b5015 55%, #221804 100%) !important;" in app_source
 assert "border-color: #f7d25c !important;" in app_source
+assert "@keyframes lunatick-nav-active-arrival" in app_source
+assert "animation: lunatick-nav-active-arrival 320ms" in app_source
+assert "@media (prefers-reduced-motion: reduce)" in app_source
 
 assert "import auth" in cards_source
 assert "def _render_trade_profile_lookup" in cards_source

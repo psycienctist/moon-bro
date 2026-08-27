@@ -639,6 +639,22 @@ LUNATICK_CSS = """
         color: var(--nav-card-accent) !important;
     }
 
+    /* A newly selected destination arrives with a short, gentle lift and
+       Rising-gold glow. Streamlit rerenders navigation controls on page
+       changes, so an entrance animation gives the switch a clear response. */
+    @keyframes lunatick-nav-active-arrival {
+        0% { opacity: 0.78; transform: translateY(2px) scale(0.965); filter: brightness(0.90); }
+        68% { opacity: 1; transform: translateY(-1px) scale(1.012); filter: brightness(1.08); }
+        100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+    }
+
+    [class*="st-key-bottom_nav_"] button,
+    [class*="st-key-lunatick_home_logo_button"] button,
+    [class*="st-key-lunatick_settings_gear_button"] button {
+        transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease, filter 180ms ease !important;
+        will-change: transform, filter;
+    }
+
     /* Whichever of the seven controls is selected uses the shared Rising-card
        gold state. Other primary destinations retain their own Card accent. */
     [class*="st-key-bottom_nav_"] button[kind="primary"],
@@ -651,6 +667,16 @@ LUNATICK_CSS = """
         border-color: #f7d25c !important;
         box-shadow: 0 0 18px rgba(247, 210, 92, 0.42) !important;
         color: #fff3c4 !important;
+        animation: lunatick-nav-active-arrival 320ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [class*="st-key-bottom_nav_"] button,
+        [class*="st-key-lunatick_home_logo_button"] button,
+        [class*="st-key-lunatick_settings_gear_button"] button {
+            animation: none !important;
+            transition: none !important;
+        }
     }
 
     /* Keep the longer Connect label compact on one line without changing
