@@ -26,6 +26,7 @@ class FakeCommunityStore:
         self.created_talk_posts: list[dict[str, Any]] = []
         self.created_comments: list[dict[str, Any]] = []
         self.votes: dict[tuple[str, int], str] = {}
+        self.board_votes: dict[tuple[str, int], str] = {}
         self.seeded_boards: list[dict[str, str]] = []
         self.hidden_posts: list[int] = []
 
@@ -53,6 +54,22 @@ class FakeCommunityStore:
                 "created_at": "2026-08-22T00:00:00+00:00",
             }
         ]
+
+    def get_board_post_votes(self, subject: str, post_ids: list[int]) -> dict[int, str]:
+        return {
+            post_id: vote_type
+            for (voter_subject, post_id), vote_type in self.board_votes.items()
+            if voter_subject == subject and post_id in post_ids
+        }
+
+    def set_board_post_vote(self, subject: str, post_id: int, vote_type: str | None) -> tuple[int, int]:
+        key = (subject, post_id)
+        if vote_type:
+            self.board_votes[key] = vote_type
+        else:
+            self.board_votes.pop(key, None)
+        votes = [value for (_, candidate_post_id), value in self.board_votes.items() if candidate_post_id == post_id]
+        return votes.count("up"), votes.count("down")
 
     def create_chat_message(self, subject: str, content: str) -> dict[str, Any]:
         self.created_chat_messages.append((subject, content))
@@ -176,9 +193,13 @@ assert store.seeded_boards[0]["slug"] == "general"
 assert boards.list_boards()[0]["post_count"] == 2
 boards.create_post("general", "current_hash", "Ignored name", "  A title  ", " A board reflection. ")
 assert store.created_board_posts == [("general", "auth0|current", "A title", "A board reflection.")]
-board_posts = boards.list_posts("general")
+board_posts = boards.list_posts("general", viewer_hash="current_hash")
 assert board_posts[0]["author"] == "other_moon"
-assert "auth0|other" not in board_posts[0].values()
+assert board_posts[0]["author_reference"] == "auth0|other"
+assert boards.set_post_vote("current_hash", 1, "up") == (1, 0)
+assert boards.list_posts("general", viewer_hash="current_hash")[0]["viewer_vote"] == "up"
+assert boards.set_post_vote("current_hash", 1, "down") == (0, 1)
+assert boards.set_post_vote("current_hash", 1, None) == (0, 0)
 
 assert chat.post_message("current_hash", "Ignored name", "  Hello chat  ") is True
 assert store.created_chat_messages == [("auth0|current", "Hello chat")]

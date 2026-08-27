@@ -40,6 +40,11 @@ if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "private_freewrite_v1"
 if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
     supabase_store = importlib.reload(supabase_store)
 
+# The Message Board renderer must be refreshed before Community: a warm worker
+# otherwise retains the former render_boards_tab() signature without compact=.
+if getattr(boards, "BOARD_MODULE_VERSION", None) != "compact_feed_v1":
+    boards = importlib.reload(boards)
+
 # The Connect page is an imported module. Require the focused Talk surface so
 # a warm worker cannot retain the former profile and moderation-heavy Community UI.
 if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_surface_toggle_v2":

@@ -21,6 +21,7 @@ assert boards.set_post_vote("member-a", first_post["id"], None) == (0, 0)
 assert boards.set_post_vote("member-a", first_post["id"], "up") == (1, 0)
 assert boards.set_post_vote("member-b", first_post["id"], "up") == (2, 0)
 assert boards.set_post_vote("member-a", second_post["id"], "up") == (1, 0)
+assert boards.set_post_vote("member-c", second_post["id"], "down") == (1, 1)
 
 with sqlite3.connect(test_db) as connection:
     connection.execute("UPDATE board_posts SET created_at=? WHERE id=?", ("2026-01-01 00:00:00", first_post["id"]))
@@ -33,6 +34,7 @@ assert first_post["downvotes"] == 0
 assert first_post["viewer_vote"] == "up"
 assert boards._sort_posts(posts, "Top")[0]["title"] == "First post"
 assert boards._sort_posts(posts, "Newest")[0]["title"] == "Second post"
+assert boards._sort_posts(posts, "Controversial")[0]["title"] == "Second post"
 
 test_db.unlink(missing_ok=True)
 print("Board vote persistence and sorting checks passed.")

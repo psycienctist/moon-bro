@@ -12,6 +12,9 @@ import supabase_store
 
 
 DB = "lunatick.db"
+# Required by app.py to replace a board renderer retained by a warm Streamlit worker.
+BOARD_MODULE_VERSION = "compact_feed_v1"
+
 DEFAULT_BOARD_SLUG = "general"
 SORT_OPTIONS = ("Newest", "Top", "Controversial")
 DEFAULT_BOARDS = [
