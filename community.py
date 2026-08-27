@@ -59,6 +59,15 @@ TALK_CSS = """
         .talk-page-header { margin-bottom: 0.38rem; }
         .talk-surface-toggle { margin-bottom: 0.36rem; }
         .talk-section-heading { margin-bottom: 0.26rem; }
+        /* The app reserves space for its fixed rail. The selected board uses
+           that clearance and gives internal feed content room above the rail. */
+        [data-testid="stMain"]:has(.st-key-talk-board-feed) [data-testid="stMainBlockContainer"] {
+            padding-bottom: calc(4.425rem + env(safe-area-inset-bottom)) !important;
+        }
+        .st-key-talk-board-feed {
+            margin-bottom: -4rem;
+            padding-bottom: calc(4rem + 0.9375rem) !important;
+        }
     }
 </style>
 """

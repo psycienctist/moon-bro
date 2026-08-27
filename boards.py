@@ -358,7 +358,9 @@ def render_boards_tab(*, compact: bool = False) -> None:
     above mobile navigation; the feed itself remains independently scrollable.
     """
     init_boards_db()
-    feed_height = 175 if compact else 275
+    # 255 px fills the Talk viewport down to the fixed mobile navigation while
+    # preserving a small visual buffer and keeping the page itself unscrollable.
+    feed_height = 255 if compact else 275
     user_hash = st.session_state.get("user_hash", "anonymous")
     display_name = st.session_state.get("display_name", "Moon Wanderer")
 
@@ -386,7 +388,11 @@ def render_boards_tab(*, compact: bool = False) -> None:
                 st.warning("Add a title and message before posting.")
 
     posts = _sort_posts(list_posts(limit=100, viewer_hash=user_hash), sort_mode)[:12]
-    with st.container(height=feed_height, border=True):
+    with st.container(
+        height=feed_height,
+        border=True,
+        key="talk-board-feed" if compact else None,
+    ):
         if not posts:
             st.caption("No discussions yet. Start the first thread.")
         for post in posts:

@@ -29,8 +29,11 @@ assert "lunatick_talk_board_post" in boards_source
 assert "st.selectbox(\"Board\"" not in boards_source
 assert 'BOARD_MODULE_VERSION = "compact_feed_v1"' in boards_source
 assert "def render_boards_tab(*, compact: bool = False)" in boards_source
-assert "feed_height = 175 if compact else 275" in boards_source
-assert "st.container(height=feed_height, border=True)" in boards_source
+assert "feed_height = 255 if compact else 275" in boards_source
+assert 'key="talk-board-feed" if compact else None' in boards_source
+assert '[data-testid="stMain"]:has(.st-key-talk-board-feed) [data-testid="stMainBlockContainer"]' in community_source
+assert "padding-bottom: calc(4.425rem + env(safe-area-inset-bottom)) !important;" in community_source
+assert "padding-bottom: calc(4rem + 0.9375rem) !important;" in community_source
 
 assert 'BOARD_MODULE_VERSION", None) != "compact_feed_v1"' in app_source
 assert "boards = importlib.reload(boards)" in app_source
