@@ -639,20 +639,30 @@ LUNATICK_CSS = """
         color: var(--nav-card-accent) !important;
     }
 
-    /* A newly selected destination arrives with a short, gentle lift and
-       Rising-gold glow. Streamlit rerenders navigation controls on page
-       changes, so an entrance animation gives the switch a clear response. */
+    /* A selected destination visibly arrives with a short gold bloom. The
+       slower settle remains compact enough for the fixed mobile rail. */
     @keyframes lunatick-nav-active-arrival {
-        0% { opacity: 0.78; transform: translateY(2px) scale(0.965); filter: brightness(0.90); }
-        68% { opacity: 1; transform: translateY(-1px) scale(1.012); filter: brightness(1.08); }
+        0% { opacity: 0.30; transform: translateY(5px) scale(0.84); filter: brightness(0.58) saturate(0.72); }
+        42% { opacity: 1; transform: translateY(-3px) scale(1.075); filter: brightness(1.38) saturate(1.18); }
+        72% { opacity: 1; transform: translateY(1px) scale(0.985); filter: brightness(1.08); }
         100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
     }
 
     [class*="st-key-bottom_nav_"] button,
     [class*="st-key-lunatick_home_logo_button"] button,
     [class*="st-key-lunatick_settings_gear_button"] button {
-        transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease, filter 180ms ease !important;
-        will-change: transform, filter;
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, color 220ms ease, transform 220ms ease, filter 220ms ease, opacity 220ms ease !important;
+        will-change: transform, filter, opacity;
+    }
+
+    /* Instant touch confirmation is visible before Streamlit changes the
+       destination, then the selected control plays its arrival sequence. */
+    [class*="st-key-bottom_nav_"] button:active,
+    [class*="st-key-lunatick_home_logo_button"] button:active,
+    [class*="st-key-lunatick_settings_gear_button"] button:active {
+        transform: scale(0.92) !important;
+        filter: brightness(1.28) saturate(1.18) !important;
+        box-shadow: 0 0 26px rgba(247, 210, 92, 0.58) !important;
     }
 
     /* Whichever of the seven controls is selected uses the shared Rising-card
@@ -667,7 +677,7 @@ LUNATICK_CSS = """
         border-color: #f7d25c !important;
         box-shadow: 0 0 18px rgba(247, 210, 92, 0.42) !important;
         color: #fff3c4 !important;
-        animation: lunatick-nav-active-arrival 320ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
+        animation: lunatick-nav-active-arrival 760ms cubic-bezier(0.16, 0.88, 0.26, 1) both;
     }
 
     @media (prefers-reduced-motion: reduce) {
