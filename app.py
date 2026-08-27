@@ -619,6 +619,29 @@ LUNATICK_CSS = """
         color: #dbeeff !important;
     }
 
+    /* Home and Settings form a paired LunaTicK utility zone. Inactive controls
+       echo the upper logo's purple panel while active controls keep their shared
+       Rising-gold state farther below. This rule deliberately changes paint only. */
+    [class*="st-key-lunatick_home_logo_button"] button[kind="secondary"],
+    [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-secondary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[kind="secondary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[data-testid="stBaseButton-secondary"] {
+        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
+        color: #f0e6ff !important;
+    }
+
+    [class*="st-key-lunatick_home_logo_button"] button[kind="secondary"]:hover,
+    [class*="st-key-lunatick_home_logo_button"] button:focus-visible,
+    [class*="st-key-lunatick_settings_gear_button"] button[kind="secondary"]:hover,
+    [class*="st-key-lunatick_settings_gear_button"] button:focus-visible {
+        background: linear-gradient(135deg, #2d1755 0%, #512696 55%, #21113f 100%) !important;
+        border-color: #ddc8ff !important;
+        box-shadow: 0 0 21px rgba(188, 140, 255, 0.54) !important;
+        color: #ffffff !important;
+    }
+
     /* The five destination buttons use the established Cosmic Card border,
        inset glow, and deep panel surface associated with their tile accent. */
     [class*="st-key-bottom_nav_"] button[kind="secondary"],
