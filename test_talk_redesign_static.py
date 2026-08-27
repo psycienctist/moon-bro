@@ -49,8 +49,9 @@ assert "NAV_ITEMS = [\n    (\"Calendar\", \"📅\", \"Inspect\"),\n    (\"Cosmic
 
 # Five distinct Cosmic Card tile accents style inactive destinations. Any
 # selected destination, Home, or Settings control uses the shared Rising gold.
-for accent in ("#f7d25c", "#9c7bff", "#66a8ff", "#c5a6ff", "#73dfbf"):
+for accent in ("#d8dee9", "#9c7bff", "#66a8ff", "#c5a6ff", "#73dfbf"):
     assert accent in app_source
+assert "st-key-bottom_nav_calendar\"] { --nav-card-accent: #d8dee9" in app_source
 assert "--nav-card-accent" in app_source
 assert "button[kind=\"primary\"]" in app_source
 assert "button[kind=\"secondary\"]" in app_source

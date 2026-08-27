@@ -604,7 +604,7 @@ LUNATICK_CSS = """
     /* Streamlit portals fixed controls through their own keyed element
        wrappers. Keep Home and Settings in the established blue/purple system
        while the five destinations inherit distinct Cosmic Card tile accents. */
-    [class*="st-key-bottom_nav_calendar"] { --nav-card-accent: #f7d25c; --nav-card-glow: rgba(247, 210, 92, 0.22); }
+    [class*="st-key-bottom_nav_calendar"] { --nav-card-accent: #d8dee9; --nav-card-glow: rgba(216, 222, 233, 0.20); }
     [class*="st-key-bottom_nav_cosmic_cards"] { --nav-card-accent: #9c7bff; --nav-card-glow: rgba(156, 123, 255, 0.22); }
     [class*="st-key-bottom_nav_community"] { --nav-card-accent: #66a8ff; --nav-card-glow: rgba(102, 168, 255, 0.22); }
     [class*="st-key-bottom_nav_journal"] { --nav-card-accent: #c5a6ff; --nav-card-glow: rgba(197, 166, 255, 0.20); }
