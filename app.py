@@ -849,14 +849,14 @@ def render_home():
     st.markdown(f"""
     <div class="stats-row">
         <div class="stat-card">
-            <div class="stat-label">Phase</div>
-            <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
-            <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
-        </div>
-        <div class="stat-card">
             <div class="stat-label">Glow</div>
             <div class="stat-val">{current["illum"]*100:.1f}%</div>
             <div class="stat-label" style="font-size:0.55rem;">Surface</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Phase</div>
+            <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
+            <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Age</div>

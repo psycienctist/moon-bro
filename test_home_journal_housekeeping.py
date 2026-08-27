@@ -24,6 +24,13 @@ assert "st.html(LUNATICK_CSS)" in app_source
 assert "margin-bottom: 0.5rem;\n        box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);" in app_source
 assert "margin: 0 0 0.5rem;" in app_source
 
+# The Moon Monitor retains its original cards, with the Phase emoji centered.
+glow_index = home_source.index('<div class="stat-label">Glow</div>')
+phase_index = home_source.index('<div class="stat-label">Phase</div>')
+age_index = home_source.index('<div class="stat-label">Age</div>')
+assert glow_index < phase_index < age_index
+assert 'class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}' in home_source
+
 # Journal is private free writing, not a reflection, prompt, chart, or badge product.
 assert 'JOURNAL_MODULE_VERSION = "private_freewrite_v1"' in journal_source
 assert "A private place for your own words." in journal_source
