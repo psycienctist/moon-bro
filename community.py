@@ -9,13 +9,13 @@ import chat_room
 
 
 # Required by app.py to replace Community pages retained by warm Streamlit workers.
-COMMUNITY_MODULE_VERSION = "talk_split_surface_v1"
+COMMUNITY_MODULE_VERSION = "talk_surface_toggle_v2"
 
 
 TALK_CSS = """
 <style>
     .talk-page-header {
-        margin: 0 0 0.65rem;
+        margin: 0 0 0.48rem;
         text-align: center;
     }
     .talk-page-kicker {
@@ -38,7 +38,7 @@ TALK_CSS = """
         align-items: baseline;
         display: flex;
         justify-content: space-between;
-        margin: 0.05rem 0 0.42rem;
+        margin: 0.08rem 0 0.34rem;
     }
     .talk-section-heading h2 {
         color: #f0f6fc;
@@ -52,13 +52,13 @@ TALK_CSS = """
         color: #8b949e;
         font-size: 0.68rem;
     }
-    .talk-divider {
-        border-top: 1px solid rgba(188, 140, 255, 0.25);
-        margin: 0.62rem 0;
+    .talk-surface-toggle {
+        margin: 0.12rem 0 0.48rem;
     }
     @media (max-width: 480px) {
-        .talk-page-header { margin-bottom: 0.52rem; }
-        .talk-section-heading { margin-bottom: 0.3rem; }
+        .talk-page-header { margin-bottom: 0.38rem; }
+        .talk-surface-toggle { margin-bottom: 0.36rem; }
+        .talk-section-heading { margin-bottom: 0.26rem; }
     }
 </style>
 """
@@ -72,7 +72,7 @@ def _section_heading(title: str, caption: str) -> None:
 
 
 def render_community() -> None:
-    """Render only the lightweight Talk chat and lasting discussion board."""
+    """Render one compact Talk surface at a time for phone-sized screens."""
     boards.init_boards_db()
     chat_room.init_chat_db()
 
@@ -87,12 +87,21 @@ def render_community() -> None:
         unsafe_allow_html=True,
     )
 
-    _section_heading("Live chat", "Updates automatically")
-    chat_room.render_chat_tab()
+    with st.container(key="talk-surface-toggle"):
+        active_surface = st.radio(
+            "Choose LunaTicK Talk surface",
+            ("Live Chat", "Message Board"),
+            key="talk_active_surface",
+            horizontal=True,
+            label_visibility="collapsed",
+        )
 
-    st.markdown('<div class="talk-divider"></div>', unsafe_allow_html=True)
-    _section_heading("Message board", "Lasting conversations")
-    boards.render_boards_tab()
+    if active_surface == "Live Chat":
+        _section_heading("Live chat", "Updates automatically")
+        chat_room.render_chat_tab()
+    else:
+        _section_heading("Message board", "Lasting conversations")
+        boards.render_boards_tab(compact=True)
 
 
 __all__ = ["render_community"]

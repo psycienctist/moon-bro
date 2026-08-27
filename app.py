@@ -42,7 +42,7 @@ if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
 
 # The Connect page is an imported module. Require the focused Talk surface so
 # a warm worker cannot retain the former profile and moderation-heavy Community UI.
-if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_split_surface_v1":
+if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_surface_toggle_v2":
     community = importlib.reload(community)
 
 # Reading Requests owns private reader matching and conversations. Reload it on

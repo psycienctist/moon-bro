@@ -348,9 +348,14 @@ def _render_vote_controls(post: dict, user_hash: str) -> None:
         st.caption(f"▲ {int(post.get('upvotes') or 0)}  ·  ▼ {int(post.get('downvotes') or 0)}")
 
 
-def render_boards_tab() -> None:
-    """Render a simple all-discussions feed with votes and flexible sorting."""
+def render_boards_tab(*, compact: bool = False) -> None:
+    """Render a simple all-discussions feed with votes and flexible sorting.
+
+    The Talk toggle uses the compact viewport so its selected board surface fits
+    above mobile navigation; the feed itself remains independently scrollable.
+    """
     init_boards_db()
+    feed_height = 175 if compact else 275
     user_hash = st.session_state.get("user_hash", "anonymous")
     display_name = st.session_state.get("display_name", "Moon Wanderer")
 
@@ -378,7 +383,7 @@ def render_boards_tab() -> None:
                 st.warning("Add a title and message before posting.")
 
     posts = _sort_posts(list_posts(limit=100, viewer_hash=user_hash), sort_mode)[:12]
-    with st.container(height=275, border=True):
+    with st.container(height=feed_height, border=True):
         if not posts:
             st.caption("No discussions yet. Start the first thread.")
         for post in posts:
