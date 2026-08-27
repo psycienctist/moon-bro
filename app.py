@@ -389,11 +389,11 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button {
         align-items: center;
-        background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
-        border: 1px solid rgba(188, 140, 255, 0.62);
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
         border-radius: 0;
-        box-shadow: 0 0 12px rgba(110, 64, 201, 0.22);
-        color: #d2a8ff;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+        color: #dbeeff !important;
         display: flex;
         font-family: 'Orbitron', sans-serif;
         font-size: 0.72rem;
@@ -413,9 +413,9 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:hover,
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:focus-visible {
-        border-color: #bc8cff;
-        box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
-        color: #f0e6ff;
+        border-color: #7dd3fc;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.42);
+        color: #f0fbff;
         outline: none;
     }
 
@@ -445,11 +445,11 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button {
         align-items: center;
-        background: linear-gradient(135deg, rgba(24, 29, 48, 0.98), rgba(45, 27, 105, 0.98));
-        border: 1px solid rgba(188, 140, 255, 0.62);
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
         border-radius: 0;
-        box-shadow: 0 0 12px rgba(110, 64, 201, 0.22);
-        color: #d2a8ff;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+        color: #dbeeff !important;
         display: flex;
         font-size: 1rem;
         height: 100%;
@@ -463,22 +463,22 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:hover,
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:focus-visible {
-        border-color: #bc8cff;
-        box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
-        color: #f0e6ff;
+        border-color: #7dd3fc;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.42);
+        color: #f0fbff;
         outline: none;
     }
 
-    /* Match the selected red state used by Streamlit's primary rail buttons.
-       This targets the actual rendered button state rather than a container key. */
+    /* A selected Home or Settings control adopts the same purple selected
+       treatment as the active destination tab. */
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
-        background: #ff4b4b !important;
-        border-color: #ff7575 !important;
-        box-shadow: 0 0 18px rgba(255, 75, 75, 0.42) !important;
-        color: #ffffff !important;
+        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
+        color: #f0e6ff !important;
         opacity: 1 !important;
     }
 
@@ -576,13 +576,54 @@ LUNATICK_CSS = """
         white-space: nowrap;
     }
 
-    /* Inactive nav buttons are bordered with the Cosmic Chart blue (#1f6feb).
-       Active (primary) buttons keep their existing Streamlit red style. Both
-       possible Streamlit attribute conventions are matched, mirroring the
-       primary-state overrides above. */
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="secondary"],
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-secondary"] {
-        border-color: #1f6feb !important;
+    /* Every destination starts as a blue, softly graduated lunar panel. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+        color: #dbeeff !important;
+        transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+    }
+
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button:hover,
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button:focus-visible {
+        border-color: #7dd3fc !important;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.42) !important;
+        color: #f0fbff !important;
+        outline: none;
+    }
+
+    /* The selected destination uses the dark-purple, purple-bordered state. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="primary"],
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
+        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
+        color: #f0e6ff !important;
+    }
+
+    /* Streamlit portals fixed controls through their own keyed element
+       wrappers. Apply the same visual states directly to all seven visible
+       button instances, not only the structural bottom-rail container. */
+    [class*="st-key-bottom_nav_"] button,
+    [class*="st-key-lunatick_home_logo_button"] button,
+    [class*="st-key-lunatick_settings_gear_button"] button {
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28) !important;
+        color: #dbeeff !important;
+    }
+
+    [class*="st-key-bottom_nav_"] button[kind="primary"],
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-primary"],
+    [class*="st-key-lunatick_home_logo_button"] button[kind="primary"],
+    [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-primary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[kind="primary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[data-testid="stBaseButton-primary"] {
+        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
+        color: #f0e6ff !important;
     }
 
     /* Keep the longer Connect label compact on one line without changing
