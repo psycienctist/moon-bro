@@ -70,6 +70,15 @@ assert "st-key-bottom_nav_tones button" in app_source
 assert "word-break: keep-all !important;" in app_source
 assert "@media (prefers-reduced-motion: reduce)" in app_source
 
+# The fixed contextual Help component must remain out of normal page flow.
+assert "Fixed contextual Help control" in app_source
+assert "st-key-lunatick-page-help-button" in app_source
+assert "st-key-lunatick-page-help-popover" in app_source
+assert "PAGE_HELP_GUIDES =" in app_source
+assert "def render_page_help(page_name: str)" in app_source
+assert "render_page_help(current_page)" in app_source
+assert "max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom))" in app_source
+
 assert "import auth" in cards_source
 assert "def _render_trade_profile_lookup" in cards_source
 assert "with st.popover(\"🤝 Trade Cards\")" in cards_source

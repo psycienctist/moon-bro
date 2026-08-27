@@ -791,6 +791,159 @@ LUNATICK_CSS = """
         }
     }
 
+    /* ---------------------------------------------------------------------
+       Fixed contextual Help control
+       ---------------------------------------------------------------------
+       The keyed trigger and guide are fixed-position overlays. They do not
+       participate in normal page flow, keeping compact Home/Connect screens
+       and the established fixed navigation unchanged. */
+    [class*="st-key-lunatick-page-help-button"],
+    .stElementContainer:has(.st-key-lunatick-page-help-button),
+    .stElementContainer:has(.st-key-lunatick-page-help-popover) {
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none;
+    }
+
+    /* Streamlit gives each container a layout wrapper in the parent flex stack.
+       Flatten these two wrappers as well so their normal 1rem row gap cannot
+       contribute invisible scroll height beneath the fixed overlay. */
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-button),
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-popover) {
+        display: contents !important;
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
+        position: fixed !important;
+        top: calc(0.65rem + env(safe-area-inset-top)) !important;
+        right: calc(0.75rem + env(safe-area-inset-right)) !important;
+        z-index: 1100 !important;
+        width: 2rem !important;
+        height: 2rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto;
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button {
+        align-items: center;
+        background: rgba(7, 26, 49, 0.94) !important;
+        border: 1px solid rgba(125, 211, 252, 0.92) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.30) !important;
+        color: #e6f7ff !important;
+        display: flex;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.86rem !important;
+        font-weight: 800;
+        height: 2rem !important;
+        justify-content: center;
+        line-height: 1;
+        min-height: 0 !important;
+        padding: 0 !important;
+        transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        width: 2rem !important;
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button:hover,
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button:focus-visible {
+        background: rgba(17, 53, 90, 0.98) !important;
+        border-color: #f7d25c !important;
+        box-shadow: 0 0 17px rgba(247, 210, 92, 0.34) !important;
+        outline: none;
+        transform: scale(1.06);
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button:active {
+        transform: scale(0.93);
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] {
+        position: fixed !important;
+        top: calc(3.25rem + env(safe-area-inset-top)) !important;
+        right: calc(0.75rem + env(safe-area-inset-right)) !important;
+        z-index: 1099 !important;
+        pointer-events: auto;
+        width: min(21rem, calc(100vw - 1.5rem)) !important;
+        max-height: min(28rem, calc(100dvh - 10.75rem - env(safe-area-inset-bottom))) !important;
+        margin: 0 !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        padding: 0.85rem !important;
+        background:
+            radial-gradient(circle at 88% 8%, rgba(125, 211, 252, 0.12), transparent 12rem),
+            linear-gradient(145deg, rgba(18, 27, 53, 0.985), rgba(7, 12, 25, 0.99)) !important;
+        border: 1px solid rgba(188, 140, 255, 0.62) !important;
+        border-radius: 0.9rem !important;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.56), 0 0 24px rgba(110, 64, 201, 0.20) !important;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-title {
+        color: #f0e6ff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        line-height: 1.35;
+        margin: 0 0 0.35rem;
+        text-transform: uppercase;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-intro {
+        color: #b9c7dc;
+        font-family: 'Crimson Pro', serif;
+        font-size: 0.98rem;
+        line-height: 1.35;
+        margin: 0 0 0.55rem;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-list {
+        color: #dbeeff;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-list li {
+        margin: 0.26rem 0;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] {
+        margin-top: 0.7rem !important;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] > button {
+        background: rgba(40, 26, 76, 0.96) !important;
+        border: 1px solid #bc8cff !important;
+        border-radius: 0.55rem !important;
+        color: #f0e6ff !important;
+        font-size: 0.76rem !important;
+        min-height: 2rem !important;
+    }
+
+    @media (max-width: 480px) {
+        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
+            top: calc(0.5rem + env(safe-area-inset-top)) !important;
+            right: calc(0.55rem + env(safe-area-inset-right)) !important;
+        }
+
+        [class*="st-key-lunatick-page-help-popover"] {
+            top: calc(3rem + env(safe-area-inset-top)) !important;
+            right: calc(0.55rem + env(safe-area-inset-right)) !important;
+            width: calc(100vw - 1.1rem) !important;
+            max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom)) !important;
+            padding: 0.75rem !important;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button {
+            transition: none !important;
+        }
+    }
+
     ::-webkit-scrollbar { width: 6px; }
 </style>
 """
@@ -2000,6 +2153,131 @@ def set_nav_page(page_name: str) -> None:
         st.query_params.pop("track_day", None)
 
 
+PAGE_HELP_GUIDES = {
+    "Home": {
+        "title": "Home guide",
+        "intro": "A private snapshot of your current lunar rhythm and personal cosmic chart.",
+        "items": (
+            "Moon Monitor shows the countdown to the next full moon.",
+            "Your Cosmic Chart uses your saved private birth data; it is not posted to community spaces.",
+            "Reading Requests opens the free community matching area for astrology readings.",
+            "Glow, Phase, and Age summarize the current lunar cycle.",
+        ),
+    },
+    "Calendar": {
+        "title": "Inspect guide",
+        "intro": "Browse the lunar calendar, upcoming celestial moments, and your own private notes.",
+        "items": (
+            "Use the arrow controls to move between months.",
+            "Moon icons indicate the lunar phase for each day.",
+            "Marked events highlight notable lunar or celestial dates.",
+            "Private notes stay visible only to you.",
+        ),
+    },
+    "Cosmic Cards": {
+        "title": "Collect guide",
+        "intro": "Create and manage a Cosmic Card while keeping your exact birth details private.",
+        "items": (
+            "Add your birth date, local time, and a city or postal code to begin.",
+            "Confirm the resolved place, coordinates, and timezone before saving.",
+            "Rising is calculated from a tropical Placidus chart using Swiss Ephemeris.",
+            "Settings controls whether derived card values are visible on your public profile.",
+        ),
+    },
+    "Community": {
+        "title": "Connect guide",
+        "intro": "Choose a live conversation or a lasting community discussion.",
+        "items": (
+            "Live Chat refreshes lightly so the room stays current.",
+            "Message Board supports upvotes, downvotes, and Newest, Top, or Controversial sorting.",
+            "Reading Requests are free, community-only, and open private messages only after a match.",
+            "Keep personal birth details and private information out of public posts.",
+        ),
+    },
+    "Journal": {
+        "title": "Reflect guide",
+        "intro": "A personal writing space intended only for your own saved reflections.",
+        "items": (
+            "Write freely, then save an entry when you are ready.",
+            "Saved journal entries are private by design.",
+            "Use Clear to discard unsaved text from the current writing area.",
+        ),
+    },
+    "Tones": {
+        "title": "Correct guide",
+        "intro": "Set a gentle listening tone for personal relaxation and reflection.",
+        "items": (
+            "Choose a preset or set your own frequency and waveform.",
+            "Binaural mode is designed for headphone listening.",
+            "Adjust cycle speed and listening volume before starting a tone.",
+            "This feature is for personal relaxation only and is not medical treatment.",
+        ),
+    },
+    "Settings": {
+        "title": "Settings guide",
+        "intro": "Manage your profile, private birth-chart inputs, visibility preferences, and account options.",
+        "items": (
+            "Your sign-in email remains private; your public profile uses your chosen handle and display name.",
+            "Birth date, time, coordinates, and resolved place are private inputs.",
+            "Use Cosmic Card privacy to choose whether derived values appear on your public card.",
+            "Moderation tools appear here only for authorized moderators.",
+        ),
+    },
+    "Reading Requests": {
+        "title": "Reading Requests guide",
+        "intro": "Request or volunteer for a free community astrology reading.",
+        "items": (
+            "Readers can describe their availability and areas of practice.",
+            "Requesters can share only the details they choose to provide.",
+            "Private lightweight messages become available only to matched participants.",
+            "Do not publish exact birth details in public discussion areas.",
+        ),
+    },
+}
+
+
+def render_page_help(page_name: str) -> None:
+    """Render a fixed page guide without adding normal-flow layout height."""
+    guide = PAGE_HELP_GUIDES.get(page_name, PAGE_HELP_GUIDES["Home"])
+    slug = page_name.lower().replace(" ", "_")
+    state_key = f"lunatick_page_help_open_{slug}"
+
+    with st.container(key="lunatick-page-help-button"):
+        toggled = st.button(
+            "?",
+            key=f"lunatick_page_help_toggle_{slug}",
+            help=f"Open the {guide['title'].lower()}",
+            type="secondary",
+        )
+
+    if toggled:
+        st.session_state[state_key] = not st.session_state.get(state_key, False)
+
+    if not st.session_state.get(state_key, False):
+        return
+
+    guide_items = "".join(f"<li>{item}</li>" for item in guide["items"])
+    with st.container(key="lunatick-page-help-popover"):
+        st.markdown(
+            f"""
+            <section class="lunatick-help-content" role="dialog" aria-label="{guide['title']}">
+              <div class="lunatick-help-title">? {guide['title']}</div>
+              <p class="lunatick-help-intro">{guide['intro']}</p>
+              <ul class="lunatick-help-list">{guide_items}</ul>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "Close guide",
+            key=f"lunatick_page_help_close_{slug}",
+            use_container_width=True,
+            type="secondary",
+        ):
+            st.session_state[state_key] = False
+            st.rerun()
+
+
 # Render one destination in the normal page body.
 current_page = st.session_state.nav_page
 
@@ -2022,6 +2300,10 @@ elif current_page == "Settings":
 else:
     st.session_state.nav_page = "Home"
     st.rerun()
+
+# CSS fixes this guide outside normal page flow, so it cannot shift destinations
+# or extend compact Home/Connect screens.
+render_page_help(current_page)
 
 NAV_ITEMS = [
     ("Calendar", "📅", "Inspect"),
