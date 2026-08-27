@@ -14,6 +14,7 @@ import track_calendar
 import boards
 import chat_room
 import community
+import reading_requests
 import moderation
 import auth
 import database_backup
@@ -43,6 +44,11 @@ if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
 # a warm worker cannot retain the former profile and moderation-heavy Community UI.
 if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_split_surface_v1":
     community = importlib.reload(community)
+
+# Reading Requests owns private reader matching and conversations. Reload it on
+# deployment so the Home entry point never targets a stale request workflow.
+if getattr(reading_requests, "READING_REQUESTS_MODULE_VERSION", None) != "reader_requests_private_messages_v1":
+    reading_requests = importlib.reload(reading_requests)
 
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
@@ -92,6 +98,16 @@ LUNATICK_CSS = """
 
     .stApp {
         font-family: 'Inter', sans-serif;
+    }
+
+    /* The Home Reading Requests entry replaces the taller Moon-status copy,
+       preserving the existing no-scroll phone composition. */
+    .st-key-home-reading-entry {
+        margin: 0.28rem 0 !important;
+    }
+    .st-key-home-reading-entry button {
+        min-height: 2.1rem !important;
+        padding: 0.28rem 0.7rem !important;
     }
 
     [data-testid="stAppViewContainer"],
@@ -619,6 +635,7 @@ journal_ui.init_db()
 cosmic_cards.init_cards_db()
 boards.init_boards_db()
 chat_room.init_chat_db()
+reading_requests.init_reading_requests_db()
 auth.init_auth_db()
 
 # ---------------------------------------------------------------------------
@@ -808,12 +825,19 @@ def render_home():
             <div><div style="color:#8b949e; font-size:0.5rem;">LUNAR PHASE</div><div style="font-size:1.1rem; font-weight:700; color:#fff;">{natal['phase_emoji']} {natal['phase_name']}</div></div>
             <div><div style="color:#8b949e; font-size:0.5rem;">FULL MOONS</div><div style="font-size:1.1rem; font-weight:700; color:#bc8cff;">{int(total_moons)} LIVED</div></div>
         </div>
-        <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
-            <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
-            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{current['moon_vibe']}</div>
-        </div>
     </div>
     """, unsafe_allow_html=True)
+
+    with st.container(key="home-reading-entry"):
+        if st.button(
+            "✦ Reading Requests",
+            key="home_reading_requests",
+            type="secondary",
+            use_container_width=True,
+            help="Request or volunteer a free private community reading.",
+        ):
+            st.session_state.nav_page = "Reading Requests"
+            st.rerun()
 
     st.markdown(f"""
     <div class="stats-row">
@@ -1818,6 +1842,8 @@ if current_page == "Home":
     render_home()
 elif current_page == "Community":
     community.render_community()
+elif current_page == "Reading Requests":
+    reading_requests.render_reading_requests()
 elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
 elif current_page == "Journal":

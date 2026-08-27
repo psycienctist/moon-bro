@@ -545,6 +545,186 @@ class SupabaseStore:
         )
         return upvotes, downvotes
 
+    def upsert_reading_reader(
+        self,
+        profile_auth_subject: str,
+        display_name: str,
+        avatar: str,
+        focus: str,
+        intro: str,
+        is_available: bool,
+    ) -> dict[str, Any]:
+        """Save a member's public, voluntary reader availability profile."""
+        rows = self._request(
+            "POST",
+            "reading_readers",
+            params={"on_conflict": "profile_auth_subject"},
+            payload={
+                "profile_auth_subject": profile_auth_subject,
+                "display_name": display_name,
+                "avatar": avatar,
+                "focus": focus,
+                "intro": intro,
+                "is_available": bool(is_available),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Reader profile save did not return exactly one row.")
+        return rows[0]
+
+    def get_reading_reader(self, profile_auth_subject: str) -> dict[str, Any] | None:
+        rows = self._request(
+            "GET",
+            "reading_readers",
+            params={
+                "select": "profile_auth_subject,display_name,avatar,focus,intro,is_available",
+                "profile_auth_subject": f"eq.{profile_auth_subject}",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return {
+            "member_id": row["profile_auth_subject"],
+            "display_name": row.get("display_name"),
+            "avatar": row.get("avatar"),
+            "focus": row.get("focus") or "",
+            "intro": row.get("intro") or "",
+            "is_available": bool(row.get("is_available")),
+        }
+
+    def list_available_reading_readers(self, limit: int = 50) -> list[dict[str, Any]]:
+        rows = self._request(
+            "GET",
+            "reading_readers",
+            params={
+                "select": "profile_auth_subject,display_name,avatar,focus,intro",
+                "is_available": "eq.true",
+                "order": "updated_at.desc",
+                "limit": str(max(1, min(int(limit), 100))),
+            },
+        )
+        return [
+            {"member_id": row["profile_auth_subject"], "display_name": row.get("display_name"), "avatar": row.get("avatar"), "focus": row.get("focus") or "", "intro": row.get("intro") or ""}
+            for row in rows or []
+        ]
+
+    def create_reading_request(
+        self, requester_auth_subject: str, requester_name: str, topic: str, private_context: str
+    ) -> dict[str, Any]:
+        rows = self._request(
+            "POST",
+            "reading_requests",
+            payload={
+                "requester_auth_subject": requester_auth_subject,
+                "requester_name": requester_name,
+                "topic": topic,
+                "private_context": private_context,
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Reading request creation did not return exactly one row.")
+        return rows[0]
+
+    def list_open_reading_requests(self, limit: int = 50) -> list[dict[str, Any]]:
+        rows = self._request(
+            "GET",
+            "reading_requests",
+            params={
+                "select": "id,requester_auth_subject,requester_name,topic,created_at",
+                "status": "eq.open",
+                "order": "created_at.desc",
+                "limit": str(max(1, min(int(limit), 100))),
+            },
+        )
+        return [
+            {"id": int(row["id"]), "requester_id": row["requester_auth_subject"], "requester_name": row.get("requester_name"), "topic": row.get("topic"), "created_at": row.get("created_at")}
+            for row in rows or []
+        ]
+
+    def list_member_reading_requests(self, profile_auth_subject: str) -> list[dict[str, Any]]:
+        rows = self._request(
+            "GET",
+            "reading_requests",
+            params={
+                "select": "id,requester_auth_subject,requester_name,topic,private_context,status,reader_auth_subject,reader_name,created_at",
+                "or": f"(requester_auth_subject.eq.{profile_auth_subject},reader_auth_subject.eq.{profile_auth_subject})",
+                "order": "updated_at.desc",
+                "limit": "100",
+            },
+        )
+        return [self._reading_request_record(row) for row in rows or []]
+
+    def get_reading_request(self, request_id: int) -> dict[str, Any] | None:
+        rows = self._request(
+            "GET",
+            "reading_requests",
+            params={
+                "select": "id,requester_auth_subject,requester_name,topic,private_context,status,reader_auth_subject,reader_name,created_at",
+                "id": f"eq.{int(request_id)}",
+                "limit": "1",
+            },
+        )
+        return self._reading_request_record(rows[0]) if rows else None
+
+    @staticmethod
+    def _reading_request_record(row: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "id": int(row["id"]), "requester_id": row["requester_auth_subject"],
+            "requester_name": row.get("requester_name"), "topic": row.get("topic"),
+            "private_context": row.get("private_context") or "", "status": row.get("status"),
+            "reader_id": row.get("reader_auth_subject"), "reader_name": row.get("reader_name"),
+            "created_at": row.get("created_at"),
+        }
+
+    def accept_reading_request(self, request_id: int, reader_auth_subject: str, reader_name: str) -> bool:
+        rows = self._request(
+            "PATCH",
+            "reading_requests",
+            params={
+                "id": f"eq.{int(request_id)}", "status": "eq.open",
+                "requester_auth_subject": f"neq.{reader_auth_subject}",
+            },
+            payload={"status": "matched", "reader_auth_subject": reader_auth_subject, "reader_name": reader_name, "updated_at": datetime.now(timezone.utc).isoformat()},
+            prefer="return=representation",
+        )
+        return bool(rows)
+
+    def close_reading_request(self, request_id: int, profile_auth_subject: str) -> bool:
+        rows = self._request(
+            "PATCH",
+            "reading_requests",
+            params={
+                "id": f"eq.{int(request_id)}", "status": "eq.matched",
+                "or": f"(requester_auth_subject.eq.{profile_auth_subject},reader_auth_subject.eq.{profile_auth_subject})",
+            },
+            payload={"status": "closed", "updated_at": datetime.now(timezone.utc).isoformat()},
+            prefer="return=representation",
+        )
+        return bool(rows)
+
+    def list_reading_messages(self, request_id: int) -> list[dict[str, Any]]:
+        rows = self._request(
+            "GET",
+            "reading_messages",
+            params={"select": "id,sender_auth_subject,sender_name,content,created_at", "reading_request_id": f"eq.{int(request_id)}", "order": "created_at.asc", "limit": "200"},
+        )
+        return [{"id": int(row["id"]), "sender_id": row["sender_auth_subject"], "sender_name": row.get("sender_name"), "content": row.get("content"), "created_at": row.get("created_at")} for row in rows or []]
+
+    def create_reading_message(self, request_id: int, sender_auth_subject: str, sender_name: str, content: str) -> dict[str, Any]:
+        rows = self._request(
+            "POST", "reading_messages",
+            payload={"reading_request_id": int(request_id), "sender_auth_subject": sender_auth_subject, "sender_name": sender_name, "content": content},
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Private reading message creation did not return exactly one row.")
+        return rows[0]
+
     def create_chat_message(self, profile_auth_subject: str, content: str) -> dict[str, Any]:
         """Create one Community chat message tied only to its canonical profile subject."""
         rows = self._request(

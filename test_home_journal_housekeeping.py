@@ -6,7 +6,7 @@ app_source = Path("app.py").read_text(encoding="utf-8")
 journal_source = Path("journal.py").read_text(encoding="utf-8")
 home_source = app_source.split("def render_home():", 1)[1].split("def render_tones():", 1)[0]
 
-# Home remains limited to its approved factual cards and Moon-in-sign display.
+# Home remains limited to its approved factual cards and compact Reading Requests entry.
 assert "import daily_reflection" not in app_source
 assert 'getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "private_freewrite_v1"' in app_source
 assert "2026 Cosmic Calendar" not in home_source
@@ -18,7 +18,8 @@ assert "FORECAST" not in home_source
 assert "☾ MOON IN ENERGY" not in home_source
 assert "YOUR COSMIC MOON COMPANION" not in home_source
 assert "AI + I = All. Always." not in home_source
-assert "Moon in {current['moon_sign']}" in home_source
+assert "Moon in {current['moon_sign']}" not in home_source
+assert "✦ Reading Requests" in home_source
 assert "st.html(LUNATICK_CSS)" in app_source
 assert "margin-bottom: 0.5rem;\n        box-shadow: 0 10px 30px rgba(31, 111, 235, 0.1);" in app_source
 assert "margin: 0 0 0.5rem;" in app_source
