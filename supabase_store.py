@@ -473,9 +473,9 @@ class SupabaseStore:
         return rows[0]
 
     def list_board_posts(self, board_slug: str | None = None, limit: int = 30) -> list[dict[str, Any]]:
-        """List visible board posts without joining private profile columns."""
+        """List visible board posts and their server-maintained vote totals."""
         params: dict[str, str] = {
-            "select": "id,board_slug,profile_auth_subject,title,content,created_at",
+            "select": "id,board_slug,profile_auth_subject,title,content,created_at,upvotes,downvotes",
             "is_hidden": "eq.false",
             "order": "created_at.desc",
             "limit": str(max(1, min(int(limit), 100))),
@@ -483,6 +483,67 @@ class SupabaseStore:
         if board_slug:
             params["board_slug"] = f"eq.{board_slug}"
         return list(self._request("GET", "board_posts", params=params) or [])
+
+    def get_board_post_votes(
+        self, profile_auth_subject: str, board_post_ids: list[int] | tuple[int, ...]
+    ) -> dict[int, str]:
+        """Return one member's current vote for each requested board post."""
+        post_ids = sorted({int(post_id) for post_id in board_post_ids})
+        if not post_ids:
+            return {}
+        rows = self._request(
+            "GET",
+            "board_post_votes",
+            params={
+                "select": "board_post_id,vote_type",
+                "profile_auth_subject": f"eq.{profile_auth_subject}",
+                "board_post_id": f"in.({','.join(str(post_id) for post_id in post_ids)})",
+                "limit": str(len(post_ids)),
+            },
+        )
+        return {int(row["board_post_id"]): str(row["vote_type"]) for row in rows or []}
+
+    def set_board_post_vote(
+        self, profile_auth_subject: str, board_post_id: int, vote_type: str | None
+    ) -> tuple[int, int]:
+        """Replace one member's vote and reconcile its board post's visible totals."""
+        if vote_type not in {"up", "down", None}:
+            raise ValueError("vote_type must be up, down, or None")
+        self._request(
+            "DELETE",
+            "board_post_votes",
+            params={
+                "profile_auth_subject": f"eq.{profile_auth_subject}",
+                "board_post_id": f"eq.{int(board_post_id)}",
+            },
+            prefer="return=minimal",
+        )
+        if vote_type:
+            self._request(
+                "POST",
+                "board_post_votes",
+                payload={
+                    "profile_auth_subject": profile_auth_subject,
+                    "board_post_id": int(board_post_id),
+                    "vote_type": vote_type,
+                },
+                prefer="return=minimal",
+            )
+        votes = self._request(
+            "GET",
+            "board_post_votes",
+            params={"select": "vote_type", "board_post_id": f"eq.{int(board_post_id)}", "limit": "1000"},
+        )
+        upvotes = sum(1 for vote in votes or [] if vote.get("vote_type") == "up")
+        downvotes = sum(1 for vote in votes or [] if vote.get("vote_type") == "down")
+        self._request(
+            "PATCH",
+            "board_posts",
+            params={"id": f"eq.{int(board_post_id)}"},
+            payload={"upvotes": upvotes, "downvotes": downvotes},
+            prefer="return=minimal",
+        )
+        return upvotes, downvotes
 
     def create_chat_message(self, profile_auth_subject: str, content: str) -> dict[str, Any]:
         """Create one Community chat message tied only to its canonical profile subject."""

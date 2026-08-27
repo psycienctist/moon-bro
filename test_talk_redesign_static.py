@@ -22,7 +22,7 @@ assert "lunatick_talk_live_chat_form" in chat_source
 assert "DEFAULT_BOARD_SLUG = \"general\"" in boards_source
 assert "lunatick_talk_board_post" in boards_source
 assert "st.selectbox(\"Board\"" not in boards_source
-assert "st.container(height=245, border=True)" in boards_source
+assert "st.container(height=275, border=True)" in boards_source
 
 assert "import lunatick_talk_ui" not in app_source
 assert "import lunatick_talk_db" not in app_source
