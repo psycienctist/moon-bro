@@ -816,54 +816,57 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
         position: fixed !important;
-        top: calc(0.65rem + env(safe-area-inset-top)) !important;
-        right: calc(0.75rem + env(safe-area-inset-right)) !important;
-        z-index: 1100 !important;
-        width: 2rem !important;
-        height: 2rem !important;
+        top: calc(0.9rem + env(safe-area-inset-top)) !important;
+        right: calc(2rem + env(safe-area-inset-right)) !important;
+        /* Streamlit's transparent header sits at z-index 999990. The Help
+           trigger must be above it for physical taps, not only DOM clicks. */
+        z-index: 1000001 !important;
+        width: 2.15rem !important;
+        height: 2.15rem !important;
         margin: 0 !important;
         padding: 0 !important;
-        pointer-events: auto;
+        pointer-events: auto !important;
     }
 
-    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button {
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button {
         align-items: center;
-        background: rgba(7, 26, 49, 0.94) !important;
-        border: 1px solid rgba(125, 211, 252, 0.92) !important;
+        background: linear-gradient(145deg, rgba(194, 218, 255, 0.96), rgba(130, 164, 232, 0.95)) !important;
+        border: 1px solid rgba(239, 245, 255, 0.98) !important;
         border-radius: 999px !important;
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.30) !important;
-        color: #e6f7ff !important;
+        box-shadow: 0 0 16px rgba(138, 178, 255, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+        color: #172340 !important;
         display: flex;
         font-family: 'Orbitron', sans-serif;
-        font-size: 0.86rem !important;
-        font-weight: 800;
-        height: 2rem !important;
+        font-size: 0.92rem !important;
+        font-weight: 900;
+        height: 2.15rem !important;
         justify-content: center;
         line-height: 1;
         min-height: 0 !important;
         padding: 0 !important;
+        pointer-events: auto !important;
         transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-        width: 2rem !important;
+        width: 2.15rem !important;
     }
 
-    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button:hover,
-    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button:focus-visible {
-        background: rgba(17, 53, 90, 0.98) !important;
-        border-color: #f7d25c !important;
-        box-shadow: 0 0 17px rgba(247, 210, 92, 0.34) !important;
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button:hover,
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button:focus-visible {
+        background: linear-gradient(145deg, #f4f8ff, #b8d2ff) !important;
+        border-color: #ffffff !important;
+        box-shadow: 0 0 20px rgba(188, 140, 255, 0.54), inset 0 1px 0 rgba(255, 255, 255, 0.74) !important;
         outline: none;
         transform: scale(1.06);
     }
 
-    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button:active {
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button:active {
         transform: scale(0.93);
     }
 
     [class*="st-key-lunatick-page-help-popover"] {
         position: fixed !important;
-        top: calc(3.25rem + env(safe-area-inset-top)) !important;
-        right: calc(0.75rem + env(safe-area-inset-right)) !important;
-        z-index: 1099 !important;
+        top: calc(3.85rem + env(safe-area-inset-top)) !important;
+        right: calc(2rem + env(safe-area-inset-right)) !important;
+        z-index: 1000000 !important;
         pointer-events: auto;
         width: min(21rem, calc(100vw - 1.5rem)) !important;
         max-height: min(28rem, calc(100dvh - 10.75rem - env(safe-area-inset-bottom))) !important;
@@ -914,7 +917,7 @@ LUNATICK_CSS = """
         margin-top: 0.7rem !important;
     }
 
-    [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] > button {
+    [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] button {
         background: rgba(40, 26, 76, 0.96) !important;
         border: 1px solid #bc8cff !important;
         border-radius: 0.55rem !important;
@@ -925,21 +928,21 @@ LUNATICK_CSS = """
 
     @media (max-width: 480px) {
         [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
-            top: calc(0.5rem + env(safe-area-inset-top)) !important;
-            right: calc(0.55rem + env(safe-area-inset-right)) !important;
+            top: calc(0.9rem + env(safe-area-inset-top)) !important;
+            right: calc(1.25rem + env(safe-area-inset-right)) !important;
         }
 
         [class*="st-key-lunatick-page-help-popover"] {
-            top: calc(3rem + env(safe-area-inset-top)) !important;
-            right: calc(0.55rem + env(safe-area-inset-right)) !important;
-            width: calc(100vw - 1.1rem) !important;
+            top: calc(3.85rem + env(safe-area-inset-top)) !important;
+            right: calc(1.25rem + env(safe-area-inset-right)) !important;
+            width: calc(100vw - 2.5rem) !important;
             max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom)) !important;
             padding: 0.75rem !important;
         }
     }
 
     @media (prefers-reduced-motion: reduce) {
-        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] > button {
+        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button {
             transition: none !important;
         }
     }

@@ -77,6 +77,9 @@ assert "st-key-lunatick-page-help-popover" in app_source
 assert "PAGE_HELP_GUIDES =" in app_source
 assert "def render_page_help(page_name: str)" in app_source
 assert "render_page_help(current_page)" in app_source
+assert "z-index: 1000001 !important;" in app_source
+assert "right: calc(1.25rem + env(safe-area-inset-right)) !important;" in app_source
+assert "[data-testid=\"stButton\"] button" in app_source
 assert "max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom))" in app_source
 
 assert "import auth" in cards_source
