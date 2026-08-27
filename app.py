@@ -1315,7 +1315,7 @@ def render_tones():
         .controls {
           display: grid;
           gap: 0.52rem;
-          grid-template-columns: 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           margin: 0.46rem 0 0.62rem;
         }
 
@@ -1436,7 +1436,7 @@ def render_tones():
       <main class="tone-space" aria-labelledby="tones-title">
         <div class="eyebrow">Lunatick sound space</div>
         <h1 id="tones-title">Healing tones</h1>
-        <p class="intro">Binaural sine tones shift gently every 11 seconds. Use headphones and set a comfortable listening level.</p>
+        <p class="intro">Binaural sine tones shift every 11 seconds. Set your beat difference, sequence, and listening level.</p>
 
         <span class="section-label">Tone presets</span>
         <div class="presets" aria-label="Tone presets">
@@ -1466,6 +1466,17 @@ def render_tones():
             <input id="frequency" type="number" min="100" max="1000" step="1" value="432" inputmode="numeric">
           </div>
           <div class="control">
+            <label class="section-label" for="beat">Beat difference (Hz)</label>
+            <input id="beat" type="number" min="0" max="20" step="0.01" value="7.83" inputmode="decimal">
+          </div>
+          <div class="control">
+            <label class="section-label" for="cycle-mode">Tone sequence</label>
+            <select id="cycle-mode">
+              <option value="random">Random</option>
+              <option value="sweep">Chakra Sweep</option>
+            </select>
+          </div>
+          <div class="control">
             <label class="section-label" for="volume">Listening volume</label>
             <div class="volume-line">
               <input id="volume" type="range" min="0" max="18" value="6" step="1" aria-describedby="volume-value">
@@ -1488,6 +1499,8 @@ def render_tones():
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           const presetButtons = [...document.querySelectorAll(".preset")];
           const frequencyInput = document.getElementById("frequency");
+          const beatInput = document.getElementById("beat");
+          const cycleModeSelect = document.getElementById("cycle-mode");
           const volume = document.getElementById("volume");
           const volumeValue = document.getElementById("volume-value");
           const startButton = document.getElementById("start");
@@ -1495,7 +1508,6 @@ def render_tones():
           const status = document.getElementById("status");
 
           const LOCKED_WAVEFORM = "sine";
-          const BINAURAL_BEAT_HZ = 7.83;
           const AUTO_SHIFT_INTERVAL_MS = 11000;
           const GLIDE_DURATION_SECONDS = 2.5;
           const presetFrequencies = [174, 285, 432, 528, 639, 741];
@@ -1506,8 +1518,10 @@ def render_tones():
           let leftGain = null;
           let rightGain = null;
           let selectedFrequency = 432;
+          let beatFrequency = 7.83;
           let shiftInterval = null;
           let sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
+          let sequenceDirection = 1;
 
           function setStatus(message, state = "idle") {
             status.textContent = message;
@@ -1538,6 +1552,10 @@ def render_tones():
             });
           }
 
+          function sequenceLabel() {
+            return cycleModeSelect.value === "sweep" ? "Chakra Sweep" : "Random";
+          }
+
           function applyFrequency(freq, announce = true) {
             selectedFrequency = Math.min(1000, Math.max(100, Number(freq) || 432));
             frequencyInput.value = selectedFrequency;
@@ -1550,7 +1568,7 @@ def render_tones():
               leftOsc.frequency.exponentialRampToValueAtTime(selectedFrequency, now + GLIDE_DURATION_SECONDS);
               rightOsc.frequency.cancelScheduledValues(now);
               rightOsc.frequency.exponentialRampToValueAtTime(
-                selectedFrequency + BINAURAL_BEAT_HZ,
+                selectedFrequency + beatFrequency,
                 now + GLIDE_DURATION_SECONDS,
               );
             }
@@ -1559,15 +1577,27 @@ def render_tones():
               const state = leftOsc && rightOsc ? "playing" : "idle";
               setStatus(
                 `${state === "playing" ? "Playing" : "Ready"} binaural sine — ${selectedPresetName(selectedFrequency)} ` +
-                `(${selectedFrequency} Hz + ${BINAURAL_BEAT_HZ} Hz beat). Shifts every 11 seconds.`,
+                `(${selectedFrequency} Hz + ${beatFrequency} Hz beat, ${sequenceLabel()}). Shifts every 11 seconds.`,
                 state,
               );
             }
           }
 
           function shiftToNextPreset() {
-            const currentIndex = presetFrequencies.indexOf(selectedFrequency);
-            const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % presetFrequencies.length : 0;
+            let nextIndex;
+            if (cycleModeSelect.value === "random") {
+              nextIndex = Math.floor(Math.random() * presetFrequencies.length);
+            } else {
+              sequenceIndex += sequenceDirection;
+              if (sequenceIndex >= presetFrequencies.length - 1) {
+                sequenceIndex = presetFrequencies.length - 1;
+                sequenceDirection = -1;
+              } else if (sequenceIndex <= 0) {
+                sequenceIndex = 0;
+                sequenceDirection = 1;
+              }
+              nextIndex = sequenceIndex;
+            }
             applyFrequency(presetFrequencies[nextIndex]);
           }
 
@@ -1634,7 +1664,7 @@ def render_tones():
               const rightPanner = audioContext.createStereoPanner();
               rightPanner.pan.value = 1;
               rightOsc.type = LOCKED_WAVEFORM;
-              rightOsc.frequency.setValueAtTime(selectedFrequency + BINAURAL_BEAT_HZ, now);
+              rightOsc.frequency.setValueAtTime(selectedFrequency + beatFrequency, now);
               rightGain.gain.setValueAtTime(0, now);
               rightGain.gain.linearRampToValueAtTime(currentGain(), now + 0.12);
               rightOsc.connect(rightGain);
@@ -1661,6 +1691,21 @@ def render_tones():
           });
 
           frequencyInput.addEventListener("change", () => applyFrequency(frequencyInput.value));
+          beatInput.addEventListener("change", () => {
+            const rawValue = Number(beatInput.value);
+            beatFrequency = Math.min(20, Math.max(0, Number.isFinite(rawValue) ? rawValue : 7.83));
+            beatInput.value = beatFrequency;
+            if (audioContext && rightOsc) {
+              rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
+              rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
+            }
+            applyFrequency(selectedFrequency);
+          });
+          cycleModeSelect.addEventListener("change", () => {
+            sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
+            sequenceDirection = 1;
+            applyFrequency(selectedFrequency);
+          });
           volume.addEventListener("input", () => {
             updateVolumeLabel();
             const gain = currentGain();
