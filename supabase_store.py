@@ -388,6 +388,158 @@ class SupabaseStore:
                 contacts.add(counterpart)
         return sorted(contacts)
 
+    def is_accepted_card_connection(self, first_auth_subject: str, second_auth_subject: str) -> bool:
+        """Return whether two distinct immutable subjects have an accepted card trade."""
+        first = str(first_auth_subject or "").strip()
+        second = str(second_auth_subject or "").strip()
+        return bool(first and second and first != second and second in set(self.list_accepted_card_contacts(first)))
+
+    @staticmethod
+    def _canonical_direct_message_pair(
+        first_auth_subject: str, second_auth_subject: str
+    ) -> tuple[str, str]:
+        """Return the stable participant ordering used by the unique thread constraint."""
+        first = str(first_auth_subject or "").strip()
+        second = str(second_auth_subject or "").strip()
+        if not first or not second or first == second:
+            raise ValueError("A direct-message thread requires two distinct signed-in members.")
+        return tuple(sorted((first, second)))
+
+    def _find_direct_message_thread(self, first_auth_subject: str, second_auth_subject: str) -> dict[str, Any] | None:
+        """Read one canonical conversation pair without returning any public-profile data."""
+        first, second = self._canonical_direct_message_pair(first_auth_subject, second_auth_subject)
+        rows = self._request(
+            "GET",
+            "direct_message_threads",
+            params={
+                "select": "id,participant_one_auth_subject,participant_two_auth_subject,created_at,updated_at",
+                "participant_one_auth_subject": f"eq.{first}",
+                "participant_two_auth_subject": f"eq.{second}",
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    def get_or_create_direct_message_thread(
+        self, first_auth_subject: str, second_auth_subject: str
+    ) -> dict[str, Any]:
+        """Return a connection-gated conversation, creating its unique canonical pair if needed."""
+        first, second = self._canonical_direct_message_pair(first_auth_subject, second_auth_subject)
+        if not self.is_accepted_card_connection(first, second):
+            raise ValueError("Direct messages require an accepted card-trade connection.")
+        existing = self._find_direct_message_thread(first, second)
+        if existing:
+            return existing
+        try:
+            rows = self._request(
+                "POST",
+                "direct_message_threads",
+                params={"on_conflict": "participant_one_auth_subject,participant_two_auth_subject"},
+                payload={
+                    "participant_one_auth_subject": first,
+                    "participant_two_auth_subject": second,
+                },
+                prefer="resolution=ignore-duplicates,return=representation",
+            )
+        except SupabaseRequestError:
+            existing = self._find_direct_message_thread(first, second)
+            if existing:
+                return existing
+            raise
+        if isinstance(rows, list) and len(rows) == 1:
+            return rows[0]
+        existing = self._find_direct_message_thread(first, second)
+        if existing:
+            return existing
+        raise SupabaseRequestError("Direct-message thread creation did not return a conversation.")
+
+    def get_direct_message_thread_for_participant(
+        self, thread_id: int, participant_auth_subject: str
+    ) -> dict[str, Any] | None:
+        """Return a conversation only when its specified participant owns it."""
+        participant = str(participant_auth_subject or "").strip()
+        if not participant:
+            return None
+        rows = self._request(
+            "GET",
+            "direct_message_threads",
+            params={
+                "select": "id,participant_one_auth_subject,participant_two_auth_subject,created_at,updated_at",
+                "id": f"eq.{int(thread_id)}",
+                "or": (
+                    f"(participant_one_auth_subject.eq.{participant},"
+                    f"participant_two_auth_subject.eq.{participant})"
+                ),
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    def list_direct_messages_for_participant(
+        self, thread_id: int, participant_auth_subject: str
+    ) -> list[dict[str, Any]]:
+        """List a bounded conversation only after checking the requesting participant."""
+        if not self.get_direct_message_thread_for_participant(thread_id, participant_auth_subject):
+            return []
+        rows = self._request(
+            "GET",
+            "direct_messages",
+            params={
+                "select": "id,sender_auth_subject,sender_name,content,created_at",
+                "thread_id": f"eq.{int(thread_id)}",
+                "order": "created_at.asc",
+                "limit": "200",
+            },
+        )
+        return [
+            {
+                "id": int(row["id"]),
+                "sender_id": row.get("sender_auth_subject"),
+                "sender_name": public_display_name(row.get("sender_name")),
+                "content": str(row.get("content") or ""),
+                "created_at": row.get("created_at"),
+            }
+            for row in rows or []
+        ]
+
+    def create_direct_message(
+        self, thread_id: int, sender_auth_subject: str, sender_name: str, content: str
+    ) -> dict[str, Any]:
+        """Add a message only when its sender is a connected owner of that thread."""
+        sender = str(sender_auth_subject or "").strip()
+        body = str(content or "").strip()
+        if not sender or not body or len(body) > 1200:
+            raise ValueError("A direct message must contain 1 to 1,200 characters.")
+        thread = self.get_direct_message_thread_for_participant(thread_id, sender)
+        if not thread:
+            raise ValueError("You are not a participant in this direct-message conversation.")
+        first = str(thread.get("participant_one_auth_subject") or "")
+        second = str(thread.get("participant_two_auth_subject") or "")
+        counterpart = second if sender == first else first
+        if not self.is_accepted_card_connection(sender, counterpart):
+            raise ValueError("Direct messages require an accepted card-trade connection.")
+        rows = self._request(
+            "POST",
+            "direct_messages",
+            payload={
+                "thread_id": int(thread_id),
+                "sender_auth_subject": sender,
+                "sender_name": public_display_name(sender_name),
+                "content": body,
+            },
+            prefer="return=representation",
+        )
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise SupabaseRequestError("Direct-message creation did not return exactly one row.")
+        self._request(
+            "PATCH",
+            "direct_message_threads",
+            params={"id": f"eq.{int(thread_id)}"},
+            payload={"updated_at": datetime.now(timezone.utc).isoformat()},
+            prefer="return=minimal",
+        )
+        return rows[0]
+
     def get_public_profile_summaries(
         self, auth_subjects: list[str] | tuple[str, ...] | set[str]
     ) -> dict[str, dict[str, Any]]:

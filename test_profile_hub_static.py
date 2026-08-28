@@ -30,6 +30,10 @@ assert "def _render_profile_hub_connections" in card_source
 assert "def _profile_hub_target_subject" in card_source
 assert "get_card_profile_by_username_server_only" in card_source
 assert "send_trade(user_hash, target_subject)" in card_source
+assert "import direct_messages" in card_source
+assert "direct_messages.render_member_direct_message(target_subject, profile)" in card_source
+assert "def render_member_direct_message" in Path("direct_messages.py").read_text(encoding="utf-8")
+assert "Direct messages require an accepted card-trade connection." in Path("supabase_store.py").read_text(encoding="utf-8")
 assert "public birth inputs" not in card_source[card_source.index("def render_profile_hub"):]
 assert "_render_trade_initiation(user_hash)" not in card_source[card_source.index("def render_cosmic_cards_tab"):]
 
@@ -40,4 +44,4 @@ assert 'from urllib.parse import quote' in board_source
 assert 'href=\'?profile={quote(profile_username, safe=\'\')}\'' in board_source
 assert '"profile_username": profiles.get(row["profile_auth_subject"], {}).get("username") or ""' in board_source
 
-print("Profile hub launcher, discovery, and Community profile-link checks passed.")
+print("Profile hub launcher, discovery, Community profile-link, and connection-gated message checks passed.")

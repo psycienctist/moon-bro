@@ -22,6 +22,7 @@ import ephem
 import streamlit as st
 
 import auth
+import direct_messages
 import supabase_store
 
 
@@ -1039,6 +1040,7 @@ def _render_profile_hub_member(user_hash: str, requested_handle: str) -> None:
         st.caption("This is your public profile. Use Settings to edit your public details.")
     elif target_subject and target_subject in set(friends_of(user_hash)):
         st.success("✦ You are connected. Their card is in your collection when it is active.")
+        direct_messages.render_member_direct_message(target_subject, profile)
     elif target_subject:
         st.caption("Send a card trade to connect. Your friend decides whether to accept it.")
         if st.button(
