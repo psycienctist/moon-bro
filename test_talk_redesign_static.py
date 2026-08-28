@@ -42,7 +42,7 @@ assert "import lunatick_talk_ui" not in app_source
 assert "import lunatick_talk_db" not in app_source
 assert "talk_db.seed_talk_posts" not in app_source
 assert "moderation.render_moderation_console()" in app_source
-assert "CARD_MODULE_VERSION\", None) != \"trade_profile_lookup_v1\"" in app_source
+assert "CARD_MODULE_VERSION\", None) != \"trade_acceptance_notification_v1\"" in app_source
 
 # The five primary destinations follow the approved compact order and labels.
 assert "NAV_ITEMS = [\n    (\"Calendar\", \"📅\", \"Inspect\"),\n    (\"Cosmic Cards\", \"🃏\", \"Collect\"),\n    (\"Community\", \"👥\", \"Connect\"),\n    (\"Journal\", \"📓\", \"Reflect\"),\n    (\"Tones\", \"🎵\", \"Correct\"),\n]" in app_source
@@ -84,8 +84,8 @@ assert "max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom))" in ap
 
 assert "import auth" in cards_source
 assert "def _render_trade_profile_lookup" in cards_source
-assert 'with st.popover("🤝 Trade Cards", help="Find a member or send a card-trade request")' in cards_source
-assert "CARD_MODULE_VERSION = \"trade_profile_lookup_v1\"" in cards_source
+assert 'with st.popover(trade_label, help="Find a member or send a card-trade request")' in cards_source
+assert "CARD_MODULE_VERSION = \"trade_acceptance_notification_v1\"" in cards_source
 
 assert '"Message board": "board_post"' in moderation_source
 assert '"Live chat": "chat_message"' in moderation_source
