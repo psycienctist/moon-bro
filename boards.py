@@ -413,9 +413,7 @@ def render_boards_tab(*, compact: bool = False) -> None:
     user_hash = st.session_state.get("user_hash", "anonymous")
     display_name = st.session_state.get("display_name", "Moon Wanderer")
 
-    controls_left, controls_right = st.columns([2, 1])
-    with controls_left:
-        st.caption("Vote on conversations and sort the community signal.")
+    _, controls_right = st.columns([2, 1])
     with controls_right:
         sort_mode = st.selectbox(
             "Sort discussions", SORT_OPTIONS, label_visibility="collapsed", key="talk_board_sort"

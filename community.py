@@ -101,6 +101,7 @@ def render_community() -> None:
             "Choose LunaTicK Talk surface",
             ("Live Chat", "Message Board"),
             key="talk_active_surface",
+            index=1,
             horizontal=True,
             label_visibility="collapsed",
         )
