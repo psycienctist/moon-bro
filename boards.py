@@ -27,6 +27,28 @@ DEFAULT_BOARDS = [
     ("intentions", "✨ Intentions", "Set & reflect"),
 ]
 
+PINNED_FEATURE_GUIDE = """
+### 📌 Message Board Field Guide
+
+Welcome to the lasting-conversation side of **LunaTicK Social**. The Message Board is the place for thoughtful posts that should remain available after the live chat moves on. Use it for questions, observations, discoveries, reflections, and resources that other members may want to revisit.
+
+**Starting a post.** Open **Start a discussion**, write a specific title, and give the community enough context to understand what you are sharing. A useful post usually explains the question or observation, adds the relevant details, and ends with a clear invitation for others to respond. Choose one idea per thread when possible; focused conversations are easier to read and more useful to future visitors.
+
+**Finding the right signal.** Use **Newest** to see recent conversations, **Top** to find posts the community has found most valuable, and **Controversial** to find threads receiving substantial but divided engagement. Sorting changes the order of the visible feed; it does not delete, edit, or change anyone’s post.
+
+**Voting responsibly.** Use ▲ when a post is helpful, constructive, insightful, or worth bringing to more members’ attention. Use ▼ when a post is misleading, off-topic, or substantially less useful to the community. Votes express community signal rather than personal agreement alone. You can change or remove your vote, and you cannot vote on your own discussion.
+
+**Member profiles.** When an author has a public username, their `@username` is clickable. Open it to view the safe public profile and, where applicable, the public Cosmic Card and connection options. Private birth date, birth time, birthplace, coordinates, email address, and account identifiers are never displayed on the board or on a public card.
+
+**Healthy conversation.** Disagree with ideas without attacking people. Quote the part you are responding to, explain your reasoning, and keep claims proportional to the evidence or personal experience behind them. Avoid flooding a thread, sharing another member’s private information, impersonating someone, or using the board for unsolicited promotion. If a post needs correction, add a calm, specific clarification so later readers can understand what changed.
+
+**Privacy and safety.** Share only what you are comfortable making public. Do not post anyone’s personal contact information, exact location, private birth data, or identifying details without clear permission. Direct messages are separate private conversations and remain subject to the app’s connection and privacy rules.
+
+**Moderation.** If you see harassment, privacy violations, spam, impersonation, or other unsafe content, use the available moderation/report path rather than escalating the thread. Moderators may review or hide content that violates community standards while preserving the board’s purpose as a welcoming space for meaningful discussion.
+
+**A simple posting checklist:** Is the title clear? Is the post self-contained? Is the right board context selected? Have private details been removed? Is there a real question, observation, or contribution for other members? If the answer is yes, post it and let the conversation develop.
+"""
+
 
 def _using_supabase_backend() -> bool:
     return supabase_store.data_backend_from_streamlit_secrets() == "supabase"
@@ -396,6 +418,8 @@ def render_boards_tab(*, compact: bool = False) -> None:
         border=True,
         key="talk-board-feed" if compact else None,
     ):
+        with st.container(key="board-pinned-feature-guide", border=True):
+            st.markdown(PINNED_FEATURE_GUIDE)
         if not posts:
             st.caption("No discussions yet. Start the first thread.")
         for post in posts:

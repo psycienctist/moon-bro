@@ -952,8 +952,10 @@ LUNATICK_CSS = """
         overscroll-behavior: contain;
         padding: 0.85rem !important;
         background:
-            radial-gradient(circle at 88% 8%, rgba(125, 211, 252, 0.12), transparent 12rem),
-            linear-gradient(145deg, rgba(18, 27, 53, 0.985), rgba(7, 12, 25, 0.99)) !important;
+            radial-gradient(circle at 88% 8%, rgba(125, 211, 252, 0.16), transparent 12rem),
+            linear-gradient(145deg, rgba(18, 27, 53, 0.78), rgba(7, 12, 25, 0.72)) !important;
+        backdrop-filter: blur(14px) saturate(125%) !important;
+        -webkit-backdrop-filter: blur(14px) saturate(125%) !important;
         border: 1px solid rgba(188, 140, 255, 0.62) !important;
         border-radius: 0.9rem !important;
         box-shadow: 0 18px 42px rgba(0, 0, 0, 0.56), 0 0 24px rgba(110, 64, 201, 0.20) !important;
@@ -995,7 +997,9 @@ LUNATICK_CSS = """
     }
 
     [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] button {
-        background: rgba(40, 26, 76, 0.96) !important;
+        background: rgba(40, 26, 76, 0.72) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
         border: 1px solid #bc8cff !important;
         border-radius: 0.55rem !important;
         color: #f0e6ff !important;
