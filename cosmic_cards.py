@@ -1104,78 +1104,88 @@ def _render_profile_hub_search_form(*, key_suffix: str = "") -> None:
         st.warning("Enter a public @username to continue.")
 
 
-def _render_profile_menu(*, viewing_member: bool) -> None:
-    """Render a compact left-anchored owner menu without consuming page width."""
-    with st.popover("☰", help="Open Profile navigation", type="secondary"):
-        st.markdown("**Profile navigation**")
-        st.caption("Your LunaTicK space")
-        profile_clicked = st.button("✎  My Profile · Edit", key="profile_menu_my_profile", use_container_width=True)
-        friends_clicked = st.button("♧  My Friends", key="profile_menu_friends", use_container_width=True)
-        dms_clicked = st.button("✉  My DMs", key="profile_menu_dms", use_container_width=True)
-        if profile_clicked:
-            st.session_state.pop("profile_hub_lookup", None)
-            st.session_state["profile_hub_section"] = "profile"
-            st.rerun()
-        if friends_clicked:
-            st.session_state.pop("profile_hub_lookup", None)
-            st.session_state["profile_hub_section"] = "friends"
-            st.rerun()
-        if dms_clicked:
-            st.session_state.pop("profile_hub_lookup", None)
-            st.session_state["profile_hub_section"] = "dms"
-            st.rerun()
-        if viewing_member:
-            st.caption("You are viewing a member profile.")
+def _render_profile_drawer_css() -> None:
+    """Keep the owner drawer over the active tab and constrained on small screens."""
+    st.html("""
+    <style>
+      .st-key-profile-drawer {
+        position: fixed !important;
+        z-index: 1000000 !important;
+        top: 0.75rem !important;
+        left: 0.75rem !important;
+        width: min(50vw, 30rem) !important;
+        max-width: calc(100vw - 1.5rem) !important;
+        height: calc(100dvh - 1.5rem) !important;
+        overflow-y: auto !important;
+        padding: 1rem !important;
+        border: 1px solid rgba(197, 166, 255, .72) !important;
+        border-radius: 16px !important;
+        background: linear-gradient(150deg, rgba(17, 12, 39, .98), rgba(5, 8, 18, .98)) !important;
+        box-shadow: 0 18px 54px rgba(0, 0, 0, .62), 0 0 32px rgba(156, 123, 255, .22) !important;
+        backdrop-filter: blur(14px) !important;
+      }
+      .st-key-profile-drawer [data-testid="stVerticalBlock"] { gap: .35rem !important; }
+      @media (max-width: 600px) {
+        .st-key-profile-drawer {
+          left: .5rem !important;
+          width: calc(100vw - 1rem) !important;
+          max-width: none !important;
+          top: .5rem !important;
+          height: calc(100dvh - 1rem) !important;
+        }
+      }
+    </style>
+    """)
 
 
-def render_profile_hub() -> None:
-    """Show the owner menu destinations or a selected public member profile directly."""
+def render_profile_drawer() -> None:
+    """Render the owner/member social drawer above whichever tab is active."""
+    if not st.session_state.get("profile_drawer_open"):
+        return
+    _render_profile_drawer_css()
     init_cards_db()
-    _render_card_css()
-    _render_profile_hub_css()
     user_hash = str(st.session_state.get("user_hash") or "anonymous")
     own_username = str(st.session_state.get("username") or "").strip()
-    requested_handle = str(st.session_state.get("profile_hub_lookup", "")).strip().lstrip("@")
+    requested_handle = str(st.session_state.get("profile_hub_lookup") or "").strip().lstrip("@")
     viewing_member = bool(requested_handle and requested_handle.lower() != own_username.lower())
-    _render_profile_menu(viewing_member=viewing_member)
 
-    if viewing_member:
-        st.markdown("<div class='profile-hub-kicker'>LunaTic member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
-        _render_profile_hub_member(user_hash, requested_handle)
+    with st.container(key="profile-drawer", border=True):
+        close_column, title_column, edit_column = st.columns([1, 7, 1])
+        with close_column:
+            if st.button("×", key="profile_drawer_close", help="Close Profile drawer", type="secondary"):
+                st.session_state["profile_drawer_open"] = False
+                st.session_state.pop("profile_hub_lookup", None)
+                st.rerun()
+        with title_column:
+            st.markdown("### Profile")
+        with edit_column:
+            if st.button("✎", key="profile_hub_edit", help="Edit your public profile", type="secondary"):
+                st.session_state["profile_drawer_open"] = False
+                st.session_state.nav_page = "Settings"
+                st.rerun()
+        st.caption("Your profile, connections, and private conversations")
+
+        own_profile = auth.get_public_profile(own_username) if own_username else None
+        if own_profile:
+            _render_profile_summary(own_profile, heading="My Profile")
+        else:
+            st.info("Complete your public profile in Settings to share a username.")
+        my_card = build_card(user_hash)
+        if my_card:
+            st.caption("My Cosmic Card")
+            render_collectible_card(my_card, is_owner=True, key_prefix="drawer_owner", compact=True)
+
+        if viewing_member:
+            st.markdown("---")
+            st.markdown("<div class='profile-hub-kicker'>Selected member</div><h4>Member Profile</h4>", unsafe_allow_html=True)
+            _render_profile_hub_member(user_hash, requested_handle)
+
         st.markdown("---")
-        st.markdown("<div class='profile-hub-kicker'>Discover</div><h3>Find another member</h3>", unsafe_allow_html=True)
-        _render_profile_hub_search_form(key_suffix="member")
-        return
-
-    section = str(st.session_state.get("profile_hub_section") or "profile")
-    if section == "friends":
-        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Friends</h2>", unsafe_allow_html=True)
+        st.markdown("<div class='profile-hub-kicker'>Connections</div><h4>My Friends</h4>", unsafe_allow_html=True)
         _render_profile_hub_connections(user_hash)
-        return
-    if section == "dms":
-        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My DMs</h2>", unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown("<div class='profile-hub-kicker'>Private</div><h4>My DMs</h4>", unsafe_allow_html=True)
         direct_messages.render_owner_dm_inbox()
-        return
-
-    own_profile = auth.get_public_profile(own_username) if own_username else None
-    title_column, edit_column = st.columns([7, 1])
-    with title_column:
-        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Profile</h2>", unsafe_allow_html=True)
-    with edit_column:
-        if st.button("✎", key="profile_hub_edit", help="Edit your public profile", type="secondary"):
-            st.session_state.nav_page = "Settings"
-            st.rerun()
-
-    if own_profile:
-        _render_profile_summary(own_profile, heading="Your public presence")
-    else:
-        st.info("Your public profile is being prepared. Complete your profile in Settings to share a username.")
-
-    st.markdown("---")
-    st.markdown("<div class='profile-hub-kicker'>Discover and connect</div><h3>Find a LunaTicK Member</h3>", unsafe_allow_html=True)
-    _render_profile_hub_search_form()
-    st.markdown("---")
-    _render_profile_hub_connections(user_hash)
 
 
 def render_cosmic_cards_tab() -> None:

@@ -83,7 +83,8 @@ assert "[data-testid=\"stButton\"] button" in app_source
 assert "max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom))" in app_source
 
 assert "import auth" in cards_source
-assert "def render_profile_hub" in cards_source
+assert "def render_profile_drawer" in cards_source
+assert "def render_profile_hub" not in cards_source
 assert "_render_trade_initiation(user_hash)" not in cards_source[cards_source.index("def render_cosmic_cards_tab"): ]
 assert "CARD_MODULE_VERSION = \"profile_menu_popover_v5\"" in cards_source
 
