@@ -453,6 +453,40 @@ class SupabaseStore:
             return existing
         raise SupabaseRequestError("Direct-message thread creation did not return a conversation.")
 
+    def list_direct_message_threads_for_participant(
+        self, participant_auth_subject: str
+    ) -> list[dict[str, Any]]:
+        """List only the signed-in member's direct-message threads."""
+        participant = str(participant_auth_subject or "").strip()
+        if not participant:
+            return []
+        rows = self._request(
+            "GET",
+            "direct_message_threads",
+            params={
+                "select": "id,participant_one_auth_subject,participant_two_auth_subject,created_at,updated_at",
+                "or": (
+                    f"(participant_one_auth_subject.eq.{participant},"
+                    f"participant_two_auth_subject.eq.{participant})"
+                ),
+                "order": "updated_at.desc",
+                "limit": "100",
+            },
+        )
+        return [
+            {
+                "id": int(row["id"]),
+                "partner_auth_subject": (
+                    row.get("participant_two_auth_subject")
+                    if row.get("participant_one_auth_subject") == participant
+                    else row.get("participant_one_auth_subject")
+                ),
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+            }
+            for row in rows or []
+        ]
+
     def get_direct_message_thread_for_participant(
         self, thread_id: int, participant_auth_subject: str
     ) -> dict[str, Any] | None:

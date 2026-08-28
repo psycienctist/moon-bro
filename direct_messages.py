@@ -82,6 +82,51 @@ def send_member_message(thread_id: int, member_auth_subject: str, content: str) 
     return True
 
 
+def render_owner_dm_inbox() -> None:
+    """Render the owner’s connection-gated DM list and selected conversation."""
+    viewer = _member_subject()
+    if not _using_supabase_backend() or not viewer:
+        st.info("Direct Messages are available after you connect with another member.")
+        return
+    threads = _store().list_direct_message_threads_for_participant(viewer)
+    st.markdown("### My DMs")
+    st.caption("Private conversations with accepted Cosmic Card connections.")
+    if not threads:
+        st.info("No direct messages yet. Open an accepted member connection to start one.")
+        return
+
+    partner_subjects = [thread.get("partner_auth_subject") for thread in threads if thread.get("partner_auth_subject")]
+    profiles = _store().get_public_profile_summaries(partner_subjects)
+    for thread in threads:
+        partner_subject = str(thread.get("partner_auth_subject") or "")
+        profile = profiles.get(partner_subject) or {}
+        username = str(profile.get("username") or "member").strip().lstrip("@")
+        label = supabase_store.public_display_name(profile.get("display_name"))
+        if st.button(
+            f"{profile.get('avatar') or '🌙'} {label} · @{username}",
+            key=f"profile_dm_thread_{_safe_key(str(thread.get('id')))}",
+            use_container_width=True,
+        ):
+            st.session_state["profile_direct_message_thread"] = int(thread["id"])
+            st.session_state["profile_direct_message_target"] = partner_subject
+            st.rerun()
+
+    active_thread = st.session_state.get("profile_direct_message_thread")
+    active_target = str(st.session_state.get("profile_direct_message_target") or "")
+    if not active_thread or not active_target:
+        return
+    active_thread_record = next((thread for thread in threads if int(thread["id"]) == int(active_thread)), None)
+    if not active_thread_record or str(active_thread_record.get("partner_auth_subject") or "") != active_target:
+        st.session_state.pop("profile_direct_message_thread", None)
+        st.session_state.pop("profile_direct_message_target", None)
+        return
+    profile = profiles.get(active_target) or {}
+    label = supabase_store.public_display_name(profile.get("display_name"))
+    st.markdown(f"#### Private chat with {html.escape(label)}")
+    st.caption("Only accepted card-trade connections can view this conversation.")
+    _render_message_panel(int(active_thread), active_target)
+
+
 def _render_message_panel(thread_id: int, member_auth_subject: str) -> None:
     """Render the conversation with a small timed refresh, if Streamlit supports it."""
     widget_key = _safe_key(member_auth_subject)

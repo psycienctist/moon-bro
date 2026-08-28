@@ -19,7 +19,15 @@ assert 'st.session_state.nav_page = "Profile"' in app_source
 assert 'st.query_params.get("profile", "")' in app_source
 
 assert "def render_profile_hub" in card_source
+assert "def _render_profile_menu" in card_source
 assert "def _render_profile_hub_member" in card_source
+assert 'with st.expander("Profile menu", expanded=True)' in card_source
+assert '"My Profile · Edit"' in card_source
+assert '"My Friends"' in card_source
+assert '"My DMs"' in card_source
+assert 'st.session_state["profile_hub_section"] = "friends"' in card_source
+assert 'st.session_state["profile_hub_section"] = "dms"' in card_source
+assert 'direct_messages.render_owner_dm_inbox()' in card_source
 assert "def _render_profile_hub_search_form" in card_source
 assert 'st.markdown("<div class=\'profile-hub-kicker\'>LunaTic member</div><h2>Member Profile</h2>"' in card_source
 assert '"My Profile", key="profile_hub_my_profile"' in card_source

@@ -1104,8 +1104,29 @@ def _render_profile_hub_search_form(*, key_suffix: str = "") -> None:
         st.warning("Enter a public @username to continue.")
 
 
+def _render_profile_menu(*, viewing_member: bool) -> None:
+    """Render the collapsible owner menu without exposing private member data."""
+    with st.sidebar:
+        with st.expander("Profile menu", expanded=True):
+            st.caption("Your LunaTicK space")
+            if st.button("My Profile · Edit", key="profile_menu_my_profile", use_container_width=True):
+                st.session_state.pop("profile_hub_lookup", None)
+                st.session_state["profile_hub_section"] = "profile"
+                st.rerun()
+            if st.button("My Friends", key="profile_menu_friends", use_container_width=True):
+                st.session_state.pop("profile_hub_lookup", None)
+                st.session_state["profile_hub_section"] = "friends"
+                st.rerun()
+            if st.button("My DMs", key="profile_menu_dms", use_container_width=True):
+                st.session_state.pop("profile_hub_lookup", None)
+                st.session_state["profile_hub_section"] = "dms"
+                st.rerun()
+            if viewing_member:
+                st.caption("You are viewing a member profile.")
+
+
 def render_profile_hub() -> None:
-    """Show either the owner profile hub or a selected public member profile directly."""
+    """Show the owner menu destinations or a selected public member profile directly."""
     init_cards_db()
     _render_card_css()
     _render_profile_hub_css()
@@ -1113,6 +1134,7 @@ def render_profile_hub() -> None:
     own_username = str(st.session_state.get("username") or "").strip()
     requested_handle = str(st.session_state.get("profile_hub_lookup", "")).strip().lstrip("@")
     viewing_member = bool(requested_handle and requested_handle.lower() != own_username.lower())
+    _render_profile_menu(viewing_member=viewing_member)
 
     if viewing_member:
         member_title_column, owner_profile_column = st.columns([7, 2])
@@ -1129,6 +1151,16 @@ def render_profile_hub() -> None:
         st.markdown("---")
         st.markdown("<div class='profile-hub-kicker'>Discover</div><h3>Find another member</h3>", unsafe_allow_html=True)
         _render_profile_hub_search_form(key_suffix="member")
+        return
+
+    section = str(st.session_state.get("profile_hub_section") or "profile")
+    if section == "friends":
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Friends</h2>", unsafe_allow_html=True)
+        _render_profile_hub_connections(user_hash)
+        return
+    if section == "dms":
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My DMs</h2>", unsafe_allow_html=True)
+        direct_messages.render_owner_dm_inbox()
         return
 
     own_profile = auth.get_public_profile(own_username) if own_username else None

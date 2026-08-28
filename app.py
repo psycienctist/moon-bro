@@ -2206,6 +2206,7 @@ PAGE_HELP_GUIDES = {
 def open_profile_hub(return_page: str) -> None:
     """Open the standalone social profile page and preserve the calling destination."""
     st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
+    st.session_state.profile_hub_section = "profile"
     st.session_state.nav_page = "Profile"
 
 
