@@ -109,7 +109,6 @@ def render_community() -> None:
         _section_heading("Live chat", "Updates automatically")
         chat_room.render_chat_tab()
     else:
-        _section_heading("Message board", "Lasting conversations")
         boards.render_boards_tab(compact=True)
 
 
