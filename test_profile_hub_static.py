@@ -21,7 +21,9 @@ assert 'st.query_params.get("profile", "")' in app_source
 assert "def render_profile_hub" in card_source
 assert "def _render_profile_hub_member" in card_source
 assert "def _render_profile_hub_search_form" in card_source
-assert 'st.markdown("<div class=\'profile-hub-kicker\'>LunaTicK member</div><h2>Member Profile</h2>"' in card_source
+assert 'st.markdown("<div class=\'profile-hub-kicker\'>LunaTic member</div><h2>Member Profile</h2>"' in card_source
+assert '"My Profile", key="profile_hub_my_profile"' in card_source
+assert 'st.session_state.pop("profile_hub_lookup", None)' in card_source
 assert "if viewing_member:" in card_source
 assert 'st.button("← Back", key="profile_hub_back")' not in card_source
 assert 'st.button("Edit my profile", key="profile_hub_edit"' not in card_source

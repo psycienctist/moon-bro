@@ -1115,7 +1115,16 @@ def render_profile_hub() -> None:
     viewing_member = bool(requested_handle and requested_handle.lower() != own_username.lower())
 
     if viewing_member:
-        st.markdown("<div class='profile-hub-kicker'>LunaTicK member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
+        member_title_column, owner_profile_column = st.columns([7, 2])
+        with member_title_column:
+            st.markdown("<div class='profile-hub-kicker'>LunaTic member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
+        with owner_profile_column:
+            if st.button(
+                "My Profile", key="profile_hub_my_profile", help="Open your own profile",
+                type="secondary", use_container_width=False,
+            ):
+                st.session_state.pop("profile_hub_lookup", None)
+                st.rerun()
         _render_profile_hub_member(user_hash, requested_handle)
         st.markdown("---")
         st.markdown("<div class='profile-hub-kicker'>Discover</div><h3>Find another member</h3>", unsafe_allow_html=True)
