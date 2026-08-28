@@ -13,13 +13,32 @@ from typing import Any
 import streamlit as st
 
 
-DRAWER_MODULE_VERSION = "profile_drawer_isolated_v1"
+DRAWER_MODULE_VERSION = "profile_drawer_isolated_v2"
 
 
 def _render_css() -> None:
     st.html(
         """
         <style>
+        @keyframes profileDrawerSlideIn {
+          from { opacity: 0; transform: translate3d(-18px, 0, 0) scale(.99); }
+          to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes profileDrawerBackdropIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        body:has(.st-key-profile-drawer-overlay)::before {
+          content: "";
+          position: fixed;
+          inset: 0;
+          z-index: 999999;
+          pointer-events: none;
+          background: rgba(3, 5, 14, .26);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
+          animation: profileDrawerBackdropIn .28s ease-out both;
+        }
         .st-key-profile-drawer-overlay {
           position: fixed !important;
           z-index: 1000000 !important;
@@ -35,6 +54,15 @@ def _render_css() -> None:
           background: linear-gradient(150deg, rgba(17,12,39,.98), rgba(5,8,18,.98)) !important;
           box-shadow: 0 18px 54px rgba(0,0,0,.62), 0 0 32px rgba(156,123,255,.22) !important;
           backdrop-filter: blur(14px) !important;
+          -webkit-backdrop-filter: blur(14px) !important;
+          animation: profileDrawerSlideIn .32s cubic-bezier(.22, .75, .24, 1) both;
+          transform-origin: left center;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          body:has(.st-key-profile-drawer-overlay)::before,
+          .st-key-profile-drawer-overlay {
+            animation: none !important;
+          }
         }
         @media (max-width: 600px) {
           .st-key-profile-drawer-overlay {

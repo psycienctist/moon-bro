@@ -14,6 +14,9 @@ try:
     import profile_drawer
 except Exception:
     profile_drawer = None
+
+if profile_drawer is not None and getattr(profile_drawer, "DRAWER_MODULE_VERSION", None) != "profile_drawer_isolated_v2":
+    profile_drawer = importlib.reload(profile_drawer)
 import track_calendar
 import boards
 import chat_room

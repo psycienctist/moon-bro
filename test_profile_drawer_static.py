@@ -13,10 +13,15 @@ assert "except Exception:\n        st.session_state[\"profile_drawer_open\"] = F
 assert "NAV_ITEMS = [" in app_source
 assert 'elif current_page == "Profile":' in app_source
 
-assert 'DRAWER_MODULE_VERSION = "profile_drawer_isolated_v1"' in drawer_source
+assert 'DRAWER_MODULE_VERSION = "profile_drawer_isolated_v2"' in drawer_source
+assert 'DRAWER_MODULE_VERSION", None) != "profile_drawer_isolated_v2"' in app_source
 assert "def render_profile_drawer(cosmic_module: Any)" in drawer_source
 assert 'with st.container(key="profile-drawer-overlay", border=True)' in drawer_source
 assert "position: fixed !important" in drawer_source
+assert "@keyframes profileDrawerSlideIn" in drawer_source
+assert "profileDrawerBackdropIn" in drawer_source
+assert "backdrop-filter: blur(3px)" in drawer_source
+assert "prefers-reduced-motion: reduce" in drawer_source
 assert "width: min(50vw, 30rem) !important" in drawer_source
 assert "def _safe_public_profile()" in drawer_source
 assert "getattr(cosmic_module, \"build_card\", None)" in drawer_source
