@@ -49,7 +49,7 @@ if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
 
 # The Message Board renderer must be refreshed before Community: a warm worker
 # otherwise retains the former render_boards_tab() signature without compact=.
-if getattr(boards, "BOARD_MODULE_VERSION", None) != "compact_feed_v1":
+if getattr(boards, "BOARD_MODULE_VERSION", None) != "compact_feed_v2":
     boards = importlib.reload(boards)
 
 # The Connect page is an imported module. Require the focused Talk surface so
