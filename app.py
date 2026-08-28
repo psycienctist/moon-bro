@@ -63,7 +63,7 @@ if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "accurate_ascendant_zip
 
 # The phone-first Track renderer is also an imported module. Reload it only
 # when a warm worker retained the prior calendar implementation.
-if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "mobile_grid_private_entries_v2":
+if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "upcoming_events_v1":
     track_calendar = importlib.reload(track_calendar)
 
 

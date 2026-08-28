@@ -20,7 +20,7 @@ import streamlit as st
 import cosmic_cards
 import supabase_store
 
-TRACK_MODULE_VERSION = "mobile_grid_private_entries_v2"
+TRACK_MODULE_VERSION = "upcoming_events_v1"
 _SQLITE_DB = Path("lunatick.db")
 
 # NASA Eclipse Web Site 2026 catalog dates/times (UT). Descriptions deliberately
