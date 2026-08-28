@@ -10,6 +10,10 @@ from datetime import datetime, timezone, timedelta
 # ---------------------------------------------------------------------------
 import journal as journal_ui
 import cosmic_cards
+try:
+    import profile_drawer
+except Exception:
+    profile_drawer = None
 import track_calendar
 import boards
 import chat_room
@@ -2203,6 +2207,11 @@ PAGE_HELP_GUIDES = {
 }
 
 
+def toggle_profile_drawer() -> None:
+    """Toggle the isolated profile overlay without changing the active page."""
+    st.session_state["profile_drawer_open"] = not st.session_state.get("profile_drawer_open", False)
+
+
 def open_profile_hub(return_page: str) -> None:
     """Open the standalone social profile page and preserve the calling destination."""
     st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
@@ -2220,8 +2229,7 @@ def render_profile_launcher(page_name: str) -> None:
             key=f"lunatick_profile_open_{page_name.lower().replace(' ', '_')}",
             help="Open your profile, find members, and trade Cosmic Cards",
             type="secondary",
-            on_click=open_profile_hub,
-            args=(page_name,),
+            on_click=toggle_profile_drawer,
         )
 
 
@@ -2295,6 +2303,11 @@ else:
 # Both fixed controls sit outside normal page flow, so neither shifts destinations
 # or extends compact Home/Connect screens.
 render_profile_launcher(current_page)
+if profile_drawer is not None:
+    try:
+        profile_drawer.render_profile_drawer(cosmic_cards)
+    except Exception:
+        st.session_state["profile_drawer_open"] = False
 render_page_help(current_page)
 
 NAV_ITEMS = [
