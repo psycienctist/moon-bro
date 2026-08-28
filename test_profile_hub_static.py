@@ -7,8 +7,8 @@ card_source = Path("cosmic_cards.py").read_text(encoding="utf-8")
 chat_source = Path("chat_room.py").read_text(encoding="utf-8")
 board_source = Path("boards.py").read_text(encoding="utf-8")
 
-assert 'CARD_MODULE_VERSION = "profile_hub_direct_view_v2"' in card_source
-assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_direct_view_v2"' in app_source
+assert 'CARD_MODULE_VERSION = "profile_hub_direct_messages_v3"' in card_source
+assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_direct_messages_v3"' in app_source
 assert "def render_profile_launcher" in app_source
 assert 'key="lunatick-profile-button"' in app_source
 assert 'help="Open your profile, find members, and trade Cosmic Cards"' in app_source
