@@ -39,7 +39,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "profile_hub_direct_messages_v3"
+CARD_MODULE_VERSION = "profile_menu_visible_v4"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -1105,24 +1105,30 @@ def _render_profile_hub_search_form(*, key_suffix: str = "") -> None:
 
 
 def _render_profile_menu(*, viewing_member: bool) -> None:
-    """Render the collapsible owner menu without exposing private member data."""
-    with st.sidebar:
-        with st.expander("Profile menu", expanded=True):
-            st.caption("Your LunaTicK space")
-            if st.button("My Profile · Edit", key="profile_menu_my_profile", use_container_width=True):
-                st.session_state.pop("profile_hub_lookup", None)
-                st.session_state["profile_hub_section"] = "profile"
-                st.rerun()
-            if st.button("My Friends", key="profile_menu_friends", use_container_width=True):
-                st.session_state.pop("profile_hub_lookup", None)
-                st.session_state["profile_hub_section"] = "friends"
-                st.rerun()
-            if st.button("My DMs", key="profile_menu_dms", use_container_width=True):
-                st.session_state.pop("profile_hub_lookup", None)
-                st.session_state["profile_hub_section"] = "dms"
-                st.rerun()
-            if viewing_member:
-                st.caption("You are viewing a member profile.")
+    """Render an observable, collapsible owner menu in the Profile route."""
+    with st.expander("☰ Profile menu", expanded=True):
+        st.caption("Your LunaTicK space")
+        menu_columns = st.columns(3)
+        with menu_columns[0]:
+            profile_clicked = st.button("My Profile · Edit", key="profile_menu_my_profile", use_container_width=True)
+        with menu_columns[1]:
+            friends_clicked = st.button("My Friends", key="profile_menu_friends", use_container_width=True)
+        with menu_columns[2]:
+            dms_clicked = st.button("My DMs", key="profile_menu_dms", use_container_width=True)
+        if profile_clicked:
+            st.session_state.pop("profile_hub_lookup", None)
+            st.session_state["profile_hub_section"] = "profile"
+            st.rerun()
+        if friends_clicked:
+            st.session_state.pop("profile_hub_lookup", None)
+            st.session_state["profile_hub_section"] = "friends"
+            st.rerun()
+        if dms_clicked:
+            st.session_state.pop("profile_hub_lookup", None)
+            st.session_state["profile_hub_section"] = "dms"
+            st.rerun()
+        if viewing_member:
+            st.caption("You are viewing a member profile.")
 
 
 def render_profile_hub() -> None:
@@ -1137,16 +1143,7 @@ def render_profile_hub() -> None:
     _render_profile_menu(viewing_member=viewing_member)
 
     if viewing_member:
-        member_title_column, owner_profile_column = st.columns([7, 2])
-        with member_title_column:
-            st.markdown("<div class='profile-hub-kicker'>LunaTic member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
-        with owner_profile_column:
-            if st.button(
-                "My Profile", key="profile_hub_my_profile", help="Open your own profile",
-                type="secondary", use_container_width=False,
-            ):
-                st.session_state.pop("profile_hub_lookup", None)
-                st.rerun()
+        st.markdown("<div class='profile-hub-kicker'>LunaTic member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
         _render_profile_hub_member(user_hash, requested_handle)
         st.markdown("---")
         st.markdown("<div class='profile-hub-kicker'>Discover</div><h3>Find another member</h3>", unsafe_allow_html=True)

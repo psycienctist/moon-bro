@@ -42,7 +42,7 @@ assert "import lunatick_talk_ui" not in app_source
 assert "import lunatick_talk_db" not in app_source
 assert "talk_db.seed_talk_posts" not in app_source
 assert "moderation.render_moderation_console()" in app_source
-assert "CARD_MODULE_VERSION\", None) != \"profile_hub_direct_messages_v3\"" in app_source
+assert "CARD_MODULE_VERSION\", None) != \"profile_menu_visible_v4\"" in app_source
 
 # The five primary destinations follow the approved compact order and labels.
 assert "NAV_ITEMS = [\n    (\"Calendar\", \"📅\", \"Inspect\"),\n    (\"Cosmic Cards\", \"🃏\", \"Collect\"),\n    (\"Community\", \"👥\", \"Connect\"),\n    (\"Journal\", \"📓\", \"Reflect\"),\n    (\"Tones\", \"🎵\", \"Correct\"),\n]" in app_source
@@ -85,7 +85,7 @@ assert "max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom))" in ap
 assert "import auth" in cards_source
 assert "def render_profile_hub" in cards_source
 assert "_render_trade_initiation(user_hash)" not in cards_source[cards_source.index("def render_cosmic_cards_tab"): ]
-assert "CARD_MODULE_VERSION = \"profile_hub_direct_messages_v3\"" in cards_source
+assert "CARD_MODULE_VERSION = \"profile_menu_visible_v4\"" in cards_source
 
 assert '"Message board": "board_post"' in moderation_source
 assert '"Live chat": "chat_message"' in moderation_source

@@ -7,8 +7,8 @@ card_source = Path("cosmic_cards.py").read_text(encoding="utf-8")
 chat_source = Path("chat_room.py").read_text(encoding="utf-8")
 board_source = Path("boards.py").read_text(encoding="utf-8")
 
-assert 'CARD_MODULE_VERSION = "profile_hub_direct_messages_v3"' in card_source
-assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_direct_messages_v3"' in app_source
+assert 'CARD_MODULE_VERSION = "profile_menu_visible_v4"' in card_source
+assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_menu_visible_v4"' in app_source
 assert "def render_profile_launcher" in app_source
 assert 'key="lunatick-profile-button"' in app_source
 assert 'help="Open your profile, find members, and trade Cosmic Cards"' in app_source
@@ -21,7 +21,7 @@ assert 'st.query_params.get("profile", "")' in app_source
 assert "def render_profile_hub" in card_source
 assert "def _render_profile_menu" in card_source
 assert "def _render_profile_hub_member" in card_source
-assert 'with st.expander("Profile menu", expanded=True)' in card_source
+assert 'with st.expander("☰ Profile menu", expanded=True)' in card_source
 assert '"My Profile · Edit"' in card_source
 assert '"My Friends"' in card_source
 assert '"My DMs"' in card_source
@@ -30,7 +30,7 @@ assert 'st.session_state["profile_hub_section"] = "dms"' in card_source
 assert 'direct_messages.render_owner_dm_inbox()' in card_source
 assert "def _render_profile_hub_search_form" in card_source
 assert 'st.markdown("<div class=\'profile-hub-kicker\'>LunaTic member</div><h2>Member Profile</h2>"' in card_source
-assert '"My Profile", key="profile_hub_my_profile"' in card_source
+assert '"My Profile", key="profile_hub_my_profile"' not in card_source
 assert 'st.session_state.pop("profile_hub_lookup", None)' in card_source
 assert "if viewing_member:" in card_source
 assert 'st.button("← Back", key="profile_hub_back")' not in card_source
