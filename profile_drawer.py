@@ -13,7 +13,7 @@ from typing import Any
 import streamlit as st
 
 
-DRAWER_MODULE_VERSION = "profile_drawer_isolated_v2"
+DRAWER_MODULE_VERSION = "profile_drawer_isolated_v3"
 
 
 def _render_css() -> None:
@@ -44,7 +44,7 @@ def _render_css() -> None:
           z-index: 1000000 !important;
           top: .75rem !important;
           left: .75rem !important;
-          width: min(50vw, 30rem) !important;
+          width: min(66.6667vw, 30rem) !important;
           max-width: calc(100vw - 1.5rem) !important;
           height: calc(100dvh - 1.5rem) !important;
           overflow-y: auto !important;
@@ -68,7 +68,7 @@ def _render_css() -> None:
           .st-key-profile-drawer-overlay {
             left: .5rem !important;
             top: .5rem !important;
-            width: min(82vw, 30rem) !important;
+            width: min(66.6667vw, 30rem) !important;
             max-width: calc(100vw - 1rem) !important;
             height: calc(100dvh - 1rem) !important;
           }

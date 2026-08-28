@@ -15,7 +15,7 @@ try:
 except Exception:
     profile_drawer = None
 
-if profile_drawer is not None and getattr(profile_drawer, "DRAWER_MODULE_VERSION", None) != "profile_drawer_isolated_v2":
+if profile_drawer is not None and getattr(profile_drawer, "DRAWER_MODULE_VERSION", None) != "profile_drawer_isolated_v3":
     profile_drawer = importlib.reload(profile_drawer)
 import track_calendar
 import boards
