@@ -1085,26 +1085,50 @@ def _render_profile_hub_connections(user_hash: str) -> None:
     st.caption(f"{len(friend_subjects)} accepted card connection{'s' if len(friend_subjects) != 1 else ''}.")
 
 
+def _render_profile_hub_search_form(*, key_suffix: str = "") -> None:
+    """Search a public handle and rerun directly into the selected member view."""
+    st.caption("Search an exact public @username to view their profile, connect, and trade Cosmic Cards.")
+    with st.form(f"profile_hub_lookup_form_{key_suffix or 'owner'}", clear_on_submit=False):
+        lookup_username = st.text_input(
+            "Username", value="", max_chars=24, placeholder="e.g. moon_orbit",
+            label_visibility="collapsed", key=f"profile_hub_lookup_input_{key_suffix or 'owner'}",
+        )
+        searched = st.form_submit_button("View profile", type="primary", use_container_width=True)
+    if searched:
+        requested_handle = lookup_username.strip().lstrip("@")
+        if requested_handle:
+            st.session_state["profile_hub_lookup"] = requested_handle
+            st.rerun()
+        st.warning("Enter a public @username to continue.")
+
+
 def render_profile_hub() -> None:
-    """Open the member's own profile first, then safe discovery and card trading."""
+    """Show either the owner profile hub or a selected public member profile directly."""
     init_cards_db()
     _render_card_css()
     _render_profile_hub_css()
     user_hash = str(st.session_state.get("user_hash") or "anonymous")
     own_username = str(st.session_state.get("username") or "").strip()
-    own_profile = auth.get_public_profile(own_username) if own_username else None
+    requested_handle = str(st.session_state.get("profile_hub_lookup", "")).strip().lstrip("@")
+    viewing_member = bool(requested_handle and requested_handle.lower() != own_username.lower())
 
-    header_left, header_right = st.columns([1, 1])
-    with header_left:
-        if st.button("← Back", key="profile_hub_back"):
-            st.session_state.nav_page = st.session_state.get("profile_return_page", "Home")
-            st.rerun()
-    with header_right:
-        if st.button("Edit my profile", key="profile_hub_edit", use_container_width=True):
+    if viewing_member:
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
+        _render_profile_hub_member(user_hash, requested_handle)
+        st.markdown("---")
+        st.markdown("<div class='profile-hub-kicker'>Discover</div><h3>Find another member</h3>", unsafe_allow_html=True)
+        _render_profile_hub_search_form(key_suffix="member")
+        return
+
+    own_profile = auth.get_public_profile(own_username) if own_username else None
+    title_column, edit_column = st.columns([7, 1])
+    with title_column:
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Profile</h2>", unsafe_allow_html=True)
+    with edit_column:
+        if st.button("✎", key="profile_hub_edit", help="Edit your public profile", type="secondary"):
             st.session_state.nav_page = "Settings"
             st.rerun()
 
-    st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Profile</h2>", unsafe_allow_html=True)
     if own_profile:
         _render_profile_summary(own_profile, heading="Your public presence")
     else:
@@ -1112,23 +1136,7 @@ def render_profile_hub() -> None:
 
     st.markdown("---")
     st.markdown("<div class='profile-hub-kicker'>Discover and connect</div><h3>Find a LunaTicK Member</h3>", unsafe_allow_html=True)
-    st.caption("Search an exact public @username to view their profile, connect, and trade Cosmic Cards.")
-    with st.form("profile_hub_lookup_form", clear_on_submit=False):
-        lookup_username = st.text_input(
-            "Username", value=st.session_state.get("profile_hub_lookup", ""), max_chars=24,
-            placeholder="e.g. moon_orbit", label_visibility="collapsed",
-        )
-        searched = st.form_submit_button("View profile", type="primary", use_container_width=True)
-    if searched:
-        st.session_state["profile_hub_lookup"] = lookup_username.strip().lstrip("@")
-
-    requested_handle = str(st.session_state.get("profile_hub_lookup", "")).strip()
-    if requested_handle:
-        _render_profile_hub_member(user_hash, requested_handle)
-        if st.button("Clear member search", key="profile_hub_clear_lookup"):
-            st.session_state.pop("profile_hub_lookup", None)
-            st.rerun()
-
+    _render_profile_hub_search_form()
     st.markdown("---")
     _render_profile_hub_connections(user_hash)
 
