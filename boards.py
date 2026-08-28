@@ -28,25 +28,49 @@ DEFAULT_BOARDS = [
 ]
 
 PINNED_FEATURE_GUIDE = """
-### 📌 Message Board Field Guide
+### 📌 LunaTicK Feature Field Guide
 
-Welcome to the lasting-conversation side of **LunaTicK Social**. The Message Board is the place for thoughtful posts that should remain available after the live chat moves on. Use it for questions, observations, discoveries, reflections, and resources that other members may want to revisit.
+Welcome to LunaTicK Social. This pinned guide explains what each destination is for and how to get the most from it. Use **Connect** for community conversation, **Correct** for personal binaural-beat listening, **Inspect** for lunar and astronomical planning, **Reflect** for private writing, **Collect** for share-safe Cosmic Cards and connections, and **Prospect** for community reading matches.
 
-**Starting a post.** Open **Start a discussion**, write a specific title, and give the community enough context to understand what you are sharing. A useful post usually explains the question or observation, adds the relevant details, and ends with a clear invitation for others to respond. Choose one idea per thread when possible; focused conversations are easier to read and more useful to future visitors.
+## Connect · Message Board and Live Chat
 
-**Finding the right signal.** Use **Newest** to see recent conversations, **Top** to find posts the community has found most valuable, and **Controversial** to find threads receiving substantial but divided engagement. Sorting changes the order of the visible feed; it does not delete, edit, or change anyone’s post.
+**Live Chat** is the quick-moving room for greetings, short observations, timely questions, and friendly conversation. Use it when your message benefits from an immediate exchange. **Message Board** is for lasting discussions that should remain useful after the live chat moves on: questions, sky observations, practices, resources, and reflective topics.
 
-**Voting responsibly.** Use ▲ when a post is helpful, constructive, insightful, or worth bringing to more members’ attention. Use ▼ when a post is misleading, off-topic, or substantially less useful to the community. Votes express community signal rather than personal agreement alone. You can change or remove your vote, and you cannot vote on your own discussion.
+To start a board thread, open **Start a discussion**, write a specific title, and provide enough context for another member to understand what you mean without guessing. Keep one main idea per thread when possible. Use **Newest** for recent activity, **Top** for posts the community has found useful, and **Controversial** for threads with substantial but divided engagement. Voting is a community signal: use ▲ for constructive, helpful, or insightful posts and ▼ for content that is misleading, off-topic, or less useful. You can change or remove your vote, but you cannot vote on your own discussion.
 
-**Member profiles.** When an author has a public username, their `@username` is clickable. Open it to view the safe public profile and, where applicable, the public Cosmic Card and connection options. Private birth date, birth time, birthplace, coordinates, email address, and account identifiers are never displayed on the board or on a public card.
+Public usernames in board posts and chat may be clickable. Open them to view the appropriate public member information and available connection options. Keep contact details, exact locations, private birth information, and identifying information out of public conversation. Disagree with ideas without attacking people, avoid flooding threads, and use the moderation path for harassment, spam, impersonation, or privacy violations.
 
-**Healthy conversation.** Disagree with ideas without attacking people. Quote the part you are responding to, explain your reasoning, and keep claims proportional to the evidence or personal experience behind them. Avoid flooding a thread, sharing another member’s private information, impersonating someone, or using the board for unsolicited promotion. If a post needs correction, add a calm, specific clarification so later readers can understand what changed.
+## Correct · Binaural Beats
 
-**Privacy and safety.** Share only what you are comfortable making public. Do not post anyone’s personal contact information, exact location, private birth data, or identifying details without clear permission. Direct messages are separate private conversations and remain subject to the app’s connection and privacy rules.
+Correct is LunaTicK’s personal listening space for binaural-beat experimentation, relaxation, and focused reflection. Use headphones so the left and right channels can be heard separately. Choose a tone preset or set the available beat difference to suit your listening intention; the beat difference is the frequency gap between the two channels, not a diagnosis or a promise of a particular result.
 
-**Moderation.** If you see harassment, privacy violations, spam, impersonation, or other unsafe content, use the available moderation/report path rather than escalating the thread. Moderators may review or hide content that violates community standards while preserving the board’s purpose as a welcoming space for meaningful discussion.
+The page uses sine-wave binaural playback with the automatic **11-second tone shift**. You can keep the default beat setting, use a meaningful value such as the Schumann-resonance setting if that is part of your personal practice, or explore the available random chakra sequence. Start at a comfortable volume, listen for a short period first, and stop if the sound causes discomfort. This feature is for personal relaxation and reflection only; it is not medical treatment or a substitute for professional care.
 
-**A simple posting checklist:** Is the title clear? Is the post self-contained? Is the right board context selected? Have private details been removed? Is there a real question, observation, or contribution for other members? If the answer is yes, post it and let the conversation develop.
+## Inspect · Calendar
+
+Inspect is your planning view for the lunar cycle and notable skywatching moments. The calendar grid helps you orient yourself by date, while **Upcoming Events:** provides the fuller event detail below the grid, including lunar phases and other notable astronomical events when available. Use the event detail to decide which dates deserve a reminder, observation session, or personal reflection.
+
+The compact **Private event** control near the legend is for your own planning notes. Add a clear title, date, and useful context, and remember that private entries are not community posts. When following an astronomical event, confirm the date and local conditions independently if precise observation timing matters; the calendar is an informational planning aid rather than a guarantee of visibility from every location.
+
+## Reflect · Journal
+
+Reflect is your private free-writing space. Use it for observations, intentions, dream notes, emotional check-ins, creative writing, or a record of what you noticed during another LunaTicK feature. A dated entry with a short title or opening sentence is easier to revisit than an unstructured block of text.
+
+Write honestly and at your own pace. You can return to earlier entries to notice patterns, but the journal is not a diagnostic tool and its prompts are not professional medical or mental-health advice. Keep highly sensitive information limited to what you genuinely want stored, and never assume a journal entry is public simply because it relates to a public card or community conversation.
+
+## Collect · Cosmic Cards
+
+Collect turns selected, share-safe chart results into a visual Cosmic Card. Begin with your private birth inputs, search for your birthplace when available, and confirm the resolved place and historical timezone before saving. This confirmation step matters because an incorrect location or daylight-saving offset can change the calculated chart result.
+
+The public card is intentionally limited to approved derived fields such as Sun, Moon, Rising, birth phase, full-moon count, and dominant-planet presentation. Exact birth date, birth time, birthplace, coordinates, timezone details, email address, and immutable account identifiers remain private. Search for another member by exact public username to view their public profile, send a card-trade request, and become connected only after the other member accepts. Accepted connections can support private member messaging under the app’s consent rules.
+
+## Prospect · Reading Requests
+
+Prospect is the community matching space for free astrology-reading requests. If you want a reading, describe what kind of reflection or chart discussion you are seeking and provide only the context you are comfortable sharing. If you volunteer as a reader, describe your approach honestly and set expectations about availability and scope.
+
+A match is a mutual community arrangement, not a professional guarantee. Wait for the relevant request or match state before using its private conversation, communicate respectfully, and do not request unnecessary personal information. Astrology readings should be treated as reflective or entertainment-oriented community exchanges rather than medical, legal, financial, or mental-health advice. End a conversation clearly if either person is uncomfortable, and never share another member’s private details outside the matched exchange.
+
+**A simple LunaTicK habit:** use Connect to exchange ideas, Correct to settle into listening, Inspect to notice timing, Reflect to write privately, Collect to share only what you approve, and Prospect to seek or offer a respectful reading match. Across every feature, protect consent, privacy, and the autonomy of other members.
 """
 
 

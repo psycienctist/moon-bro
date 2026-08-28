@@ -10,14 +10,23 @@ assert "backdrop-filter: blur(8px)" in app_source
 
 assert "PINNED_FEATURE_GUIDE" in boards_source
 for phrase in (
-    "Starting a post",
-    "Finding the right signal",
-    "Voting responsibly",
-    "Member profiles",
-    "Healthy conversation",
-    "Privacy and safety",
-    "Moderation",
-    "posting checklist",
+    "## Connect · Message Board and Live Chat",
+    "## Correct · Binaural Beats",
+    "## Inspect · Calendar",
+    "## Reflect · Journal",
+    "## Collect · Cosmic Cards",
+    "## Prospect · Reading Requests",
+    "To start a board thread",
+    "Newest",
+    "Top",
+    "Controversial",
+    "Voting",
+    "11-second tone shift",
+    "Private event",
+    "free-writing",
+    "share-safe chart results",
+    "Reading Requests",
+    "A simple LunaTicK habit",
 ):
     assert phrase in boards_source
 assert '📌 Pinned LunaTicK Feature Guide' in boards_source
