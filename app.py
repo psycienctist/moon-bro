@@ -58,7 +58,7 @@ if getattr(reading_requests, "READING_REQUESTS_MODULE_VERSION", None) != "reader
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
 # module version rather than checking only a helper that older releases share.
-if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_menu_visible_v4":
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_menu_popover_v5":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 # The phone-first Track renderer is also an imported module. Reload it only

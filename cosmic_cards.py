@@ -39,7 +39,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "profile_menu_visible_v4"
+CARD_MODULE_VERSION = "profile_menu_popover_v5"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -1105,16 +1105,13 @@ def _render_profile_hub_search_form(*, key_suffix: str = "") -> None:
 
 
 def _render_profile_menu(*, viewing_member: bool) -> None:
-    """Render an observable, collapsible owner menu in the Profile route."""
-    with st.expander("☰ Profile menu", expanded=True):
+    """Render a compact left-anchored owner menu without consuming page width."""
+    with st.popover("☰", help="Open Profile navigation", type="secondary"):
+        st.markdown("**Profile navigation**")
         st.caption("Your LunaTicK space")
-        menu_columns = st.columns(3)
-        with menu_columns[0]:
-            profile_clicked = st.button("My Profile · Edit", key="profile_menu_my_profile", use_container_width=True)
-        with menu_columns[1]:
-            friends_clicked = st.button("My Friends", key="profile_menu_friends", use_container_width=True)
-        with menu_columns[2]:
-            dms_clicked = st.button("My DMs", key="profile_menu_dms", use_container_width=True)
+        profile_clicked = st.button("✎  My Profile · Edit", key="profile_menu_my_profile", use_container_width=True)
+        friends_clicked = st.button("♧  My Friends", key="profile_menu_friends", use_container_width=True)
+        dms_clicked = st.button("✉  My DMs", key="profile_menu_dms", use_container_width=True)
         if profile_clicked:
             st.session_state.pop("profile_hub_lookup", None)
             st.session_state["profile_hub_section"] = "profile"
