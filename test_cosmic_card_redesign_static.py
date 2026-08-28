@@ -50,8 +50,7 @@ for tile_color in ("#d8dee9", "#66a8ff", "#f7d25c", "#c5a6ff", "#9c7bff", "#73df
     assert tile_color in source, tile_color
 assert "@media (max-width: 600px)" in source
 assert "min-height:82px" in source
-assert "def render_profile_drawer" in source
-assert "def render_profile_hub" not in source
+assert "def render_profile_hub" in source
 assert "_render_trade_initiation(user_hash)" not in source[source.index("def render_cosmic_cards_tab"): ]
 assert source.index("render_collectible_card(my_card") < source.index('st.markdown("#### Your Collection")')
 assert "cosmic_detail" in source

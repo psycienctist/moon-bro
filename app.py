@@ -2093,21 +2093,14 @@ if str(st.query_params.get("track_day", "")).strip():
 requested_profile = str(st.query_params.get("profile", "")).strip().lstrip("@")
 if requested_profile:
     st.session_state.profile_hub_lookup = requested_profile
-    st.session_state.profile_drawer_open = True
     st.session_state.profile_return_page = "Community"
-    if st.session_state.get("nav_page") in {None, "Profile"}:
-        st.session_state.nav_page = "Community"
+    st.session_state.nav_page = "Profile"
     st.query_params.pop("profile", None)
 
 # Existing sessions may still point to a former standalone social tab. Move
 # those users directly into the unified Community destination on the next run.
 if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
     st.session_state.nav_page = "Community"
-
-# Convert any older session that still points at the retired standalone Profile tab.
-if st.session_state.nav_page == "Profile":
-    st.session_state.nav_page = st.session_state.get("profile_return_page") or "Home"
-    st.session_state.profile_drawer_open = True
 
 
 def set_nav_page(page_name: str) -> None:
@@ -2210,21 +2203,24 @@ PAGE_HELP_GUIDES = {
 }
 
 
-def toggle_profile_drawer(return_page: str) -> None:
-    """Toggle the owner/member drawer while leaving the active tab in place."""
+def open_profile_hub(return_page: str) -> None:
+    """Open the standalone social profile page and preserve the calling destination."""
     st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
-    st.session_state.profile_drawer_open = not st.session_state.get("profile_drawer_open", False)
+    st.session_state.profile_hub_section = "profile"
+    st.session_state.nav_page = "Profile"
 
 
 def render_profile_launcher(page_name: str) -> None:
     """Render the fixed profile entry point outside normal layout flow."""
+    if page_name == "Profile":
+        return
     with st.container(key="lunatick-profile-button"):
         st.button(
             "👤",
             key=f"lunatick_profile_open_{page_name.lower().replace(' ', '_')}",
             help="Open your profile, find members, and trade Cosmic Cards",
             type="secondary",
-            on_click=toggle_profile_drawer,
+            on_click=open_profile_hub,
             args=(page_name,),
         )
 
@@ -2282,6 +2278,8 @@ elif current_page == "Reading Requests":
     reading_requests.render_reading_requests()
 elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
+elif current_page == "Profile":
+    cosmic_cards.render_profile_hub()
 elif current_page == "Journal":
     journal_ui.render_journal_tab()
 elif current_page == "Calendar":
@@ -2294,10 +2292,9 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# The profile launcher and drawer are fixed overlays, so the active destination
-# remains in place and compact Home/Connect screens do not gain normal-flow height.
+# Both fixed controls sit outside normal page flow, so neither shifts destinations
+# or extends compact Home/Connect screens.
 render_profile_launcher(current_page)
-cosmic_cards.render_profile_drawer()
 render_page_help(current_page)
 
 NAV_ITEMS = [

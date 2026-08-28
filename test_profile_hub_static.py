@@ -13,29 +13,24 @@ assert "def render_profile_launcher" in app_source
 assert 'key="lunatick-profile-button"' in app_source
 assert 'help="Open your profile, find members, and trade Cosmic Cards"' in app_source
 assert "left: calc(2rem + env(safe-area-inset-left))" in app_source
-assert "def toggle_profile_drawer" in app_source
-assert 'st.session_state.profile_drawer_open = not st.session_state.get("profile_drawer_open", False)' in app_source
-assert "cosmic_cards.render_profile_drawer()" in app_source
-assert 'st.session_state.nav_page = "Profile"' not in app_source
+assert "elif current_page == \"Profile\":" in app_source
+assert "cosmic_cards.render_profile_hub()" in app_source
+assert 'st.session_state.nav_page = "Profile"' in app_source
 assert 'st.query_params.get("profile", "")' in app_source
 
-assert "def render_profile_hub" not in card_source
-assert "def _render_profile_menu" not in card_source
+assert "def render_profile_hub" in card_source
+assert "def _render_profile_menu" in card_source
 assert "def _render_profile_hub_member" in card_source
-assert 'def render_profile_drawer' in card_source
-assert 'with st.container(key="profile-drawer", border=True)' in card_source
-assert 'position: fixed !important' in card_source
-assert 'width: min(50vw, 30rem) !important' in card_source
-assert 'with st.popover("☰", help="Open Profile navigation", type="secondary")' not in card_source
+assert 'with st.popover("☰", help="Open Profile navigation", type="secondary")' in card_source
 assert 'with st.expander("☰ Profile menu", expanded=True)' not in card_source
-assert 'st.markdown("### Profile")' in card_source
-assert 'heading="My Profile"' in card_source
-assert 'st.markdown("<div class=\'profile-hub-kicker\'>Connections</div><h4>My Friends</h4>"' in card_source
-assert 'st.markdown("<div class=\'profile-hub-kicker\'>Private</div><h4>My DMs</h4>"' in card_source
-assert 'st.session_state["profile_hub_section"]' not in card_source
+assert '"✎  My Profile · Edit"' in card_source
+assert '"♧  My Friends"' in card_source
+assert '"✉  My DMs"' in card_source
+assert 'st.session_state["profile_hub_section"] = "friends"' in card_source
+assert 'st.session_state["profile_hub_section"] = "dms"' in card_source
 assert 'direct_messages.render_owner_dm_inbox()' in card_source
 assert "def _render_profile_hub_search_form" in card_source
-assert 'st.markdown("<div class=\'profile-hub-kicker\'>Selected member</div><h4>Member Profile</h4>"' in card_source
+assert 'st.markdown("<div class=\'profile-hub-kicker\'>LunaTic member</div><h2>Member Profile</h2>"' in card_source
 assert '"My Profile", key="profile_hub_my_profile"' not in card_source
 assert 'st.session_state.pop("profile_hub_lookup", None)' in card_source
 assert "if viewing_member:" in card_source
@@ -50,7 +45,7 @@ assert "import direct_messages" in card_source
 assert "direct_messages.render_member_direct_message(target_subject, profile)" in card_source
 assert "def render_member_direct_message" in Path("direct_messages.py").read_text(encoding="utf-8")
 assert "Direct messages require an accepted card-trade connection." in Path("supabase_store.py").read_text(encoding="utf-8")
-assert "public birth inputs" not in card_source[card_source.index("def render_profile_drawer"):]
+assert "public birth inputs" not in card_source[card_source.index("def render_profile_hub"):]
 assert "_render_trade_initiation(user_hash)" not in card_source[card_source.index("def render_cosmic_cards_tab"):]
 
 assert 'from urllib.parse import quote' in chat_source
