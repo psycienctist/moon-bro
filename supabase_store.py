@@ -331,7 +331,7 @@ class SupabaseStore:
     def list_card_trades(self, auth_subject: str, direction: str = "all") -> list[dict[str, Any]]:
         """List the active profile's card trades without joining private profile fields."""
         filters: dict[str, str] = {
-            "select": "id,sender_auth_subject,receiver_auth_subject,message,status,created_at,resolved_at,sender_seen_at",
+            "select": "id,sender_auth_subject,receiver_auth_subject,message,status,created_at",
             "order": "created_at.desc",
             "limit": "100",
         }
@@ -364,21 +364,6 @@ class SupabaseStore:
             prefer="return=representation",
         )
         return bool(rows)
-
-    def mark_accepted_card_trades_seen(self, sender_auth_subject: str) -> int:
-        """Mark only the sender's unviewed accepted card-trade alerts as seen."""
-        rows = self._request(
-            "PATCH",
-            "card_trades",
-            params={
-                "sender_auth_subject": f"eq.{sender_auth_subject}",
-                "status": "eq.accepted",
-                "sender_seen_at": "is.null",
-            },
-            payload={"sender_seen_at": datetime.now(timezone.utc).isoformat()},
-            prefer="return=representation",
-        )
-        return len(rows or [])
 
     def list_accepted_card_contacts(self, auth_subject: str) -> list[str]:
         """Return counterpart subjects from accepted card trades for server-side card summaries."""

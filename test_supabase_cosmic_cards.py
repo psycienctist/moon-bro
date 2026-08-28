@@ -53,7 +53,6 @@ class FakeStore:
         self.updates: list[tuple[str, dict[str, Any]]] = []
         self.trades: list[tuple[str, str, str]] = []
         self.resolutions: list[tuple[int, str, bool]] = []
-        self.seen_acknowledgements: list[str] = []
 
     def get_profile_by_auth_subject(self, subject: str) -> dict[str, Any] | None:
         profile = self.profiles.get(subject)
@@ -76,39 +75,21 @@ class FakeStore:
 
     def list_card_trades(self, subject: str, direction: str) -> list[dict[str, Any]]:
         assert subject == self.current_subject
-        if direction == "incoming":
-            return [
-                {
-                    "id": 9,
-                    "sender_auth_subject": "auth0|other",
-                    "receiver_auth_subject": subject,
-                    "message": "Let us connect.",
-                    "status": "pending",
-                    "created_at": "2026-08-22T00:00:00+00:00",
-                    "sender_seen_at": None,
-                }
-            ]
-        assert direction == "outgoing"
+        assert direction == "incoming"
         return [
             {
-                "id": 10,
-                "sender_auth_subject": subject,
-                "receiver_auth_subject": "auth0|other",
-                "message": "",
-                "status": "accepted",
-                "created_at": "2026-08-21T00:00:00+00:00",
-                "resolved_at": "2026-08-22T00:00:00+00:00",
-                "sender_seen_at": None,
+                "id": 9,
+                "sender_auth_subject": "auth0|other",
+                "receiver_auth_subject": subject,
+                "message": "Let us connect.",
+                "status": "pending",
+                "created_at": "2026-08-22T00:00:00+00:00",
             }
         ]
 
     def resolve_card_trade(self, trade_id: int, subject: str, accept: bool) -> bool:
         self.resolutions.append((trade_id, subject, accept))
         return True
-
-    def mark_accepted_card_trades_seen(self, subject: str) -> int:
-        self.seen_acknowledgements.append(subject)
-        return 1
 
     def list_accepted_card_contacts(self, subject: str) -> list[str]:
         assert subject == self.current_subject
@@ -182,12 +163,6 @@ assert store.trades == [("auth0|current", "auth0|other", "Let us connect.")]
 
 incoming = cards.list_trades("current_hash", "incoming")
 assert incoming[0]["sender"] == "auth0|other"
-assert incoming[0]["sender_seen_at"] is None
-outgoing = cards.list_trades("current_hash", "outgoing")
-assert outgoing[0]["status"] == "accepted"
-assert outgoing[0]["sender_seen_at"] is None
-assert cards.mark_accepted_trades_seen("current_hash") == 1
-assert store.seen_acknowledgements == ["auth0|current"]
 assert cards.resolve_trade(9, "current_hash", True) is True
 assert store.resolutions == [(9, "auth0|current", True)]
 assert cards.friends_of("current_hash") == ["auth0|other"]

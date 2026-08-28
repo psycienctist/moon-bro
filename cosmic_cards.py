@@ -38,7 +38,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "trade_acceptance_notification_v1"
+CARD_MODULE_VERSION = "trade_profile_lookup_v1"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -313,14 +313,9 @@ def init_cards_db() -> None:
             message TEXT,
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            resolved_at TIMESTAMP,
-            sender_seen_at TIMESTAMP
+            resolved_at TIMESTAMP
         )
     """)
-    try:
-        cursor.execute("ALTER TABLE card_trades ADD COLUMN sender_seen_at TIMESTAMP")
-    except sqlite3.OperationalError:
-        pass
     conn.commit()
     conn.close()
 
@@ -604,7 +599,6 @@ def list_trades(user_hash: str, direction: str = "all") -> list[dict]:
                 "id": row["id"], "sender": row["sender_auth_subject"],
                 "receiver": row["receiver_auth_subject"], "message": row.get("message"),
                 "status": row["status"], "created_at": row.get("created_at"),
-                "sender_seen_at": row.get("sender_seen_at"),
             }
             for row in _supabase().list_card_trades(_resolve_auth_subject(user_hash), direction)
         ]
@@ -612,42 +606,20 @@ def list_trades(user_hash: str, direction: str = "all") -> list[dict]:
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
     if direction == "incoming":
-        cursor.execute("""SELECT id, sender_hash, receiver_hash, message, status, created_at, sender_seen_at
+        cursor.execute("""SELECT id, sender_hash, receiver_hash, message, status, created_at
             FROM card_trades WHERE receiver_hash=? ORDER BY created_at DESC""", (user_hash,))
     elif direction == "outgoing":
-        cursor.execute("""SELECT id, sender_hash, receiver_hash, message, status, created_at, sender_seen_at
+        cursor.execute("""SELECT id, sender_hash, receiver_hash, message, status, created_at
             FROM card_trades WHERE sender_hash=? ORDER BY created_at DESC""", (user_hash,))
     elif direction == "all":
-        cursor.execute("""SELECT id, sender_hash, receiver_hash, message, status, created_at, sender_seen_at
+        cursor.execute("""SELECT id, sender_hash, receiver_hash, message, status, created_at
             FROM card_trades WHERE sender_hash=? OR receiver_hash=? ORDER BY created_at DESC""", (user_hash, user_hash))
     else:
         conn.close()
         raise ValueError("Card-trade direction must be incoming, outgoing, or all.")
     rows = cursor.fetchall()
     conn.close()
-    return [
-        {"id": row[0], "sender": row[1], "receiver": row[2], "message": row[3], "status": row[4],
-         "created_at": row[5], "sender_seen_at": row[6]}
-        for row in rows
-    ]
-
-
-def mark_accepted_trades_seen(user_hash: str) -> int:
-    """Acknowledge accepted outbound trades for their sender only."""
-    if _using_supabase_backend():
-        return _supabase().mark_accepted_card_trades_seen(_resolve_auth_subject(user_hash))
-    init_cards_db()
-    conn = sqlite3.connect(DB)
-    cursor = conn.cursor()
-    cursor.execute(
-        """UPDATE card_trades SET sender_seen_at=CURRENT_TIMESTAMP
-           WHERE sender_hash=? AND status='accepted' AND sender_seen_at IS NULL""",
-        (user_hash,),
-    )
-    updated = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return updated
+    return [{"id": row[0], "sender": row[1], "receiver": row[2], "message": row[3], "status": row[4], "created_at": row[5]} for row in rows]
 
 
 def resolve_trade(trade_id: int, user_hash: str, accept: bool) -> bool:
@@ -988,21 +960,8 @@ def _render_trade_profile_lookup(user_hash: str) -> None:
 
 
 def _render_trade_initiation(user_hash: str) -> None:
-    """Compact top-of-screen trade action, accepted-trade alert, and card discovery."""
-    unseen_acceptances = [
-        trade for trade in list_trades(user_hash, "outgoing")
-        if trade.get("status") == "accepted" and not trade.get("sender_seen_at")
-    ]
-    notification_count = len(unseen_acceptances)
-    trade_label = "🤝 Trade Cards" if not notification_count else f"🤝 Trade Cards · {notification_count} new"
-    with st.popover(trade_label, help="Find a member or send a card-trade request"):
-        if notification_count:
-            noun = "friend has" if notification_count == 1 else "friends have"
-            st.success(f"✦ {notification_count} {noun} accepted your card trade.")
-            if st.button("Mark trade update as seen", key="acknowledge_accepted_card_trades", use_container_width=True):
-                mark_accepted_trades_seen(user_hash)
-                st.rerun()
-            st.markdown("---")
+    """Compact top-of-screen trade action and public card discovery."""
+    with st.popover("🤝 Trade Cards", help="Find a member or send a card-trade request"):
         _render_trade_profile_lookup(user_hash)
         st.markdown("---")
         st.caption("Send a card trade to add an accepted friend to your collection.")
