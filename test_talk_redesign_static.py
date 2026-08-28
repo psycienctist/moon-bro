@@ -27,7 +27,7 @@ assert "lunatick_talk_live_chat_form" in chat_source
 assert "DEFAULT_BOARD_SLUG = \"general\"" in boards_source
 assert "lunatick_talk_board_post" in boards_source
 assert "st.selectbox(\"Board\"" not in boards_source
-assert 'BOARD_MODULE_VERSION = "compact_feed_v2"' in boards_source
+assert 'BOARD_MODULE_VERSION = "compact_feed_v3"' in boards_source
 assert "def render_boards_tab(*, compact: bool = False)" in boards_source
 assert "feed_height = 255 if compact else 275" in boards_source
 assert 'key="talk-board-feed" if compact else None' in boards_source
@@ -35,7 +35,7 @@ assert '[data-testid="stMain"]:has(.st-key-talk-board-feed) [data-testid="stMain
 assert "padding-bottom: calc(4.425rem + env(safe-area-inset-bottom)) !important;" in community_source
 assert "padding-bottom: calc(4rem + 0.9375rem) !important;" in community_source
 
-assert 'BOARD_MODULE_VERSION", None) != "compact_feed_v2"' in app_source
+assert 'BOARD_MODULE_VERSION", None) != "compact_feed_v3"' in app_source
 assert "boards = importlib.reload(boards)" in app_source
 assert 'COMMUNITY_MODULE_VERSION", None) != "talk_surface_toggle_v2"' in app_source
 assert "import lunatick_talk_ui" not in app_source

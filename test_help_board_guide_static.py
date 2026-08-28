@@ -20,8 +20,10 @@ for phrase in (
     "posting checklist",
 ):
     assert phrase in boards_source
-assert 'key="board-pinned-feature-guide"' in boards_source
+assert '📌 Pinned LunaTicK Feature Guide' in boards_source
+assert 'Correct · Calendar · Journal · Cosmic Cards · Reading Requests' in boards_source
 assert 'key="talk-board-feed" if compact else None' in boards_source
-assert boards_source.index('key="board-pinned-feature-guide"') > boards_source.index('key="talk-board-feed"')
+assert 'with st.expander("📌 Pinned LunaTicK Feature Guide", expanded=False):' in boards_source
+assert boards_source.index('Pinned LunaTicK Feature Guide') > boards_source.index('key="talk-board-feed"')
 
 print("Help translucency and pinned board guide checks passed.")

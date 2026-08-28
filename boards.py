@@ -14,7 +14,7 @@ import supabase_store
 
 DB = "lunatick.db"
 # Required by app.py to replace a board renderer retained by a warm Streamlit worker.
-BOARD_MODULE_VERSION = "compact_feed_v2"
+BOARD_MODULE_VERSION = "compact_feed_v3"
 
 DEFAULT_BOARD_SLUG = "general"
 SORT_OPTIONS = ("Newest", "Top", "Controversial")
@@ -418,7 +418,8 @@ def render_boards_tab(*, compact: bool = False) -> None:
         border=True,
         key="talk-board-feed" if compact else None,
     ):
-        with st.container(key="board-pinned-feature-guide", border=True):
+        with st.expander("📌 Pinned LunaTicK Feature Guide", expanded=False):
+            st.caption("Correct · Calendar · Journal · Cosmic Cards · Reading Requests")
             st.markdown(PINNED_FEATURE_GUIDE)
         if not posts:
             st.caption("No discussions yet. Start the first thread.")
