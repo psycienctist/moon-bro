@@ -68,8 +68,8 @@ def _render_css() -> None:
           .st-key-profile-drawer-overlay {
             left: .5rem !important;
             top: .5rem !important;
-            width: calc(100vw - 1rem) !important;
-            max-width: none !important;
+            width: min(82vw, 30rem) !important;
+            max-width: calc(100vw - 1rem) !important;
             height: calc(100dvh - 1rem) !important;
           }
         }
