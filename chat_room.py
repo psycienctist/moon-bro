@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import sqlite3
+from urllib.parse import quote
 
 import streamlit as st
 
@@ -95,6 +96,7 @@ def recent_messages(limit: int = 50) -> list[dict]:
                     or profiles.get(row["profile_auth_subject"], {}).get("username")
                     or "Moon Wanderer"
                 ),
+                "profile_username": profiles.get(row["profile_auth_subject"], {}).get("username") or "",
                 "content": row["content"],
                 "created_at": row.get("created_at"),
             }
@@ -113,7 +115,7 @@ def recent_messages(limit: int = 50) -> list[dict]:
     finally:
         conn.close()
     return [
-        {"author": row[0], "content": row[1], "created_at": row[2]}
+        {"author": row[0], "profile_username": "", "content": row[1], "created_at": row[2]}
         for row in reversed(rows)
     ]
 
@@ -130,10 +132,16 @@ def _render_chat_panel() -> None:
         for message in messages:
             timestamp = str(message.get("created_at") or "")[11:16]
             author = html.escape(str(message.get("author") or "Moon Wanderer"))
+            profile_username = str(message.get("profile_username") or "").strip()
+            profile_label = html.escape(profile_username or str(message.get("author") or "Moon Wanderer"))
+            author_markup = (
+                f"<a href='?profile={quote(profile_username, safe='')}' style='color:#bc8cff;font-weight:700;text-decoration:none;'>@{profile_label}</a>"
+                if profile_username else f"<span style='color:#bc8cff;font-weight:700;'>@{profile_label}</span>"
+            )
             content = html.escape(str(message.get("content") or "")).replace("\n", "<br>")
             st.markdown(
                 f"<div style='margin:0 0 .5rem;'>"
-                f"<span style='color:#bc8cff;font-weight:700;'>@{author}</span> "
+                f"{author_markup} "
                 f"<span style='color:#8b949e;font-size:.68rem;'>{timestamp}</span><br>"
                 f"<span style='color:#e6edf3;'>{content}</span></div>",
                 unsafe_allow_html=True,

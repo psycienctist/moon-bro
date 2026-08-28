@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 import html
 import sqlite3
+from urllib.parse import quote
 
 import streamlit as st
 
@@ -205,6 +206,7 @@ def list_posts(
                     or profiles.get(row["profile_auth_subject"], {}).get("display_name")
                     or "Moon Wanderer"
                 ),
+                "profile_username": profiles.get(row["profile_auth_subject"], {}).get("username") or "",
                 "title": row["title"],
                 "content": row["content"],
                 "upvotes": int(row.get("upvotes") or 0),
@@ -244,6 +246,7 @@ def list_posts(
             "board": row[1],
             "author_reference": row[2],
             "author": row[3],
+            "profile_username": "",
             "title": row[4],
             "content": row[5],
             "upvotes": int(row[6] or 0),
@@ -398,12 +401,18 @@ def render_boards_tab(*, compact: bool = False) -> None:
         for post in posts:
             board = html.escape(_board_label(str(post.get("board") or "")))
             author = html.escape(str(post.get("author") or "Moon Wanderer"))
+            profile_username = str(post.get("profile_username") or "").strip()
+            profile_label = html.escape(profile_username or str(post.get("author") or "Moon Wanderer"))
+            author_markup = (
+                f"<a href='?profile={quote(profile_username, safe='')}' style='color:#bc8cff;text-decoration:none;'>@{profile_label}</a>"
+                if profile_username else f"@{profile_label}"
+            )
             title = html.escape(str(post.get("title") or "Untitled"))
             content = html.escape(str(post.get("content") or "")).replace("\n", "<br>")
             created_at = html.escape(str(post.get("created_at") or "")[:16])
             st.markdown(
                 f"<article style='border-bottom:1px solid #30363d;padding:.5rem 0 .18rem;'>"
-                f"<div style='color:#8b949e;font-size:.65rem;'>{board} · @{author} · {created_at}</div>"
+                f"<div style='color:#8b949e;font-size:.65rem;'>{board} · {author_markup} · {created_at}</div>"
                 f"<div style='color:#f0f6fc;font-weight:700;margin:.18rem 0;'>{title}</div>"
                 f"<div style='color:#c9d1d9;font-size:.88rem;line-height:1.42;'>{content}</div>"
                 f"</article>",

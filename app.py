@@ -58,7 +58,7 @@ if getattr(reading_requests, "READING_REQUESTS_MODULE_VERSION", None) != "reader
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
 # module version rather than checking only a helper that older releases share.
-if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "trade_profile_lookup_v1":
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_social_v1":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 # The phone-first Track renderer is also an imported module. Reload it only
@@ -821,8 +821,10 @@ LUNATICK_CSS = """
        participate in normal page flow, keeping compact Home/Connect screens
        and the established fixed navigation unchanged. */
     [class*="st-key-lunatick-page-help-button"],
+    [class*="st-key-lunatick-profile-button"],
     .stElementContainer:has(.st-key-lunatick-page-help-button),
-    .stElementContainer:has(.st-key-lunatick-page-help-popover) {
+    .stElementContainer:has(.st-key-lunatick-page-help-popover),
+    .stElementContainer:has(.st-key-lunatick-profile-button) {
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -833,8 +835,53 @@ LUNATICK_CSS = """
        Flatten these two wrappers as well so their normal 1rem row gap cannot
        contribute invisible scroll height beneath the fixed overlay. */
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-button),
-    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-popover) {
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-popover),
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-profile-button) {
         display: contents !important;
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] {
+        position: fixed !important;
+        top: calc(0.9rem + env(safe-area-inset-top)) !important;
+        left: calc(2rem + env(safe-area-inset-left)) !important;
+        z-index: 1000001 !important;
+        width: 2.15rem !important;
+        height: 2.15rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto !important;
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button {
+        align-items: center;
+        background: linear-gradient(145deg, rgba(47, 30, 91, 0.98), rgba(17, 13, 39, 0.98)) !important;
+        border: 1px solid rgba(188, 140, 255, 0.90) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 0 16px rgba(188, 140, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+        color: #f0e6ff !important;
+        display: flex;
+        font-size: 1rem !important;
+        height: 2.15rem !important;
+        justify-content: center;
+        line-height: 1;
+        min-height: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto !important;
+        transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        width: 2.15rem !important;
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button:hover,
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button:focus-visible {
+        background: linear-gradient(145deg, #593bb0, #25184f) !important;
+        border-color: #e0ccff !important;
+        box-shadow: 0 0 20px rgba(188, 140, 255, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.30) !important;
+        outline: none;
+        transform: scale(1.06);
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button:active {
+        transform: scale(0.93);
     }
 
     [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
@@ -950,6 +997,11 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
+        [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] {
+            top: calc(0.9rem + env(safe-area-inset-top)) !important;
+            left: calc(1.25rem + env(safe-area-inset-left)) !important;
+        }
+
         [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
             top: calc(0.9rem + env(safe-area-inset-top)) !important;
             right: calc(1.25rem + env(safe-area-inset-right)) !important;
@@ -965,7 +1017,8 @@ LUNATICK_CSS = """
     }
 
     @media (prefers-reduced-motion: reduce) {
-        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button {
+        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button,
+        [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button {
             transition: none !important;
         }
     }
@@ -2035,6 +2088,15 @@ if st.query_params.get("reading_requests") == "1":
 if str(st.query_params.get("track_day", "")).strip():
     st.session_state.nav_page = "Calendar"
 
+# Community usernames use this lightweight route to open the same safe public
+# profile surface without placing immutable account identifiers in the UI.
+requested_profile = str(st.query_params.get("profile", "")).strip().lstrip("@")
+if requested_profile:
+    st.session_state.profile_hub_lookup = requested_profile
+    st.session_state.profile_return_page = "Community"
+    st.session_state.nav_page = "Profile"
+    st.query_params.pop("profile", None)
+
 # Existing sessions may still point to a former standalone social tab. Move
 # those users directly into the unified Community destination on the next run.
 if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
@@ -2108,6 +2170,16 @@ PAGE_HELP_GUIDES = {
             "This feature is for personal relaxation only and is not medical treatment.",
         ),
     },
+    "Profile": {
+        "title": "Profile guide",
+        "intro": "Your public LunaTicK presence and your private card-collection connections.",
+        "items": (
+            "Search an exact public @username to view a member profile.",
+            "Send a card trade to request a mutual connection; the other member must accept it.",
+            "Accepted connections can display Cosmic Cards when the owner has activated one.",
+            "Profiles never reveal private birth inputs, account email, or location details.",
+        ),
+    },
     "Settings": {
         "title": "Settings guide",
         "intro": "Manage your profile, private birth-chart inputs, visibility preferences, and account options.",
@@ -2129,6 +2201,27 @@ PAGE_HELP_GUIDES = {
         ),
     },
 }
+
+
+def open_profile_hub(return_page: str) -> None:
+    """Open the standalone social profile page and preserve the calling destination."""
+    st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
+    st.session_state.nav_page = "Profile"
+
+
+def render_profile_launcher(page_name: str) -> None:
+    """Render the fixed profile entry point outside normal layout flow."""
+    if page_name == "Profile":
+        return
+    with st.container(key="lunatick-profile-button"):
+        st.button(
+            "👤",
+            key=f"lunatick_profile_open_{page_name.lower().replace(' ', '_')}",
+            help="Open your profile, find members, and trade Cosmic Cards",
+            type="secondary",
+            on_click=open_profile_hub,
+            args=(page_name,),
+        )
 
 
 def render_page_help(page_name: str) -> None:
@@ -2184,6 +2277,8 @@ elif current_page == "Reading Requests":
     reading_requests.render_reading_requests()
 elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
+elif current_page == "Profile":
+    cosmic_cards.render_profile_hub()
 elif current_page == "Journal":
     journal_ui.render_journal_tab()
 elif current_page == "Calendar":
@@ -2196,8 +2291,9 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# CSS fixes this guide outside normal page flow, so it cannot shift destinations
-# or extend compact Home/Connect screens.
+# Both fixed controls sit outside normal page flow, so neither shifts destinations
+# or extends compact Home/Connect screens.
+render_profile_launcher(current_page)
 render_page_help(current_page)
 
 NAV_ITEMS = [

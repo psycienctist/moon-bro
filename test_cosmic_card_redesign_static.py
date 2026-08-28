@@ -50,14 +50,14 @@ for tile_color in ("#d8dee9", "#66a8ff", "#f7d25c", "#c5a6ff", "#9c7bff", "#73df
     assert tile_color in source, tile_color
 assert "@media (max-width: 600px)" in source
 assert "min-height:82px" in source
-assert "def _render_trade_initiation" in source
-assert 'with st.popover("🤝 Trade Cards", help="Find a member or send a card-trade request")' in source
+assert "def render_profile_hub" in source
+assert "_render_trade_initiation(user_hash)" not in source[source.index("def render_cosmic_cards_tab"): ]
 assert source.index("render_collectible_card(my_card") < source.index('st.markdown("#### Your Collection")')
 assert "cosmic_detail" in source
-assert 'CARD_MODULE_VERSION = "trade_profile_lookup_v1"' in source
+assert 'CARD_MODULE_VERSION = "profile_hub_social_v1"' in source
 for tile_class in ("cosmic-card-tile--sun", "cosmic-card-tile--moon", "cosmic-card-tile--rising", "cosmic-card-tile--birth_phase", "cosmic-card-tile--full_moons", "cosmic-card-tile--dominant"):
     assert tile_class in source, tile_class
-assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "trade_profile_lookup_v1"' in app_source
+assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_social_v1"' in app_source
 assert "cosmic_cards = importlib.reload(cosmic_cards)" in app_source
 
 print("Cosmic Card single-face, six-tile, share-safe, and warm-reload checks passed.")

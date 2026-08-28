@@ -38,7 +38,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "trade_profile_lookup_v1"
+CARD_MODULE_VERSION = "profile_hub_social_v1"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -979,6 +979,160 @@ def _render_trade_initiation(user_hash: str) -> None:
                 st.rerun()
 
 
+def _render_profile_hub_css() -> None:
+    """Style the dedicated social profile surface without exposing private fields."""
+    st.html("""
+    <style>
+      .profile-hub-card {
+        background: linear-gradient(145deg, rgba(26, 16, 57, .9), rgba(9, 12, 24, .96));
+        border: 1px solid rgba(188, 140, 255, .46);
+        border-radius: 14px;
+        margin: .55rem 0;
+        padding: .8rem .9rem;
+      }
+      .profile-hub-card__name { color: #f0f6fc; font-size: 1.04rem; font-weight: 750; }
+      .profile-hub-card__handle { color: #bc8cff; font-size: .82rem; margin-top: .1rem; }
+      .profile-hub-card__bio { color: #c9d1d9; font-size: .87rem; line-height: 1.42; margin: .38rem 0 0; }
+      .profile-hub-kicker { color: #bc8cff; font-family: Orbitron, sans-serif; font-size: .59rem; font-weight: 800; letter-spacing: .15em; margin: .18rem 0; text-transform: uppercase; }
+    </style>
+    """)
+
+
+def _render_profile_summary(profile: dict, *, heading: str | None = None) -> None:
+    """Render only the safe public presence fields shared by a member."""
+    avatar = html.escape(str(profile.get("avatar") or "🌙"))
+    display_name = html.escape(str(profile.get("display_name") or "Moon Wanderer"))
+    username = html.escape(str(profile.get("username") or "moon_wanderer"))
+    bio = html.escape(str(profile.get("bio") or "")).replace("\n", "<br>")
+    kicker = f"<div class='profile-hub-kicker'>{html.escape(heading)}</div>" if heading else ""
+    st.markdown(
+        f"<section class='profile-hub-card'>"
+        f"{kicker}<div class='profile-hub-card__name'>{avatar} {display_name}</div>"
+        f"<div class='profile-hub-card__handle'>@{username}</div>"
+        f"<div class='profile-hub-card__bio'>{bio or 'No bio shared yet.'}</div>"
+        f"</section>",
+        unsafe_allow_html=True,
+    )
+
+
+def _profile_hub_target_subject(username: str) -> str:
+    """Resolve a target only on the server; never surface its immutable subject."""
+    if not _using_supabase_backend():
+        return ""
+    source = _supabase().get_card_profile_by_username_server_only(username)
+    return str((source or {}).get("auth_subject") or "").strip()
+
+
+def _render_profile_hub_member(user_hash: str, requested_handle: str) -> None:
+    """Show one searched public profile with connection and card-trade actions."""
+    profile = auth.get_public_profile(requested_handle)
+    if profile is None:
+        st.info(f"No public LunaTicK profile was found for @{html.escape(requested_handle)}.")
+        return
+
+    _render_profile_summary(profile, heading="Member profile")
+    username = str(profile.get("username") or requested_handle).strip()
+    current_username = str(st.session_state.get("username") or "").strip()
+    target_subject = _profile_hub_target_subject(username)
+
+    if username == current_username:
+        st.caption("This is your public profile. Use Settings to edit your public details.")
+    elif target_subject and target_subject in set(friends_of(user_hash)):
+        st.success("✦ You are connected. Their card is in your collection when it is active.")
+    elif target_subject:
+        st.caption("Send a card trade to connect. Your friend decides whether to accept it.")
+        if st.button(
+            f"Send card trade to @{username}",
+            key=f"profile_hub_trade_{_safe_card_key(username)}",
+            type="primary",
+            use_container_width=True,
+        ):
+            ok, note = send_trade(user_hash, target_subject)
+            (st.success if ok else st.warning)(note)
+            if ok:
+                st.rerun()
+    else:
+        st.caption("This member’s profile is still syncing. Try again shortly to send a card trade.")
+
+    public_card = build_public_card_by_username(username)
+    if public_card:
+        st.caption("Public Cosmic Card")
+        render_collectible_card(public_card, is_owner=False, key_prefix=f"profile_hub_{_safe_card_key(username)}", compact=True)
+
+
+def _render_profile_hub_connections(user_hash: str) -> None:
+    """List accepted public connections without revealing private profile data."""
+    friend_subjects = friends_of(user_hash)
+    st.subheader("Your Connections")
+    if not friend_subjects:
+        st.caption("Search a member above and send a card trade to start your collection.")
+        return
+    if _using_supabase_backend():
+        profiles = _supabase().get_public_profile_summaries(friend_subjects)
+        for subject in friend_subjects:
+            profile = profiles.get(subject) or {}
+            username = str(profile.get("username") or "").strip()
+            label = str(profile.get("display_name") or username or "Moon Wanderer")
+            avatar = str(profile.get("avatar") or "🌙")
+            if username and st.button(
+                f"{avatar} {label} · @{username}",
+                key=f"profile_hub_connection_{_safe_card_key(subject)}",
+                use_container_width=True,
+            ):
+                st.session_state["profile_hub_lookup"] = username
+                st.rerun()
+        return
+    st.caption(f"{len(friend_subjects)} accepted card connection{'s' if len(friend_subjects) != 1 else ''}.")
+
+
+def render_profile_hub() -> None:
+    """Open the member's own profile first, then safe discovery and card trading."""
+    init_cards_db()
+    _render_card_css()
+    _render_profile_hub_css()
+    user_hash = str(st.session_state.get("user_hash") or "anonymous")
+    own_username = str(st.session_state.get("username") or "").strip()
+    own_profile = auth.get_public_profile(own_username) if own_username else None
+
+    header_left, header_right = st.columns([1, 1])
+    with header_left:
+        if st.button("← Back", key="profile_hub_back"):
+            st.session_state.nav_page = st.session_state.get("profile_return_page", "Home")
+            st.rerun()
+    with header_right:
+        if st.button("Edit my profile", key="profile_hub_edit", use_container_width=True):
+            st.session_state.nav_page = "Settings"
+            st.rerun()
+
+    st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Profile</h2>", unsafe_allow_html=True)
+    if own_profile:
+        _render_profile_summary(own_profile, heading="Your public presence")
+    else:
+        st.info("Your public profile is being prepared. Complete your profile in Settings to share a username.")
+
+    st.markdown("---")
+    st.markdown("<div class='profile-hub-kicker'>Discover and connect</div><h3>Find a LunaTicK Member</h3>", unsafe_allow_html=True)
+    st.caption("Search an exact public @username to view their profile, connect, and trade Cosmic Cards.")
+    with st.form("profile_hub_lookup_form", clear_on_submit=False):
+        lookup_username = st.text_input(
+            "Username", value=st.session_state.get("profile_hub_lookup", ""), max_chars=24,
+            placeholder="e.g. moon_orbit", label_visibility="collapsed",
+        )
+        searched = st.form_submit_button("View profile", type="primary", use_container_width=True)
+    if searched:
+        st.session_state["profile_hub_lookup"] = lookup_username.strip().lstrip("@")
+
+    requested_handle = str(st.session_state.get("profile_hub_lookup", "")).strip()
+    if requested_handle:
+        _render_profile_hub_member(user_hash, requested_handle)
+        if st.button("Clear member search", key="profile_hub_clear_lookup"):
+            st.session_state.pop("profile_hub_lookup", None)
+            st.rerun()
+
+    st.markdown("---")
+    _render_profile_hub_connections(user_hash)
+
+
 def render_cosmic_cards_tab() -> None:
     """Render the compact owner card, its detail panel, and accepted-card collection."""
     init_cards_db()
@@ -986,8 +1140,7 @@ def render_cosmic_cards_tab() -> None:
     profile = get_or_create_profile(user_hash)
     my_card = build_card(user_hash)
 
-    # This occupies the exact light-weight top action role formerly used by Flip.
-    _render_trade_initiation(user_hash)
+    st.caption("Use the profile button in the upper-left corner to find members, connect, and trade Cosmic Cards.")
 
     if not my_card:
         st.info("Add your birth date to unlock your Cosmic Card.")
