@@ -5,8 +5,8 @@ from pathlib import Path
 card_source = Path("cosmic_cards.py").read_text(encoding="utf-8")
 app_source = Path("app.py").read_text(encoding="utf-8")
 
-assert 'CARD_MODULE_VERSION = "profile_hub_social_v1"' in card_source
-assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_social_v1"' in app_source
+assert 'CARD_MODULE_VERSION = "profile_hub_direct_view_v2"' in card_source
+assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "profile_hub_direct_view_v2"' in app_source
 assert "def render_profile_hub" in card_source
 assert "def _render_profile_hub_member" in card_source
 assert "def _profile_hub_target_subject" in card_source

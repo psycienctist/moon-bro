@@ -38,7 +38,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "profile_hub_social_v1"
+CARD_MODULE_VERSION = "profile_hub_direct_view_v2"
 
 
 CARD_PROFILE_DEFAULTS = {
