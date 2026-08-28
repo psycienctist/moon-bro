@@ -41,6 +41,11 @@ def test_calendar_source_renders_feed_below_calendar() -> None:
     assert "✦ Upcoming Events:" in source
     assert "track-upcoming-card" in source
     assert "_render_upcoming_events(today)" in source
+    assert "Daily moon phases, notable skywatching events, and your private calendar." not in source
+    assert 'st.popover("✎ Private event"' in source
+    assert "track-calendar-footer" in source
+    assert "track-private-event-control" in source
+    assert "with st.expander(f\"✎ Add a private note" not in source
     assert source.index("track-legend") < source.rindex("_render_upcoming_events(today)")
 
 

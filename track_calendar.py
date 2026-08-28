@@ -442,7 +442,12 @@ def _render_css() -> None:
         .st-key-track-month-nav [data-testid="stColumn"] { min-width:0!important; }
         .st-key-track-month-nav .st-key-track_previous_month, .st-key-track-month-nav .st-key-track_next_month { flex:0 0 1.72rem!important; width:1.72rem!important; }
         .st-key-track_previous_month button, .st-key-track_next_month button { min-height:1.72rem!important; height:1.72rem!important; min-width:1.72rem!important; width:1.72rem!important; padding:0!important; border-radius:.48rem!important; font-size:.66rem!important; line-height:1!important; }
-        .track-legend { display:flex; flex-wrap:wrap; gap:.42rem .78rem; color:#9ba9bf; font-size:.62rem; margin:.42rem 0 .08rem; }
+        .st-key-track-calendar-footer { margin:.42rem 0 .08rem; }
+        .st-key-track-calendar-footer [data-testid="stHorizontalBlock"] { display:flex!important; flex-direction:row!important; flex-wrap:nowrap!important; align-items:center!important; gap:.35rem!important; width:100%!important; }
+        .st-key-track-calendar-footer [data-testid="stColumn"] { min-width:0!important; }
+        .track-legend { display:flex; flex-wrap:wrap; gap:.42rem .78rem; color:#9ba9bf; font-size:.62rem; margin:0; }
+        .st-key-track-private-event-control button { min-height:1.78rem!important; padding:.24rem .38rem!important; border:1px solid rgba(188,140,255,.82)!important; border-radius:.5rem!important; background:linear-gradient(135deg,rgba(85,54,139,.74),rgba(32,22,65,.94))!important; box-shadow:0 0 10px rgba(188,140,255,.16)!important; color:#f0e6ff!important; font-size:.57rem!important; font-weight:700!important; line-height:1!important; white-space:nowrap!important; }
+        .st-key-track-private-event-control button:hover { border-color:#e0c6ff!important; background:linear-gradient(135deg,rgba(111,72,174,.80),rgba(47,30,88,.98))!important; }
         .track-upcoming-title { margin:1rem 0 .48rem; color:#f0e6ff; font-family:Orbitron,sans-serif; font-size:.72rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
         .track-upcoming-list { display:grid; gap:.5rem; margin:0 0 1rem; }
         .track-upcoming-card { display:grid; grid-template-columns:3.25rem 2.15rem minmax(0,1fr); gap:.55rem; align-items:start; border:1px solid rgba(188,140,255,.38); border-radius:10px; background:linear-gradient(145deg,rgba(31,22,56,.82),rgba(10,15,29,.95)); box-shadow:inset 0 0 17px rgba(188,140,255,.07); padding:.62rem .68rem; }
@@ -560,17 +565,19 @@ def render_track_tab() -> None:
         with right:
             st.button("▶", key="track_next_month", on_click=_set_month, args=(1,))
 
-    st.caption("Daily moon phases, notable skywatching events, and your private calendar.")
-
-    with st.expander(f"✎ Add a private note · {selected.strftime('%b')} {selected.day}", expanded=False):
-        _render_selected_day(selected, entries.get(selected.isoformat(), {}))
-
     st.markdown(f'<div class="track-grid">{_month_grid_html(month_start, entries)}</div>', unsafe_allow_html=True)
-    st.markdown(
-        "<div class='track-legend'>"
-        "<span>✦ lunar event</span><span style='color:#bc8cff'>• private note</span>"
-        "<span style='color:#f05d6e'>• cycle start</span><span style='color:#63d99d'>• cycle end</span>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    with st.container(key="track-calendar-footer"):
+        legend_column, private_event_column = st.columns([4.2, 1.35], vertical_alignment="center")
+        with legend_column:
+            st.markdown(
+                "<div class='track-legend'>"
+                "<span>✦ lunar event</span><span style='color:#bc8cff'>• private note</span>"
+                "<span style='color:#f05d6e'>• cycle start</span><span style='color:#63d99d'>• cycle end</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with private_event_column:
+            with st.container(key="track-private-event-control"):
+                with st.popover("✎ Private event", help="Add or edit a private note for the selected date", use_container_width=True):
+                    _render_selected_day(selected, entries.get(selected.isoformat(), {}))
     _render_upcoming_events(today)
