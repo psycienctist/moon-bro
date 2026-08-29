@@ -11,19 +11,35 @@ import hashlib
 import html
 import math
 import sqlite3
+import requests
+import swisseph as swe
+from timezonefinder import TimezoneFinder
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from collections import Counter
 from datetime import date, datetime, time as dtime, timedelta, timezone
 
 import ephem
 import streamlit as st
 
+import auth
+import direct_messages
 import supabase_store
 
 
+def _cache_data(*args, **kwargs):
+    cache = getattr(st, "cache_data", None)
+    if cache is not None:
+        return cache(*args, **kwargs)
+    return lambda function: function
+
+
 DB = "lunatick.db"
+GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
+GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository maintainer)"
+_TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "public_value_privacy_v3"
+CARD_MODULE_VERSION = "birth_chart_horoscope_v1"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -77,7 +93,7 @@ TERM_EXPLANATIONS = {
         "title": "Rising sign",
         "what": "The zodiac sector rising on the eastern horizon at your recorded birth moment and location.",
         "how": "LunaTicK combines your birth time, UTC offset, latitude, and longitude to calculate the Ascendant.",
-        "note": "This field stays unavailable until actual coordinates are provided. The app does not yet resolve city time zones or historical daylight-saving rules automatically.",
+        "note": "Coordinates and the historical timezone are resolved from a confirmed city or postal/ZIP-code result.",
     },
     "birth_phase": {
         "title": "Birth phase",
@@ -147,6 +163,63 @@ def _has_actual_coordinates(lat: object, lon: object) -> bool:
         return False
 
 
+@_cache_data(ttl=86400, show_spinner=False)
+def _geocode_place(query: str) -> list[dict]:
+    """Resolve one explicit city/postal-code search; never run as autocomplete."""
+    normalized = " ".join(str(query or "").split())
+    if not normalized:
+        return []
+    response = requests.get(
+        GEOCODER_URL,
+        params={"q": normalized, "format": "jsonv2", "addressdetails": 1, "limit": 5},
+        headers={"User-Agent": GEOCODER_USER_AGENT, "Accept-Language": "en"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    results = []
+    for item in response.json():
+        try:
+            lat = float(item["lat"])
+            lon = float(item["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        timezone_name = _TIMEZONE_FINDER.timezone_at(lng=lon, lat=lat)
+        if timezone_name:
+            results.append({
+                "label": str(item.get("display_name") or normalized),
+                "lat": lat,
+                "lon": lon,
+                "timezone": timezone_name,
+            })
+    return results
+
+
+def _local_to_utc(
+    birth_date: str,
+    birth_time: str | None,
+    utc_offset: float | None = None,
+    timezone_name: str | None = None,
+) -> datetime:
+    """Convert local wall time using historical IANA rules when available."""
+    parsed_date = date.fromisoformat(birth_date[:10])
+    if birth_time:
+        try:
+            parts = birth_time.strip().split(":")
+            local_time = dtime(int(parts[0]) % 24, int(parts[1]) % 60 if len(parts) > 1 else 0)
+        except (TypeError, ValueError):
+            local_time = dtime(12, 0)
+    else:
+        local_time = dtime(12, 0)
+    naive = datetime.combine(parsed_date, local_time)
+    if timezone_name:
+        try:
+            return naive.replace(tzinfo=ZoneInfo(timezone_name)).astimezone(timezone.utc)
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    offset = float(utc_offset) if utc_offset is not None else 0.0
+    return (naive - timedelta(hours=offset)).replace(tzinfo=timezone.utc)
+
+
 def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None) -> dict:
     """Calculate card astronomy from a UTC instant and optional actual coordinates."""
     observer = ephem.Observer()
@@ -196,42 +269,18 @@ def _chart(dt_utc: datetime, lat: float | None = None, lon: float | None = None)
 
     if lat is not None and lon is not None:
         try:
-            local_sidereal_time = float(observer.sidereal_time())
-            latitude_radians = math.radians(float(lat))
-            obliquity = math.radians(23.4392911)
-            y = -math.cos(local_sidereal_time)
-            x = (
-                math.sin(local_sidereal_time) * math.cos(obliquity)
-                + math.tan(latitude_radians) * math.sin(obliquity)
+            # Swiss Ephemeris is the reference calculation for the Ascendant.
+            jd_ut = swe.julday(
+                dt_utc.year, dt_utc.month, dt_utc.day,
+                dt_utc.hour + dt_utc.minute / 60 + dt_utc.second / 3600,
             )
-            # The earlier implementation returned the point opposite the
-            # Ascendant. The independent Swiss Ephemeris audit showed that
-            # adding 180° yields the actual eastern-horizon Ascendant.
-            ascendant = (math.degrees(math.atan2(y, x)) + 180.0) % 360
+            _cusps, ascmc = swe.houses_ex(jd_ut, float(lat), float(lon), b"P", 0)
+            ascendant = float(ascmc[0]) % 360.0
             rising_sign, rising_symbol = _sign_from_lon(ascendant)
-            out.update({
-                "has_rising": True,
-                "rising_sign": rising_sign,
-                "rising_symbol": rising_symbol,
-            })
-        except (TypeError, ValueError, OverflowError):
+            out.update({"has_rising": True, "rising_sign": rising_sign, "rising_symbol": rising_symbol})
+        except (TypeError, ValueError, OverflowError, swe.Error):
             pass
     return out
-
-
-def _local_to_utc(birth_date: str, birth_time: str | None, utc_offset: float | None) -> datetime:
-    """Convert the user-supplied local wall time using their supplied offset."""
-    parsed_date = date.fromisoformat(birth_date[:10])
-    if birth_time:
-        try:
-            parts = birth_time.strip().split(":")
-            local_time = dtime(int(parts[0]) % 24, int(parts[1]) % 60 if len(parts) > 1 else 0)
-        except (TypeError, ValueError):
-            local_time = dtime(12, 0)
-    else:
-        local_time = dtime(12, 0)
-    offset = float(utc_offset) if utc_offset is not None else 0.0
-    return (datetime.combine(parsed_date, local_time) - timedelta(hours=offset)).replace(tzinfo=timezone.utc)
 
 
 def init_cards_db() -> None:
@@ -395,6 +444,15 @@ def _full_moons_lived(birth_date: str) -> int:
         return 0
 
 
+def _timezone_for_coordinates(lat: float | None, lon: float | None) -> str | None:
+    if lat is None or lon is None:
+        return None
+    try:
+        return _TIMEZONE_FINDER.timezone_at(lng=float(lon), lat=float(lat))
+    except (TypeError, ValueError):
+        return None
+
+
 def build_card(user_hash: str) -> dict | None:
     """Build the private owner card; callers must not render private inputs for contacts."""
     profile = get_or_create_profile(user_hash)
@@ -403,7 +461,12 @@ def build_card(user_hash: str) -> dict | None:
     try:
         has_coordinates = _has_actual_coordinates(profile.get("lat"), profile.get("lon"))
         natal = _chart(
-            _local_to_utc(profile["birth_date"], profile.get("birth_time"), profile.get("utc_offset")),
+            _local_to_utc(
+                profile["birth_date"],
+                profile.get("birth_time"),
+                profile.get("utc_offset"),
+                _timezone_for_coordinates(profile.get("lat"), profile.get("lon")),
+            ),
             float(profile["lat"]) if has_coordinates else None,
             float(profile["lon"]) if has_coordinates else None,
         )
@@ -626,6 +689,12 @@ def _render_card_css() -> None:
     .cosmic-card-tile--birth_phase { border-color:#c5a6ff; box-shadow:inset 0 0 18px rgba(197,166,255,.14),0 0 11px rgba(197,166,255,.15); }.cosmic-card-tile--birth_phase .cosmic-card-tile-value { color:#c5a6ff; }
     .cosmic-card-tile--full_moons { border-color:#9c7bff; box-shadow:inset 0 0 18px rgba(156,123,255,.14),0 0 11px rgba(156,123,255,.15); }.cosmic-card-tile--full_moons .cosmic-card-tile-value { color:#9c7bff; }
     .cosmic-card-tile--dominant { border-color:#73dfbf; box-shadow:inset 0 0 18px rgba(115,223,191,.14),0 0 11px rgba(115,223,191,.15); }.cosmic-card-tile--dominant .cosmic-card-tile-value { color:#73dfbf; }
+    .lunatick-birth-chart { max-width:640px; margin:.35rem auto .8rem; border:1px solid rgba(188,140,255,.22); border-radius:18px; background:radial-gradient(circle at center,rgba(36,25,72,.42),rgba(5,8,17,.88) 68%); overflow:hidden; }
+    .lunatick-birth-chart svg { display:block; width:100%; height:auto; }
+    .astro-position-row { margin:.25rem 0; padding:.5rem .6rem; min-height:3.2rem; border:1px solid rgba(188,140,255,.2); border-radius:10px; background:rgba(18,22,42,.72); color:#f0f6fc; line-height:1.35; }
+    .astro-reading-card { margin:.65rem 0 .9rem; padding:.75rem .85rem; border:1px solid rgba(188,140,255,.35); border-radius:14px; background:linear-gradient(145deg,rgba(31,24,62,.78),rgba(9,14,28,.9)); box-shadow:inset 0 0 22px rgba(188,140,255,.08); }
+    .astro-reading-kicker { color:#bc8cff; font-size:.62rem; font-weight:800; letter-spacing:1.6px; margin-bottom:.35rem; }
+    .astro-reading-text { color:#f0f6fc; font-size:1rem; line-height:1.65; letter-spacing:.01em; }
     @media (max-width: 600px) {
       div[class*="st-key-cosmic_card_"] { padding:.62rem .58rem .68rem !important; margin:.28rem 0 .52rem !important; border-radius:18px !important; }
       .cosmic-card-grid { gap:.35rem; }
@@ -773,8 +842,8 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards") -> None:
     default_birth_date = date.fromisoformat(profile["birth_date"]) if profile.get("birth_date") else date(1990, 1, 1)
     birth_date = st.date_input("Birth date", value=default_birth_date, min_value=date(1920, 1, 1), max_value=date.today(), key=f"{key_prefix}_bd")
 
-    st.caption("Birth time and actual coordinates unlock Rising. LunaTicK does not infer coordinates from a city label.")
-    time_column, offset_column = st.columns(2)
+    st.caption("Enter a city and region/country or a postal/ZIP code. LunaTicK resolves the coordinates and historical timezone for you.")
+    time_column, location_column = st.columns(2)
     with time_column:
         raw_time = profile.get("birth_time") or "12:00"
         try:
@@ -783,32 +852,47 @@ def render_profile_form(user_hash: str, key_prefix: str = "cards") -> None:
         except (TypeError, ValueError):
             time_value = dtime(12, 0)
         birth_time = st.time_input("Birth time (local)", value=time_value, key=f"{key_prefix}_bt")
-    with offset_column:
-        offset_default = float(profile["utc_offset"]) if profile.get("utc_offset") is not None else 0.0
-        utc_offset = st.number_input(
-            "UTC offset (hours)", min_value=-12.0, max_value=14.0, value=offset_default, step=0.5,
-            help="Enter the historical local UTC offset for the birth moment, including daylight-saving time where applicable.",
-            key=f"{key_prefix}_off",
+    with location_column:
+        location_query = st.text_input(
+            "Birth city or postal/ZIP code",
+            value=profile.get("birth_place") or "",
+            placeholder="e.g. 10001 or New York, NY, USA",
+            key=f"{key_prefix}_place",
         )
 
-    place = st.text_input("Birth place (optional label)", value=profile.get("birth_place") or "", placeholder="e.g. New York, NY", key=f"{key_prefix}_place")
-    latitude_column, longitude_column = st.columns(2)
-    with latitude_column:
-        latitude = st.number_input("Latitude", min_value=-90.0, max_value=90.0, value=float(profile.get("lat") or 0.0), step=0.0001, format="%.4f", key=f"{key_prefix}_lat")
-    with longitude_column:
-        longitude = st.number_input("Longitude", min_value=-180.0, max_value=180.0, value=float(profile.get("lon") or 0.0), step=0.0001, format="%.4f", key=f"{key_prefix}_lon")
+    results_key = f"{key_prefix}_geo_results"
+    if st.button("Find birth location", key=f"{key_prefix}_find_location"):
+        try:
+            st.session_state[results_key] = _geocode_place(location_query)
+        except requests.RequestException:
+            st.session_state[results_key] = []
+            st.error("The location service is temporarily unavailable. Please try again.")
+
+    results = st.session_state.get(results_key, [])
+    selected = None
+    if results:
+        labels = [f"{item['label']} — {item['timezone']}" for item in results]
+        selected_index = st.selectbox("Confirm the matching birthplace", range(len(labels)), format_func=lambda index: labels[index], key=f"{key_prefix}_geo_choice")
+        selected = results[selected_index]
+        st.caption(f"Resolved coordinates: {selected['lat']:.4f}, {selected['lon']:.4f}. The timezone is determined from those coordinates.")
+    elif location_query:
+        st.info("Search for the birthplace, then select the matching result before saving.")
 
     if st.button("Save birth inputs", type="primary", key=f"{key_prefix}_save"):
-        actual_coordinates = _has_actual_coordinates(latitude, longitude)
+        if not selected:
+            st.error("Please search for and confirm a city or postal/ZIP-code match before saving.")
+            return
+        birth_datetime = datetime.combine(birth_date, birth_time).replace(tzinfo=ZoneInfo(selected["timezone"]))
+        utc_offset = birth_datetime.utcoffset().total_seconds() / 3600
         save_profile(
             user_hash,
             name.strip() or "Moon Wanderer",
             birth_date.isoformat(),
             birth_time=f"{birth_time.hour:02d}:{birth_time.minute:02d}",
-            birth_place=place.strip() or None,
-            lat=float(latitude) if actual_coordinates else None,
-            lon=float(longitude) if actual_coordinates else None,
-            utc_offset=float(utc_offset),
+            birth_place=selected["label"],
+            lat=selected["lat"],
+            lon=selected["lon"],
+            utc_offset=utc_offset,
         )
         st.session_state.display_name = name.strip() or "Moon Wanderer"
         st.session_state.birth_date = birth_date
@@ -821,9 +905,72 @@ def _friend_label(card: dict) -> str:
     return f"{card['display_name']} ({natal['sun_symbol']} {natal['sun_sign']} · {natal['moon_symbol']} {natal['moon_sign']})"
 
 
+def _render_trade_profile_lookup(user_hash: str) -> None:
+    """Find a public member and send a privacy-safe direct card-trade request."""
+    st.markdown("##### Find a LunaTicK member")
+    st.caption("Enter a public @username to view their profile and send a card-trade request.")
+    with st.form("card_profile_lookup_form", clear_on_submit=False):
+        lookup_username = st.text_input(
+            "Username",
+            value=st.session_state.get("card_profile_lookup", ""),
+            max_chars=24,
+            placeholder="e.g. moon_orbit",
+            label_visibility="collapsed",
+        )
+        search_profile = st.form_submit_button("Find member", use_container_width=True)
+    if search_profile:
+        st.session_state["card_profile_lookup"] = lookup_username.strip().lstrip("@")
+
+    requested_handle = str(st.session_state.get("card_profile_lookup", "")).strip()
+    if not requested_handle:
+        return
+    profile = auth.get_public_profile(requested_handle)
+    if profile is None:
+        st.info(f"No public LunaTicK profile was found for @{html.escape(requested_handle)}.")
+    else:
+        avatar = html.escape(str(profile.get("avatar") or "🌙"))
+        display_name = html.escape(str(profile.get("display_name") or "Moon Wanderer"))
+        username = html.escape(str(profile.get("username") or requested_handle))
+        bio = html.escape(str(profile.get("bio") or "")).replace("\n", "<br>")
+        st.markdown(
+            f"<div style='border:1px solid rgba(188,140,255,.32);border-radius:12px;padding:.7rem;margin:.55rem 0;'>"
+            f"<div style='color:#f0f6fc;font-weight:700;'>{avatar} {display_name}</div>"
+            f"<div style='color:#bc8cff;font-size:.8rem;'>@{username}</div>"
+            f"<div style='color:#c9d1d9;font-size:.84rem;margin-top:.28rem;'>{bio or 'No bio shared yet.'}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        target_subject = ""
+        if _using_supabase_backend():
+            # Keep the immutable subject server-side; it is used only to create the request.
+            source = _supabase().get_card_profile_by_username_server_only(str(profile.get("username") or requested_handle))
+            target_subject = str((source or {}).get("auth_subject") or "").strip()
+        if target_subject:
+            st.caption("Send a request now; once accepted, this member is added to your collection.")
+            if st.button(f"Send card trade to @{username}", key="send_lookup_card_trade", type="primary", use_container_width=True):
+                ok, note = send_trade(user_hash, target_subject)
+                (st.success if ok else st.warning)(note)
+                if ok:
+                    st.rerun()
+        else:
+            st.caption("Direct trades are available after this member’s public profile finishes syncing.")
+
+        public_card = build_public_card_by_username(str(profile.get("username") or requested_handle))
+        if public_card:
+            render_collectible_card(public_card, is_owner=False, key_prefix=f"trade_lookup_{username}", compact=True)
+        else:
+            st.caption("This member has not activated a public Cosmic Card yet.")
+
+    if st.button("Clear member search", key="clear_card_profile_lookup"):
+        st.session_state.pop("card_profile_lookup", None)
+        st.rerun()
+
+
 def _render_trade_initiation(user_hash: str) -> None:
-    """Compact top-of-screen trade action, replacing the retired Flip control."""
-    with st.popover("🤝 Trade Cards"):
+    """Compact top-of-screen trade action and public card discovery."""
+    with st.popover("🤝 Trade Cards", help="Find a member or send a card-trade request"):
+        _render_trade_profile_lookup(user_hash)
+        st.markdown("---")
         st.caption("Send a card trade to add an accepted friend to your collection.")
         discoverable_cards = list_users_with_cards(user_hash)
         if not discoverable_cards:
@@ -839,6 +986,204 @@ def _render_trade_initiation(user_hash: str) -> None:
                 st.rerun()
 
 
+def _render_profile_hub_css() -> None:
+    """Style the dedicated social profile surface without exposing private fields."""
+    st.html("""
+    <style>
+      .profile-hub-card {
+        background: linear-gradient(145deg, rgba(26, 16, 57, .9), rgba(9, 12, 24, .96));
+        border: 1px solid rgba(188, 140, 255, .46);
+        border-radius: 14px;
+        margin: .55rem 0;
+        padding: .8rem .9rem;
+      }
+      .profile-hub-card__name { color: #f0f6fc; font-size: 1.04rem; font-weight: 750; }
+      .profile-hub-card__handle { color: #bc8cff; font-size: .82rem; margin-top: .1rem; }
+      .profile-hub-card__bio { color: #c9d1d9; font-size: .87rem; line-height: 1.42; margin: .38rem 0 0; }
+      .profile-hub-kicker { color: #bc8cff; font-family: Orbitron, sans-serif; font-size: .59rem; font-weight: 800; letter-spacing: .15em; margin: .18rem 0; text-transform: uppercase; }
+    </style>
+    """)
+
+
+def _render_profile_summary(profile: dict, *, heading: str | None = None) -> None:
+    """Render only the safe public presence fields shared by a member."""
+    avatar = html.escape(str(profile.get("avatar") or "🌙"))
+    display_name = html.escape(str(profile.get("display_name") or "Moon Wanderer"))
+    username = html.escape(str(profile.get("username") or "moon_wanderer"))
+    bio = html.escape(str(profile.get("bio") or "")).replace("\n", "<br>")
+    kicker = f"<div class='profile-hub-kicker'>{html.escape(heading)}</div>" if heading else ""
+    st.markdown(
+        f"<section class='profile-hub-card'>"
+        f"{kicker}<div class='profile-hub-card__name'>{avatar} {display_name}</div>"
+        f"<div class='profile-hub-card__handle'>@{username}</div>"
+        f"<div class='profile-hub-card__bio'>{bio or 'No bio shared yet.'}</div>"
+        f"</section>",
+        unsafe_allow_html=True,
+    )
+
+
+def _profile_hub_target_subject(username: str) -> str:
+    """Resolve a target only on the server; never surface its immutable subject."""
+    if not _using_supabase_backend():
+        return ""
+    source = _supabase().get_card_profile_by_username_server_only(username)
+    return str((source or {}).get("auth_subject") or "").strip()
+
+
+def _render_profile_hub_member(user_hash: str, requested_handle: str) -> None:
+    """Show one searched public profile with connection and card-trade actions."""
+    profile = auth.get_public_profile(requested_handle)
+    if profile is None:
+        st.info(f"No public LunaTicK profile was found for @{html.escape(requested_handle)}.")
+        return
+
+    _render_profile_summary(profile, heading="Member profile")
+    username = str(profile.get("username") or requested_handle).strip()
+    current_username = str(st.session_state.get("username") or "").strip()
+    target_subject = _profile_hub_target_subject(username)
+
+    if username == current_username:
+        st.caption("This is your public profile. Use Settings to edit your public details.")
+    elif target_subject and target_subject in set(friends_of(user_hash)):
+        st.success("✦ You are connected. Their card is in your collection when it is active.")
+        direct_messages.render_member_direct_message(target_subject, profile)
+    elif target_subject:
+        st.caption("Send a card trade to connect. Your friend decides whether to accept it.")
+        if st.button(
+            f"Send card trade to @{username}",
+            key=f"profile_hub_trade_{_safe_card_key(username)}",
+            type="primary",
+            use_container_width=True,
+        ):
+            ok, note = send_trade(user_hash, target_subject)
+            (st.success if ok else st.warning)(note)
+            if ok:
+                st.rerun()
+    else:
+        st.caption("This member’s profile is still syncing. Try again shortly to send a card trade.")
+
+    public_card = build_public_card_by_username(username)
+    if public_card:
+        st.caption("Public Cosmic Card")
+        render_collectible_card(public_card, is_owner=False, key_prefix=f"profile_hub_{_safe_card_key(username)}", compact=True)
+
+
+def _render_profile_hub_connections(user_hash: str) -> None:
+    """List accepted public connections without revealing private profile data."""
+    friend_subjects = friends_of(user_hash)
+    st.subheader("Your Connections")
+    if not friend_subjects:
+        st.caption("Search a member above and send a card trade to start your collection.")
+        return
+    if _using_supabase_backend():
+        profiles = _supabase().get_public_profile_summaries(friend_subjects)
+        for subject in friend_subjects:
+            profile = profiles.get(subject) or {}
+            username = str(profile.get("username") or "").strip()
+            label = str(profile.get("display_name") or username or "Moon Wanderer")
+            avatar = str(profile.get("avatar") or "🌙")
+            if username and st.button(
+                f"{avatar} {label} · @{username}",
+                key=f"profile_hub_connection_{_safe_card_key(subject)}",
+                use_container_width=True,
+            ):
+                st.session_state["profile_hub_lookup"] = username
+                st.rerun()
+        return
+    st.caption(f"{len(friend_subjects)} accepted card connection{'s' if len(friend_subjects) != 1 else ''}.")
+
+
+def _render_profile_hub_search_form(*, key_suffix: str = "") -> None:
+    """Search a public handle and rerun directly into the selected member view."""
+    st.caption("Search an exact public @username to view their profile, connect, and trade Cosmic Cards.")
+    with st.form(f"profile_hub_lookup_form_{key_suffix or 'owner'}", clear_on_submit=False):
+        lookup_username = st.text_input(
+            "Username", value="", max_chars=24, placeholder="e.g. moon_orbit",
+            label_visibility="collapsed", key=f"profile_hub_lookup_input_{key_suffix or 'owner'}",
+        )
+        searched = st.form_submit_button("View profile", type="primary", use_container_width=True)
+    if searched:
+        requested_handle = lookup_username.strip().lstrip("@")
+        if requested_handle:
+            st.session_state["profile_hub_lookup"] = requested_handle
+            st.rerun()
+        st.warning("Enter a public @username to continue.")
+
+
+def _render_profile_menu(*, viewing_member: bool) -> None:
+    """Render a compact left-anchored owner menu without consuming page width."""
+    with st.popover("☰", help="Open Profile navigation", type="secondary"):
+        st.markdown("**Profile navigation**")
+        st.caption("Your LunaTicK space")
+        profile_clicked = st.button("✎  My Profile · Edit", key="profile_menu_my_profile", use_container_width=True)
+        friends_clicked = st.button("♧  My Friends", key="profile_menu_friends", use_container_width=True)
+        dms_clicked = st.button("✉  My DMs", key="profile_menu_dms", use_container_width=True)
+        if profile_clicked:
+            st.session_state.pop("profile_hub_lookup", None)
+            st.session_state["profile_hub_section"] = "profile"
+            st.rerun()
+        if friends_clicked:
+            st.session_state.pop("profile_hub_lookup", None)
+            st.session_state["profile_hub_section"] = "friends"
+            st.rerun()
+        if dms_clicked:
+            st.session_state.pop("profile_hub_lookup", None)
+            st.session_state["profile_hub_section"] = "dms"
+            st.rerun()
+        if viewing_member:
+            st.caption("You are viewing a member profile.")
+
+
+def render_profile_hub() -> None:
+    """Show the owner menu destinations or a selected public member profile directly."""
+    init_cards_db()
+    _render_card_css()
+    _render_profile_hub_css()
+    user_hash = str(st.session_state.get("user_hash") or "anonymous")
+    own_username = str(st.session_state.get("username") or "").strip()
+    requested_handle = str(st.session_state.get("profile_hub_lookup", "")).strip().lstrip("@")
+    viewing_member = bool(requested_handle and requested_handle.lower() != own_username.lower())
+    _render_profile_menu(viewing_member=viewing_member)
+
+    if viewing_member:
+        st.markdown("<div class='profile-hub-kicker'>LunaTic member</div><h2>Member Profile</h2>", unsafe_allow_html=True)
+        _render_profile_hub_member(user_hash, requested_handle)
+        st.markdown("---")
+        st.markdown("<div class='profile-hub-kicker'>Discover</div><h3>Find another member</h3>", unsafe_allow_html=True)
+        _render_profile_hub_search_form(key_suffix="member")
+        return
+
+    section = str(st.session_state.get("profile_hub_section") or "profile")
+    if section == "friends":
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Friends</h2>", unsafe_allow_html=True)
+        _render_profile_hub_connections(user_hash)
+        return
+    if section == "dms":
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My DMs</h2>", unsafe_allow_html=True)
+        direct_messages.render_owner_dm_inbox()
+        return
+
+    own_profile = auth.get_public_profile(own_username) if own_username else None
+    title_column, edit_column = st.columns([7, 1])
+    with title_column:
+        st.markdown("<div class='profile-hub-kicker'>LunaTicK social</div><h2>My Profile</h2>", unsafe_allow_html=True)
+    with edit_column:
+        if st.button("✎", key="profile_hub_edit", help="Edit your public profile", type="secondary"):
+            st.session_state.nav_page = "Settings"
+            st.rerun()
+
+    if own_profile:
+        _render_profile_summary(own_profile, heading="Your public presence")
+    else:
+        st.info("Your public profile is being prepared. Complete your profile in Settings to share a username.")
+
+    st.markdown("---")
+    st.markdown("<div class='profile-hub-kicker'>Discover and connect</div><h3>Find a LunaTicK Member</h3>", unsafe_allow_html=True)
+    _render_profile_hub_search_form()
+    st.markdown("---")
+    _render_profile_hub_connections(user_hash)
+
+
 def render_cosmic_cards_tab() -> None:
     """Render the compact owner card, its detail panel, and accepted-card collection."""
     init_cards_db()
@@ -846,8 +1191,7 @@ def render_cosmic_cards_tab() -> None:
     profile = get_or_create_profile(user_hash)
     my_card = build_card(user_hash)
 
-    # This occupies the exact light-weight top action role formerly used by Flip.
-    _render_trade_initiation(user_hash)
+    st.caption("Use the profile button in the upper-left corner to find members, connect, and trade Cosmic Cards.")
 
     if not my_card:
         st.info("Add your birth date to unlock your Cosmic Card.")
@@ -856,6 +1200,7 @@ def render_cosmic_cards_tab() -> None:
         return
 
     render_collectible_card(my_card, is_owner=True, key_prefix="owner")
+    render_birth_chart_and_horoscope(profile)
 
     # The collection intentionally follows the owner-card explanation area.
     st.markdown("#### Your Collection")
@@ -887,3 +1232,269 @@ def render_cosmic_cards_tab() -> None:
 
     with st.expander("Update private birth inputs", expanded=False):
         render_profile_form(user_hash, key_prefix="cards")
+
+
+# ---------------------------------------------------------------------------
+# Owner-only birth-chart and horoscope experience.
+# These values are deliberately calculated from the private profile at render
+# time and are never added to shareable_card().
+# ---------------------------------------------------------------------------
+
+_DETAILED_PLANETS = (
+    ("Sun", swe.SUN, "☉", "#f6b73c"),
+    ("Moon", swe.MOON, "☾", "#d8dee9"),
+    ("Mercury", swe.MERCURY, "☿", "#66a8ff"),
+    ("Venus", swe.VENUS, "♀", "#f783c2"),
+    ("Mars", swe.MARS, "♂", "#ff6b6b"),
+    ("Jupiter", swe.JUPITER, "♃", "#c5a6ff"),
+    ("Saturn", swe.SATURN, "♄", "#9ba9bf"),
+)
+
+_DETAILED_ASPECTS = (
+    (0, "Conjunction", "☌", "#f6b73c"),
+    (60, "Sextile", "⚹", "#66a8ff"),
+    (90, "Square", "□", "#ff6b6b"),
+    (120, "Trine", "△", "#73dfbf"),
+    (180, "Opposition", "☍", "#f783c2"),
+)
+
+_HOROSCOPE_ENERGIES = (
+    "a quiet opening",
+    "a threshold of courage",
+    "a return to your center",
+    "a clearing of old noise",
+    "a spark of creative motion",
+    "a patient rebalancing",
+    "a wider view of what matters",
+)
+_HOROSCOPE_GUIDANCE = (
+    "choose one honest next step instead of solving the whole path",
+    "protect the first uninterrupted hour you can claim",
+    "let curiosity lead before certainty makes the decision for you",
+    "name the boundary that would make your energy feel more like your own",
+    "finish one small thing that has been asking for your attention",
+    "share your insight generously, without needing to control its reception",
+    "make room for a conversation that leaves both people more understood",
+    "return to the body through breath, water, walking, or deliberate rest",
+    "notice what repeats today; repetition may be showing you a pattern",
+    "write down the feeling before turning it into a conclusion",
+)
+_SIGN_TRAITS = {
+    "Aries": "direct, initiating, and willing to turn an idea into motion",
+    "Taurus": "grounded, patient, and attentive to what can endure",
+    "Gemini": "curious, connective, and energized by living questions",
+    "Cancer": "protective, intuitive, and deeply responsive to atmosphere",
+    "Leo": "expressive, generous, and capable of warming a whole room",
+    "Virgo": "observant, refining, and devoted to useful details",
+    "Libra": "relational, discerning, and drawn toward meaningful balance",
+    "Scorpio": "perceptive, focused, and unafraid of honest transformation",
+    "Sagittarius": "searching, candid, and oriented toward a larger horizon",
+    "Capricorn": "steady, strategic, and willing to build over time",
+    "Aquarius": "independent, inventive, and attentive to collective possibility",
+    "Pisces": "imaginative, empathic, and porous to the emotional field around you",
+}
+
+
+def _detailed_birth_chart(profile: dict) -> dict | None:
+    """Return private planetary positions, aspects, and optional Ascendant."""
+    birth_date = str(profile.get("birth_date") or "").strip()
+    if not birth_date:
+        return None
+    try:
+        has_coordinates = _has_actual_coordinates(profile.get("lat"), profile.get("lon"))
+        timezone_name = _timezone_for_coordinates(profile.get("lat"), profile.get("lon"))
+        dt_utc = _local_to_utc(birth_date, profile.get("birth_time"), profile.get("utc_offset"), timezone_name)
+        jd_ut = swe.julday(
+            dt_utc.year,
+            dt_utc.month,
+            dt_utc.day,
+            dt_utc.hour + dt_utc.minute / 60 + dt_utc.second / 3600,
+        )
+        flags = swe.FLG_SWIEPH | swe.FLG_SPEED
+        positions = []
+        for name, planet_id, symbol, color in _DETAILED_PLANETS:
+            values, _retflags, _ret_message = swe.calc_ut(jd_ut, planet_id, flags)
+            longitude = float(values[0]) % 360.0
+            sign, sign_symbol = _sign_from_lon(longitude)
+            positions.append({
+                "name": name,
+                "symbol": symbol,
+                "color": color,
+                "longitude": longitude,
+                "sign": sign,
+                "sign_symbol": sign_symbol,
+                "degree": longitude % 30.0,
+            })
+
+        aspects = []
+        for left_index, left in enumerate(positions):
+            for right in positions[left_index + 1:]:
+                raw_delta = abs(left["longitude"] - right["longitude"]) % 360.0
+                separation = min(raw_delta, 360.0 - raw_delta)
+                for angle, label, symbol, color in _DETAILED_ASPECTS:
+                    orb = abs(separation - angle)
+                    if orb <= 6.0:
+                        aspects.append({
+                            "left": left["name"], "right": right["name"],
+                            "label": label, "symbol": symbol, "color": color,
+                            "angle": angle, "orb": orb,
+                        })
+                        break
+
+        ascendant = None
+        if has_coordinates:
+            try:
+                _cusps, ascmc = swe.houses_ex(jd_ut, float(profile["lat"]), float(profile["lon"]), b"P", 0)
+                asc_longitude = float(ascmc[0]) % 360.0
+                rising_sign, rising_symbol = _sign_from_lon(asc_longitude)
+                ascendant = {"longitude": asc_longitude, "sign": rising_sign, "symbol": rising_symbol}
+            except (TypeError, ValueError, OverflowError, swe.Error):
+                ascendant = None
+        return {"positions": positions, "aspects": aspects, "ascendant": ascendant, "birth_date": birth_date}
+    except (TypeError, ValueError, OverflowError, swe.Error):
+        return None
+
+
+def _chart_point(longitude: float, radius: float, center: float = 320.0) -> tuple[float, float]:
+    angle = math.radians(longitude - 90.0)
+    return center + radius * math.cos(angle), center + radius * math.sin(angle)
+
+
+def _chart_sector_path(start_longitude: float, end_longitude: float, outer: float = 292.0, inner: float = 226.0) -> str:
+    start_outer = _chart_point(start_longitude, outer)
+    end_outer = _chart_point(end_longitude, outer)
+    end_inner = _chart_point(end_longitude, inner)
+    start_inner = _chart_point(start_longitude, inner)
+    large_arc = 1 if (end_longitude - start_longitude) > 180 else 0
+    return (
+        f"M {start_outer[0]:.1f},{start_outer[1]:.1f} "
+        f"A {outer},{outer} 0 {large_arc} 1 {end_outer[0]:.1f},{end_outer[1]:.1f} "
+        f"L {end_inner[0]:.1f},{end_inner[1]:.1f} "
+        f"A {inner},{inner} 0 {large_arc} 0 {start_inner[0]:.1f},{start_inner[1]:.1f} Z"
+    )
+
+
+def _birth_chart_svg(chart: dict) -> str:
+    """Render a self-contained, privacy-safe SVG for the owner’s birth chart."""
+    element_colors = {"Fire": "#ff6b6b", "Earth": "#73dfbf", "Air": "#66a8ff", "Water": "#c5a6ff"}
+    elements = {
+        "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
+        "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
+        "Gemini": "Air", "Libra": "Air", "Aquarius": "Air",
+        "Cancer": "Water", "Scorpio": "Water", "Pisces": "Water",
+    }
+    zodiac_paths = []
+    zodiac_labels = []
+    for index, (sign, symbol) in enumerate(ZODIAC):
+        start = index * 30.0
+        color = element_colors[elements[sign]]
+        zodiac_paths.append(f"<path d='{_chart_sector_path(start, start + 30)}' fill='{color}' fill-opacity='.18' stroke='{color}' stroke-opacity='.34' stroke-width='1.5'/>")
+        x, y = _chart_point(start + 15, 258)
+        zodiac_labels.append(f"<text x='{x:.1f}' y='{y + 5:.1f}' text-anchor='middle' fill='{color}' font-size='19'>{html.escape(symbol)}</text>")
+
+    position_by_name = {item["name"]: item for item in chart["positions"]}
+    aspect_lines = []
+    for aspect in chart["aspects"]:
+        left = position_by_name[aspect["left"]]
+        right = position_by_name[aspect["right"]]
+        x1, y1 = _chart_point(left["longitude"], 174)
+        x2, y2 = _chart_point(right["longitude"], 174)
+        aspect_lines.append(f"<line x1='{x1:.1f}' y1='{y1:.1f}' x2='{x2:.1f}' y2='{y2:.1f}' stroke='{aspect['color']}' stroke-opacity='.46' stroke-width='1.4'/>")
+
+    planet_nodes = []
+    for item in chart["positions"]:
+        x, y = _chart_point(item["longitude"], 174)
+        planet_nodes.append(
+            f"<circle cx='{x:.1f}' cy='{y:.1f}' r='16' fill='{item['color']}' fill-opacity='.18' stroke='{item['color']}' stroke-width='1.2'/>"
+            f"<text x='{x:.1f}' y='{y + 5:.1f}' text-anchor='middle' fill='{item['color']}' font-size='17'>{html.escape(item['symbol'])}</text>"
+        )
+
+    center_label = "✦"
+    if chart["ascendant"]:
+        center_label = chart["ascendant"]["symbol"]
+    return f"""
+    <div class='lunatick-birth-chart'>
+      <svg viewBox='0 0 640 640' role='img' aria-label='Private LunaTicK birth chart'>
+        <defs><filter id='chartGlow'><feGaussianBlur stdDeviation='5' result='blur'/><feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge></filter></defs>
+        <circle cx='320' cy='320' r='304' fill='#080b15' stroke='#bc8cff' stroke-opacity='.35' stroke-width='2'/>
+        {''.join(zodiac_paths)}
+        {''.join(zodiac_labels)}
+        <circle cx='320' cy='320' r='226' fill='none' stroke='#bc8cff' stroke-opacity='.25'/>
+        <circle cx='320' cy='320' r='174' fill='rgba(8,11,21,.65)' stroke='#bc8cff' stroke-opacity='.18'/>
+        {''.join(aspect_lines)}
+        {''.join(planet_nodes)}
+        <circle cx='320' cy='320' r='46' fill='#bc8cff' fill-opacity='.22' stroke='#bc8cff' filter='url(#chartGlow)'/>
+        <text x='320' y='332' text-anchor='middle' fill='#f0f6fc' font-size='34'>{html.escape(center_label)}</text>
+      </svg>
+    </div>
+    """
+
+
+def _daily_horoscope(chart: dict, category: str) -> str:
+    """Generate a deterministic daily reading without requiring an external API."""
+    today_key = date.today().isoformat()
+    sun = next((item for item in chart["positions"] if item["name"] == "Sun"), chart["positions"][0])
+    moon = next((item for item in chart["positions"] if item["name"] == "Moon"), chart["positions"][1])
+    phase_name = _chart(datetime.now(timezone.utc), None, None).get("phase_name", "the current Moon")
+    seed = hashlib.sha256(f"{today_key}|{sun['sign']}|{category}".encode("utf-8")).digest()
+    energy = _HOROSCOPE_ENERGIES[seed[0] % len(_HOROSCOPE_ENERGIES)]
+    guidance = _HOROSCOPE_GUIDANCE[seed[1] % len(_HOROSCOPE_GUIDANCE)]
+    category_line = {
+        "General": "Let the day be a conversation between your intention and what the world actually offers.",
+        "Love & Connection": "Listen for the need beneath the first reaction, including your own.",
+        "Work & Purpose": "Give the most important task a clear container instead of giving it your whole identity.",
+        "Wellness & Reflection": "Treat restoration as a practice that makes honest action possible.",
+    }.get(category, "Return to what is true, useful, and kind.")
+    return (
+        f"With your Sun in {sun['sign']} and your natal Moon in {moon['sign']}, today carries {energy}. "
+        f"The {phase_name.lower()} context invites you to {guidance}. {category_line}"
+    )
+
+
+def _sign_traits_reading(chart: dict) -> str:
+    sun = next((item for item in chart["positions"] if item["name"] == "Sun"), chart["positions"][0])
+    moon = next((item for item in chart["positions"] if item["name"] == "Moon"), chart["positions"][1])
+    rising = chart.get("ascendant")
+    rising_text = f" Your Rising sign adds a {rising['sign']} way of meeting the world." if rising else " Add a confirmed birth time and location to calculate your Rising sign."
+    return f"Your Sun sign is {sun['sign']}: { _SIGN_TRAITS.get(sun['sign'], 'distinctive and reflective') }. Your Moon in {moon['sign']} describes an emotional rhythm that deserves room to be heard.{rising_text}"
+
+
+def render_birth_chart_and_horoscope(profile: dict) -> None:
+    """Render detailed astrology only for the signed-in owner."""
+    chart = _detailed_birth_chart(profile)
+    if not chart:
+        return
+    st.markdown("#### Your Birth Chart & Daily Horoscope")
+    st.caption("Private owner view. Exact birth inputs remain server-side and are not included in shared Cosmic Cards.")
+    st.html(_birth_chart_svg(chart))
+
+    st.markdown("##### Planetary Positions")
+    position_columns = st.columns(2)
+    for index, item in enumerate(chart["positions"]):
+        with position_columns[index % 2]:
+            st.markdown(
+                f"<div class='astro-position-row'><span style='color:{item['color']};font-size:1.3rem;'>{html.escape(item['symbol'])}</span> "
+                f"<strong>{html.escape(item['name'])}</strong><br><span style='color:{sign_color(item['sign'])};'>{html.escape(item['sign_symbol'])} {html.escape(item['sign'])} {item['degree']:.1f}°</span></div>",
+                unsafe_allow_html=True,
+            )
+
+    ascendant = chart.get("ascendant")
+    if ascendant:
+        st.caption(f"Rising / Ascendant: {ascendant['symbol']} {ascendant['sign']}")
+    else:
+        st.info("Rising sign is unavailable until a confirmed birthplace and birth time are saved.")
+
+    if chart["aspects"]:
+        st.markdown("##### Key Aspects")
+        aspect_text = " · ".join(
+            f"{item['symbol']} {item['left']}–{item['right']} {item['label']} ({item['orb']:.1f}° orb)"
+            for item in chart["aspects"][:8]
+        )
+        st.caption(aspect_text)
+
+    mode = st.radio("Reading", ("Today's Reading", "Sign Traits"), horizontal=True, key="cosmic_reading_mode")
+    if mode == "Today's Reading":
+        category = st.selectbox("Reading category", ("General", "Love & Connection", "Work & Purpose", "Wellness & Reflection"), key="cosmic_reading_category")
+        st.markdown(f"<div class='astro-reading-card'><div class='astro-reading-kicker'>TODAY'S READING · {html.escape(category.upper())}</div><div class='astro-reading-text'>{html.escape(_daily_horoscope(chart, category))}</div></div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='astro-reading-card'><div class='astro-reading-kicker'>SIGN TRAITS</div><div class='astro-reading-text'>{html.escape(_sign_traits_reading(chart))}</div></div>", unsafe_allow_html=True)
