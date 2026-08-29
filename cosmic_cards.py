@@ -39,7 +39,7 @@ GEOCODER_USER_AGENT = "LunaTicK/1.0 (birth-location lookup; contact repository m
 _TIMEZONE_FINDER = TimezoneFinder()
 # Bumped whenever a complete Cosmic Card module reload is required after a
 # warm-worker deployment, not merely a check for an older helper symbol.
-CARD_MODULE_VERSION = "profile_menu_popover_v5"
+CARD_MODULE_VERSION = "birth_chart_horoscope_v1"
 
 
 CARD_PROFILE_DEFAULTS = {
@@ -689,6 +689,12 @@ def _render_card_css() -> None:
     .cosmic-card-tile--birth_phase { border-color:#c5a6ff; box-shadow:inset 0 0 18px rgba(197,166,255,.14),0 0 11px rgba(197,166,255,.15); }.cosmic-card-tile--birth_phase .cosmic-card-tile-value { color:#c5a6ff; }
     .cosmic-card-tile--full_moons { border-color:#9c7bff; box-shadow:inset 0 0 18px rgba(156,123,255,.14),0 0 11px rgba(156,123,255,.15); }.cosmic-card-tile--full_moons .cosmic-card-tile-value { color:#9c7bff; }
     .cosmic-card-tile--dominant { border-color:#73dfbf; box-shadow:inset 0 0 18px rgba(115,223,191,.14),0 0 11px rgba(115,223,191,.15); }.cosmic-card-tile--dominant .cosmic-card-tile-value { color:#73dfbf; }
+    .lunatick-birth-chart { max-width:640px; margin:.35rem auto .8rem; border:1px solid rgba(188,140,255,.22); border-radius:18px; background:radial-gradient(circle at center,rgba(36,25,72,.42),rgba(5,8,17,.88) 68%); overflow:hidden; }
+    .lunatick-birth-chart svg { display:block; width:100%; height:auto; }
+    .astro-position-row { margin:.25rem 0; padding:.5rem .6rem; min-height:3.2rem; border:1px solid rgba(188,140,255,.2); border-radius:10px; background:rgba(18,22,42,.72); color:#f0f6fc; line-height:1.35; }
+    .astro-reading-card { margin:.65rem 0 .9rem; padding:.75rem .85rem; border:1px solid rgba(188,140,255,.35); border-radius:14px; background:linear-gradient(145deg,rgba(31,24,62,.78),rgba(9,14,28,.9)); box-shadow:inset 0 0 22px rgba(188,140,255,.08); }
+    .astro-reading-kicker { color:#bc8cff; font-size:.62rem; font-weight:800; letter-spacing:1.6px; margin-bottom:.35rem; }
+    .astro-reading-text { color:#f0f6fc; font-size:1rem; line-height:1.65; letter-spacing:.01em; }
     @media (max-width: 600px) {
       div[class*="st-key-cosmic_card_"] { padding:.62rem .58rem .68rem !important; margin:.28rem 0 .52rem !important; border-radius:18px !important; }
       .cosmic-card-grid { gap:.35rem; }
@@ -1194,6 +1200,7 @@ def render_cosmic_cards_tab() -> None:
         return
 
     render_collectible_card(my_card, is_owner=True, key_prefix="owner")
+    render_birth_chart_and_horoscope(profile)
 
     # The collection intentionally follows the owner-card explanation area.
     st.markdown("#### Your Collection")
@@ -1225,3 +1232,269 @@ def render_cosmic_cards_tab() -> None:
 
     with st.expander("Update private birth inputs", expanded=False):
         render_profile_form(user_hash, key_prefix="cards")
+
+
+# ---------------------------------------------------------------------------
+# Owner-only birth-chart and horoscope experience.
+# These values are deliberately calculated from the private profile at render
+# time and are never added to shareable_card().
+# ---------------------------------------------------------------------------
+
+_DETAILED_PLANETS = (
+    ("Sun", swe.SUN, "☉", "#f6b73c"),
+    ("Moon", swe.MOON, "☾", "#d8dee9"),
+    ("Mercury", swe.MERCURY, "☿", "#66a8ff"),
+    ("Venus", swe.VENUS, "♀", "#f783c2"),
+    ("Mars", swe.MARS, "♂", "#ff6b6b"),
+    ("Jupiter", swe.JUPITER, "♃", "#c5a6ff"),
+    ("Saturn", swe.SATURN, "♄", "#9ba9bf"),
+)
+
+_DETAILED_ASPECTS = (
+    (0, "Conjunction", "☌", "#f6b73c"),
+    (60, "Sextile", "⚹", "#66a8ff"),
+    (90, "Square", "□", "#ff6b6b"),
+    (120, "Trine", "△", "#73dfbf"),
+    (180, "Opposition", "☍", "#f783c2"),
+)
+
+_HOROSCOPE_ENERGIES = (
+    "a quiet opening",
+    "a threshold of courage",
+    "a return to your center",
+    "a clearing of old noise",
+    "a spark of creative motion",
+    "a patient rebalancing",
+    "a wider view of what matters",
+)
+_HOROSCOPE_GUIDANCE = (
+    "choose one honest next step instead of solving the whole path",
+    "protect the first uninterrupted hour you can claim",
+    "let curiosity lead before certainty makes the decision for you",
+    "name the boundary that would make your energy feel more like your own",
+    "finish one small thing that has been asking for your attention",
+    "share your insight generously, without needing to control its reception",
+    "make room for a conversation that leaves both people more understood",
+    "return to the body through breath, water, walking, or deliberate rest",
+    "notice what repeats today; repetition may be showing you a pattern",
+    "write down the feeling before turning it into a conclusion",
+)
+_SIGN_TRAITS = {
+    "Aries": "direct, initiating, and willing to turn an idea into motion",
+    "Taurus": "grounded, patient, and attentive to what can endure",
+    "Gemini": "curious, connective, and energized by living questions",
+    "Cancer": "protective, intuitive, and deeply responsive to atmosphere",
+    "Leo": "expressive, generous, and capable of warming a whole room",
+    "Virgo": "observant, refining, and devoted to useful details",
+    "Libra": "relational, discerning, and drawn toward meaningful balance",
+    "Scorpio": "perceptive, focused, and unafraid of honest transformation",
+    "Sagittarius": "searching, candid, and oriented toward a larger horizon",
+    "Capricorn": "steady, strategic, and willing to build over time",
+    "Aquarius": "independent, inventive, and attentive to collective possibility",
+    "Pisces": "imaginative, empathic, and porous to the emotional field around you",
+}
+
+
+def _detailed_birth_chart(profile: dict) -> dict | None:
+    """Return private planetary positions, aspects, and optional Ascendant."""
+    birth_date = str(profile.get("birth_date") or "").strip()
+    if not birth_date:
+        return None
+    try:
+        has_coordinates = _has_actual_coordinates(profile.get("lat"), profile.get("lon"))
+        timezone_name = _timezone_for_coordinates(profile.get("lat"), profile.get("lon"))
+        dt_utc = _local_to_utc(birth_date, profile.get("birth_time"), profile.get("utc_offset"), timezone_name)
+        jd_ut = swe.julday(
+            dt_utc.year,
+            dt_utc.month,
+            dt_utc.day,
+            dt_utc.hour + dt_utc.minute / 60 + dt_utc.second / 3600,
+        )
+        flags = swe.FLG_SWIEPH | swe.FLG_SPEED
+        positions = []
+        for name, planet_id, symbol, color in _DETAILED_PLANETS:
+            values, _retflags, _ret_message = swe.calc_ut(jd_ut, planet_id, flags)
+            longitude = float(values[0]) % 360.0
+            sign, sign_symbol = _sign_from_lon(longitude)
+            positions.append({
+                "name": name,
+                "symbol": symbol,
+                "color": color,
+                "longitude": longitude,
+                "sign": sign,
+                "sign_symbol": sign_symbol,
+                "degree": longitude % 30.0,
+            })
+
+        aspects = []
+        for left_index, left in enumerate(positions):
+            for right in positions[left_index + 1:]:
+                raw_delta = abs(left["longitude"] - right["longitude"]) % 360.0
+                separation = min(raw_delta, 360.0 - raw_delta)
+                for angle, label, symbol, color in _DETAILED_ASPECTS:
+                    orb = abs(separation - angle)
+                    if orb <= 6.0:
+                        aspects.append({
+                            "left": left["name"], "right": right["name"],
+                            "label": label, "symbol": symbol, "color": color,
+                            "angle": angle, "orb": orb,
+                        })
+                        break
+
+        ascendant = None
+        if has_coordinates:
+            try:
+                _cusps, ascmc = swe.houses_ex(jd_ut, float(profile["lat"]), float(profile["lon"]), b"P", 0)
+                asc_longitude = float(ascmc[0]) % 360.0
+                rising_sign, rising_symbol = _sign_from_lon(asc_longitude)
+                ascendant = {"longitude": asc_longitude, "sign": rising_sign, "symbol": rising_symbol}
+            except (TypeError, ValueError, OverflowError, swe.Error):
+                ascendant = None
+        return {"positions": positions, "aspects": aspects, "ascendant": ascendant, "birth_date": birth_date}
+    except (TypeError, ValueError, OverflowError, swe.Error):
+        return None
+
+
+def _chart_point(longitude: float, radius: float, center: float = 320.0) -> tuple[float, float]:
+    angle = math.radians(longitude - 90.0)
+    return center + radius * math.cos(angle), center + radius * math.sin(angle)
+
+
+def _chart_sector_path(start_longitude: float, end_longitude: float, outer: float = 292.0, inner: float = 226.0) -> str:
+    start_outer = _chart_point(start_longitude, outer)
+    end_outer = _chart_point(end_longitude, outer)
+    end_inner = _chart_point(end_longitude, inner)
+    start_inner = _chart_point(start_longitude, inner)
+    large_arc = 1 if (end_longitude - start_longitude) > 180 else 0
+    return (
+        f"M {start_outer[0]:.1f},{start_outer[1]:.1f} "
+        f"A {outer},{outer} 0 {large_arc} 1 {end_outer[0]:.1f},{end_outer[1]:.1f} "
+        f"L {end_inner[0]:.1f},{end_inner[1]:.1f} "
+        f"A {inner},{inner} 0 {large_arc} 0 {start_inner[0]:.1f},{start_inner[1]:.1f} Z"
+    )
+
+
+def _birth_chart_svg(chart: dict) -> str:
+    """Render a self-contained, privacy-safe SVG for the owner’s birth chart."""
+    element_colors = {"Fire": "#ff6b6b", "Earth": "#73dfbf", "Air": "#66a8ff", "Water": "#c5a6ff"}
+    elements = {
+        "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
+        "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
+        "Gemini": "Air", "Libra": "Air", "Aquarius": "Air",
+        "Cancer": "Water", "Scorpio": "Water", "Pisces": "Water",
+    }
+    zodiac_paths = []
+    zodiac_labels = []
+    for index, (sign, symbol) in enumerate(ZODIAC):
+        start = index * 30.0
+        color = element_colors[elements[sign]]
+        zodiac_paths.append(f"<path d='{_chart_sector_path(start, start + 30)}' fill='{color}' fill-opacity='.18' stroke='{color}' stroke-opacity='.34' stroke-width='1.5'/>")
+        x, y = _chart_point(start + 15, 258)
+        zodiac_labels.append(f"<text x='{x:.1f}' y='{y + 5:.1f}' text-anchor='middle' fill='{color}' font-size='19'>{html.escape(symbol)}</text>")
+
+    position_by_name = {item["name"]: item for item in chart["positions"]}
+    aspect_lines = []
+    for aspect in chart["aspects"]:
+        left = position_by_name[aspect["left"]]
+        right = position_by_name[aspect["right"]]
+        x1, y1 = _chart_point(left["longitude"], 174)
+        x2, y2 = _chart_point(right["longitude"], 174)
+        aspect_lines.append(f"<line x1='{x1:.1f}' y1='{y1:.1f}' x2='{x2:.1f}' y2='{y2:.1f}' stroke='{aspect['color']}' stroke-opacity='.46' stroke-width='1.4'/>")
+
+    planet_nodes = []
+    for item in chart["positions"]:
+        x, y = _chart_point(item["longitude"], 174)
+        planet_nodes.append(
+            f"<circle cx='{x:.1f}' cy='{y:.1f}' r='16' fill='{item['color']}' fill-opacity='.18' stroke='{item['color']}' stroke-width='1.2'/>"
+            f"<text x='{x:.1f}' y='{y + 5:.1f}' text-anchor='middle' fill='{item['color']}' font-size='17'>{html.escape(item['symbol'])}</text>"
+        )
+
+    center_label = "✦"
+    if chart["ascendant"]:
+        center_label = chart["ascendant"]["symbol"]
+    return f"""
+    <div class='lunatick-birth-chart'>
+      <svg viewBox='0 0 640 640' role='img' aria-label='Private LunaTicK birth chart'>
+        <defs><filter id='chartGlow'><feGaussianBlur stdDeviation='5' result='blur'/><feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge></filter></defs>
+        <circle cx='320' cy='320' r='304' fill='#080b15' stroke='#bc8cff' stroke-opacity='.35' stroke-width='2'/>
+        {''.join(zodiac_paths)}
+        {''.join(zodiac_labels)}
+        <circle cx='320' cy='320' r='226' fill='none' stroke='#bc8cff' stroke-opacity='.25'/>
+        <circle cx='320' cy='320' r='174' fill='rgba(8,11,21,.65)' stroke='#bc8cff' stroke-opacity='.18'/>
+        {''.join(aspect_lines)}
+        {''.join(planet_nodes)}
+        <circle cx='320' cy='320' r='46' fill='#bc8cff' fill-opacity='.22' stroke='#bc8cff' filter='url(#chartGlow)'/>
+        <text x='320' y='332' text-anchor='middle' fill='#f0f6fc' font-size='34'>{html.escape(center_label)}</text>
+      </svg>
+    </div>
+    """
+
+
+def _daily_horoscope(chart: dict, category: str) -> str:
+    """Generate a deterministic daily reading without requiring an external API."""
+    today_key = date.today().isoformat()
+    sun = next((item for item in chart["positions"] if item["name"] == "Sun"), chart["positions"][0])
+    moon = next((item for item in chart["positions"] if item["name"] == "Moon"), chart["positions"][1])
+    phase_name = _chart(datetime.now(timezone.utc), None, None).get("phase_name", "the current Moon")
+    seed = hashlib.sha256(f"{today_key}|{sun['sign']}|{category}".encode("utf-8")).digest()
+    energy = _HOROSCOPE_ENERGIES[seed[0] % len(_HOROSCOPE_ENERGIES)]
+    guidance = _HOROSCOPE_GUIDANCE[seed[1] % len(_HOROSCOPE_GUIDANCE)]
+    category_line = {
+        "General": "Let the day be a conversation between your intention and what the world actually offers.",
+        "Love & Connection": "Listen for the need beneath the first reaction, including your own.",
+        "Work & Purpose": "Give the most important task a clear container instead of giving it your whole identity.",
+        "Wellness & Reflection": "Treat restoration as a practice that makes honest action possible.",
+    }.get(category, "Return to what is true, useful, and kind.")
+    return (
+        f"With your Sun in {sun['sign']} and your natal Moon in {moon['sign']}, today carries {energy}. "
+        f"The {phase_name.lower()} context invites you to {guidance}. {category_line}"
+    )
+
+
+def _sign_traits_reading(chart: dict) -> str:
+    sun = next((item for item in chart["positions"] if item["name"] == "Sun"), chart["positions"][0])
+    moon = next((item for item in chart["positions"] if item["name"] == "Moon"), chart["positions"][1])
+    rising = chart.get("ascendant")
+    rising_text = f" Your Rising sign adds a {rising['sign']} way of meeting the world." if rising else " Add a confirmed birth time and location to calculate your Rising sign."
+    return f"Your Sun sign is {sun['sign']}: { _SIGN_TRAITS.get(sun['sign'], 'distinctive and reflective') }. Your Moon in {moon['sign']} describes an emotional rhythm that deserves room to be heard.{rising_text}"
+
+
+def render_birth_chart_and_horoscope(profile: dict) -> None:
+    """Render detailed astrology only for the signed-in owner."""
+    chart = _detailed_birth_chart(profile)
+    if not chart:
+        return
+    st.markdown("#### Your Birth Chart & Daily Horoscope")
+    st.caption("Private owner view. Exact birth inputs remain server-side and are not included in shared Cosmic Cards.")
+    st.html(_birth_chart_svg(chart))
+
+    st.markdown("##### Planetary Positions")
+    position_columns = st.columns(2)
+    for index, item in enumerate(chart["positions"]):
+        with position_columns[index % 2]:
+            st.markdown(
+                f"<div class='astro-position-row'><span style='color:{item['color']};font-size:1.3rem;'>{html.escape(item['symbol'])}</span> "
+                f"<strong>{html.escape(item['name'])}</strong><br><span style='color:{sign_color(item['sign'])};'>{html.escape(item['sign_symbol'])} {html.escape(item['sign'])} {item['degree']:.1f}°</span></div>",
+                unsafe_allow_html=True,
+            )
+
+    ascendant = chart.get("ascendant")
+    if ascendant:
+        st.caption(f"Rising / Ascendant: {ascendant['symbol']} {ascendant['sign']}")
+    else:
+        st.info("Rising sign is unavailable until a confirmed birthplace and birth time are saved.")
+
+    if chart["aspects"]:
+        st.markdown("##### Key Aspects")
+        aspect_text = " · ".join(
+            f"{item['symbol']} {item['left']}–{item['right']} {item['label']} ({item['orb']:.1f}° orb)"
+            for item in chart["aspects"][:8]
+        )
+        st.caption(aspect_text)
+
+    mode = st.radio("Reading", ("Today's Reading", "Sign Traits"), horizontal=True, key="cosmic_reading_mode")
+    if mode == "Today's Reading":
+        category = st.selectbox("Reading category", ("General", "Love & Connection", "Work & Purpose", "Wellness & Reflection"), key="cosmic_reading_category")
+        st.markdown(f"<div class='astro-reading-card'><div class='astro-reading-kicker'>TODAY'S READING · {html.escape(category.upper())}</div><div class='astro-reading-text'>{html.escape(_daily_horoscope(chart, category))}</div></div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='astro-reading-card'><div class='astro-reading-kicker'>SIGN TRAITS</div><div class='astro-reading-text'>{html.escape(_sign_traits_reading(chart))}</div></div>", unsafe_allow_html=True)
