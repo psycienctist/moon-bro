@@ -1193,9 +1193,13 @@ def render_cosmic_cards_tab() -> None:
 
     st.caption("Use the profile button in the upper-left corner to find members, connect, and trade Cosmic Cards.")
 
-    # Keep the owner-only chart immediately visible on Collect. It must not be
-    # hidden behind the card-success gate: a valid private birth profile can
-    # still produce a chart even if a separate card calculation needs repair.
+    if my_card:
+        # Preserve the existing Collect hierarchy: the Cosmic Card stays first.
+        render_collectible_card(my_card, is_owner=True, key_prefix="owner")
+
+    # The owner-only chart is rendered independently of card success. This keeps
+    # the chart reachable without moving the established Cosmic Card to the
+    # bottom of Collect.
     render_birth_chart_and_horoscope(profile)
 
     if not my_card:
@@ -1203,8 +1207,6 @@ def render_cosmic_cards_tab() -> None:
         with st.expander("Add your private birth inputs", expanded=True):
             render_profile_form(user_hash, key_prefix="cards")
         return
-
-    render_collectible_card(my_card, is_owner=True, key_prefix="owner")
 
     # The collection intentionally follows the owner-card explanation area.
     st.markdown("#### Your Collection")
@@ -1549,7 +1551,9 @@ def render_birth_chart_and_horoscope(profile: dict) -> None:
         st.warning("Your birth profile is saved, but the chart could not be calculated yet. Open Update private birth inputs below and save the confirmed birth details again.")
         return
     st.caption("Private owner view. Exact birth inputs remain server-side and are not included in shared Cosmic Cards.")
-    st.html(_birth_chart_svg(chart))
+    # Markdown HTML is intentionally used here instead of st.html so the SVG
+    # remains visible on Streamlit versions that sanitize st.html containers.
+    st.markdown(_birth_chart_svg(chart), unsafe_allow_html=True)
 
     st.markdown("##### Planetary Positions")
     position_columns = st.columns(2)

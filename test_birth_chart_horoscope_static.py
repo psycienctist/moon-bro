@@ -26,10 +26,13 @@ for required_symbol in (
 # Detailed chart data is rendered only from the private owner profile path and
 # never added to shareable_card(), which is the public/member-card boundary.
 assert "render_birth_chart_and_horoscope(profile)" in source
+assert "st.markdown(_birth_chart_svg(chart), unsafe_allow_html=True)" in source
 collect_start = source.index("def render_cosmic_cards_tab")
 chart_call = source.index("render_birth_chart_and_horoscope(profile)", collect_start)
-card_gate = source.index("if not my_card:", collect_start)
-assert chart_call < card_gate
+card_render = source.index("render_collectible_card(my_card", collect_start)
+card_gate = source.index("if not my_card:", chart_call)
+assert card_render < chart_call < card_gate
+
 assert "Your private birth chart will appear here after you save a birth date in Collect." in source
 assert "the chart could not be calculated yet" in source
 shareable_start = source.index("def shareable_card")
