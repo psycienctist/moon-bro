@@ -1375,56 +1375,130 @@ def _chart_sector_path(start_longitude: float, end_longitude: float, outer: floa
 
 
 def _birth_chart_svg(chart: dict) -> str:
-    """Render a self-contained, privacy-safe SVG for the owner’s birth chart."""
-    element_colors = {"Fire": "#ff6b6b", "Earth": "#73dfbf", "Air": "#66a8ff", "Water": "#c5a6ff"}
+    """Render the owner-only SVG port of Emergent's BirthChart component."""
+    view_size = 640.0
+    center = view_size / 2
+    outer_r = view_size * 0.465
+    sign_r = view_size * 0.39
+    track_r = view_size * 0.30
+    inner_r = view_size * 0.14
+    element_colors = {"Fire": "#EF4444", "Earth": "#10B981", "Air": "#60A5FA", "Water": "#A78BFA"}
+    element_backgrounds = {"Fire": "rgba(239,68,68,0.15)", "Earth": "rgba(16,185,129,0.15)", "Air": "rgba(96,165,250,0.15)", "Water": "rgba(167,139,250,0.15)"}
     elements = {
         "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
         "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
         "Gemini": "Air", "Libra": "Air", "Aquarius": "Air",
         "Cancer": "Water", "Scorpio": "Water", "Pisces": "Water",
     }
-    zodiac_paths = []
-    zodiac_labels = []
-    for index, (sign, symbol) in enumerate(ZODIAC):
-        start = index * 30.0
-        color = element_colors[elements[sign]]
-        zodiac_paths.append(f"<path d='{_chart_sector_path(start, start + 30)}' fill='{color}' fill-opacity='.18' stroke='{color}' stroke-opacity='.34' stroke-width='1.5'/>")
-        x, y = _chart_point(start + 15, 258)
-        zodiac_labels.append(f"<text x='{x:.1f}' y='{y + 5:.1f}' text-anchor='middle' fill='{color}' font-size='19'>{html.escape(symbol)}</text>")
+    brand_glow = "#C084FC"
 
-    position_by_name = {item["name"]: item for item in chart["positions"]}
-    aspect_lines = []
-    for aspect in chart["aspects"]:
-        left = position_by_name[aspect["left"]]
-        right = position_by_name[aspect["right"]]
-        x1, y1 = _chart_point(left["longitude"], 174)
-        x2, y2 = _chart_point(right["longitude"], 174)
-        aspect_lines.append(f"<line x1='{x1:.1f}' y1='{y1:.1f}' x2='{x2:.1f}' y2='{y2:.1f}' stroke='{aspect['color']}' stroke-opacity='.46' stroke-width='1.4'/>")
+    def point(longitude: float, radius: float) -> tuple[float, float]:
+        return _chart_point(longitude, radius, center)
 
-    planet_nodes = []
-    for item in chart["positions"]:
-        x, y = _chart_point(item["longitude"], 174)
-        planet_nodes.append(
-            f"<circle cx='{x:.1f}' cy='{y:.1f}' r='16' fill='{item['color']}' fill-opacity='.18' stroke='{item['color']}' stroke-width='1.2'/>"
-            f"<text x='{x:.1f}' y='{y + 5:.1f}' text-anchor='middle' fill='{item['color']}' font-size='17'>{html.escape(item['symbol'])}</text>"
+    def sector_path(start_longitude: float, end_longitude: float) -> str:
+        start_outer = point(start_longitude, outer_r)
+        end_outer = point(end_longitude, outer_r)
+        end_inner = point(end_longitude, sign_r)
+        start_inner = point(start_longitude, sign_r)
+        return (
+            f"M {start_outer[0]:.2f} {start_outer[1]:.2f} "
+            f"A {outer_r:.2f} {outer_r:.2f} 0 0 1 {end_outer[0]:.2f} {end_outer[1]:.2f} "
+            f"L {end_inner[0]:.2f} {end_inner[1]:.2f} "
+            f"A {sign_r:.2f} {sign_r:.2f} 0 0 0 {start_inner[0]:.2f} {start_inner[1]:.2f} Z"
         )
 
-    center_label = "✦"
-    if chart["ascendant"]:
-        center_label = chart["ascendant"]["symbol"]
+    sun = next((item for item in chart["positions"] if item["name"] == "Sun"), None)
+    sun_sign = sun["sign"] if sun else ""
+    zodiac_segments = []
+    for index, (sign, symbol) in enumerate(ZODIAC):
+        start = index * 30.0
+        mid = start + 15.0
+        element = elements[sign]
+        fill = element_backgrounds[element]
+        border = element_colors[element]
+        selected = sign == sun_sign
+        if selected:
+            fill = fill.replace("0.15", "0.35")
+        label_x, label_y = point(mid, (outer_r + sign_r) / 2)
+        zodiac_segments.append(
+            f"<g><path d='{sector_path(start, start + 30.0)}' fill='{fill}' stroke='{border if selected else 'rgba(148,163,184,0.08)'}' stroke-width='{1.5 if selected else 0.5}'/>"
+            f"<text x='{label_x:.2f}' y='{label_y + 1:.2f}' font-size='{13 if selected else 10}' fill='{border if selected else 'rgba(148,163,184,0.5)'}' text-anchor='middle' font-weight='{ 'bold' if selected else 'normal' }'>{html.escape(symbol)}</text></g>"
+        )
+
+    ticks = []
+    for degree in range(0, 360, 5):
+        major = degree % 30 == 0
+        tick_r1 = outer_r + (4 if major else 2)
+        tick_r2 = outer_r - (3 if major else 1)
+        x1, y1 = point(degree, tick_r1)
+        x2, y2 = point(degree, tick_r2)
+        ticks.append(
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{'rgba(148,163,184,0.3)' if major else 'rgba(148,163,184,0.12)'}' stroke-width='{1 if major else 0.5}'/>"
+        )
+
+    position_by_name = {item["name"]: item for item in chart["positions"]}
+    marker_items = list(chart["positions"])
+    if chart.get("ascendant"):
+        marker_items.append({
+            "name": "Ascendant", "symbol": "AC", "longitude": chart["ascendant"]["longitude"],
+            "color": "#C084FC", "sign": chart["ascendant"]["sign"],
+        })
+        position_by_name["Ascendant"] = marker_items[-1]
+
+    marker_state = []
+    for item in marker_items:
+        x, y = point(item["longitude"], track_r)
+        marker_state.append({"item": item, "x": x, "y": y})
+    for left_index in range(len(marker_state)):
+        for right_index in range(left_index + 1, len(marker_state)):
+            left = marker_state[left_index]
+            right = marker_state[right_index]
+            if math.hypot(left["x"] - right["x"], left["y"] - right["y"]) < 14:
+                right["x"], right["y"] = point(right["item"]["longitude"], track_r - 16)
+
+    aspect_lines = []
+    for aspect in chart["aspects"][:8]:
+        left = position_by_name.get(aspect["left"])
+        right = position_by_name.get(aspect["right"])
+        if not left or not right:
+            continue
+        x1, y1 = point(left["longitude"], track_r - 12)
+        x2, y2 = point(right["longitude"], track_r - 12)
+        dash = " stroke-dasharray='4,3'" if aspect["label"] == "Square" else " stroke-dasharray='6,3'" if aspect["label"] == "Opposition" else ""
+        aspect_lines.append(
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='0.8' opacity='0.35'{dash}/>"
+        )
+
+    planet_nodes = []
+    for marker in marker_state:
+        item = marker["item"]
+        x, y = marker["x"], marker["y"]
+        font_size = 7 if item["name"] == "Ascendant" else 9
+        planet_nodes.append(
+            f"<g><circle cx='{x:.2f}' cy='{y:.2f}' r='10' fill='{item['color']}' opacity='0.15'/>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='5' fill='{item['color']}' opacity='0.9' stroke='rgba(0,0,0,0.4)' stroke-width='0.5'/>"
+            f"<text x='{x:.2f}' y='{y - 9:.2f}' font-size='{font_size}' fill='{item['color']}' text-anchor='middle' font-weight='bold'>{html.escape(item['symbol'])}</text></g>"
+        )
+
+    center_label = sun["sign_symbol"] if sun else "✦"
     return f"""
     <div class='lunatick-birth-chart'>
-      <svg viewBox='0 0 640 640' role='img' aria-label='Private LunaTicK birth chart'>
-        <defs><filter id='chartGlow'><feGaussianBlur stdDeviation='5' result='blur'/><feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge></filter></defs>
-        <circle cx='320' cy='320' r='304' fill='#080b15' stroke='#bc8cff' stroke-opacity='.35' stroke-width='2'/>
-        {''.join(zodiac_paths)}
-        {''.join(zodiac_labels)}
-        <circle cx='320' cy='320' r='226' fill='none' stroke='#bc8cff' stroke-opacity='.25'/>
-        <circle cx='320' cy='320' r='174' fill='rgba(8,11,21,.65)' stroke='#bc8cff' stroke-opacity='.18'/>
+      <svg viewBox='0 0 {view_size:.0f} {view_size:.0f}' role='img' aria-label='Private LunaTicK birth chart'>
+        <defs>
+          <radialGradient id='birthChartCenterGlow' cx='50%' cy='50%' r='50%'><stop offset='0%' stop-color='{brand_glow}' stop-opacity='0.25'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0'/></radialGradient>
+          <radialGradient id='birthChartOuterGlow' cx='50%' cy='50%' r='50%'><stop offset='85%' stop-color='transparent' stop-opacity='0'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0.08'/></radialGradient>
+        </defs>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r + 6:.2f}' fill='url(#birthChartOuterGlow)'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r:.2f}' fill='none' stroke='rgba(148,163,184,0.15)' stroke-width='1'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{sign_r:.2f}' fill='none' stroke='rgba(148,163,184,0.1)' stroke-width='0.5'/>
+        {''.join(ticks)}
+        {''.join(zodiac_segments)}
+        {''.join(f"<line x1='{point(i * 30.0, inner_r)[0]:.2f}' y1='{point(i * 30.0, inner_r)[1]:.2f}' x2='{point(i * 30.0, sign_r)[0]:.2f}' y2='{point(i * 30.0, sign_r)[1]:.2f}' stroke='rgba(148,163,184,0.12)' stroke-width='0.5'/>" for i in range(12))}
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{track_r:.2f}' fill='none' stroke='rgba(148,163,184,0.06)' stroke-width='0.5' stroke-dasharray='3,3'/>
         {''.join(aspect_lines)}
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r:.2f}' fill='url(#birthChartCenterGlow)' stroke='rgba(192,132,252,0.2)' stroke-width='1'/>
+        <text x='{center:.0f}' y='{center + 10:.0f}' font-size='28' fill='{brand_glow}' text-anchor='middle' font-weight='bold'>{html.escape(center_label)}</text>
         {''.join(planet_nodes)}
-        <circle cx='320' cy='320' r='46' fill='#bc8cff' fill-opacity='.22' stroke='#bc8cff' filter='url(#chartGlow)'/>
-        <text x='320' y='332' text-anchor='middle' fill='#f0f6fc' font-size='34'>{html.escape(center_label)}</text>
       </svg>
     </div>
     """

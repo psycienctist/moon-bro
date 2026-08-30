@@ -30,6 +30,24 @@ shareable_start = source.index("def shareable_card")
 assert source.index("def _detailed_birth_chart") > shareable_start
 assert "birth_date" not in source[source.index("def shareable_card"):source.index("def build_friend_card")]
 
+# The SVG port preserves the Emergent component's geometry and visual vocabulary.
+for required_geometry in (
+    "outer_r = view_size * 0.465",
+    "sign_r = view_size * 0.39",
+    "track_r = view_size * 0.30",
+    "inner_r = view_size * 0.14",
+    "for degree in range(0, 360, 5)",
+    "for i in range(12)",
+    "r='10' fill='{item['color']}' opacity='0.15'",
+    "r='5' fill='{item['color']}' opacity='0.9'",
+    "birthChartCenterGlow",
+    "birthChartOuterGlow",
+    "stroke-dasharray='4,3'",
+    "stroke-dasharray='6,3'",
+    "center_label = sun[\"sign_symbol\"]",
+):
+    assert required_geometry in source, required_geometry
+
 # The chart remains visually responsive and uses the existing dark cosmic palette.
 for required_style in (
     ".lunatick-birth-chart",
