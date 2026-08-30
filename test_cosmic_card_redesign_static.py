@@ -54,10 +54,10 @@ assert "def render_profile_hub" in source
 assert "_render_trade_initiation(user_hash)" not in source[source.index("def render_cosmic_cards_tab"): ]
 assert source.index("render_collectible_card(my_card") < source.index('st.markdown("#### Your Collection")')
 assert "cosmic_detail" in source
-assert 'CARD_MODULE_VERSION = "birth_chart_horoscope_v1"' in source
+assert 'CARD_MODULE_VERSION = "birth_chart_svg_v2"' in source
 for tile_class in ("cosmic-card-tile--sun", "cosmic-card-tile--moon", "cosmic-card-tile--rising", "cosmic-card-tile--birth_phase", "cosmic-card-tile--full_moons", "cosmic-card-tile--dominant"):
     assert tile_class in source, tile_class
-assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "birth_chart_horoscope_v1"' in app_source
+assert 'getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "birth_chart_svg_v2"' in app_source
 assert "cosmic_cards = importlib.reload(cosmic_cards)" in app_source
 
 print("Cosmic Card single-face, six-tile, share-safe, and warm-reload checks passed.")
