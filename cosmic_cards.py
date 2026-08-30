@@ -1193,6 +1193,11 @@ def render_cosmic_cards_tab() -> None:
 
     st.caption("Use the profile button in the upper-left corner to find members, connect, and trade Cosmic Cards.")
 
+    # Keep the owner-only chart immediately visible on Collect. It must not be
+    # hidden behind the card-success gate: a valid private birth profile can
+    # still produce a chart even if a separate card calculation needs repair.
+    render_birth_chart_and_horoscope(profile)
+
     if not my_card:
         st.info("Add your birth date to unlock your Cosmic Card.")
         with st.expander("Add your private birth inputs", expanded=True):
@@ -1200,7 +1205,6 @@ def render_cosmic_cards_tab() -> None:
         return
 
     render_collectible_card(my_card, is_owner=True, key_prefix="owner")
-    render_birth_chart_and_horoscope(profile)
 
     # The collection intentionally follows the owner-card explanation area.
     st.markdown("#### Your Collection")
@@ -1535,10 +1539,15 @@ def _sign_traits_reading(chart: dict) -> str:
 
 def render_birth_chart_and_horoscope(profile: dict) -> None:
     """Render detailed astrology only for the signed-in owner."""
+    st.markdown("#### Your Birth Chart & Daily Horoscope")
+    birth_date = str(profile.get("birth_date") or "").strip()
+    if not birth_date:
+        st.info("Your private birth chart will appear here after you save a birth date in Collect.")
+        return
     chart = _detailed_birth_chart(profile)
     if not chart:
+        st.warning("Your birth profile is saved, but the chart could not be calculated yet. Open Update private birth inputs below and save the confirmed birth details again.")
         return
-    st.markdown("#### Your Birth Chart & Daily Horoscope")
     st.caption("Private owner view. Exact birth inputs remain server-side and are not included in shared Cosmic Cards.")
     st.html(_birth_chart_svg(chart))
 
