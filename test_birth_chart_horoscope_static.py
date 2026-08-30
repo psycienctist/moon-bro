@@ -29,7 +29,7 @@ assert "render_birth_chart_and_horoscope(profile)" in source
 assert "st.markdown(_birth_chart_svg(chart), unsafe_allow_html=True)" in source
 assert "astro-positions-table-row" in source
 assert "grid-template-columns:1fr 1fr" in source
-assert "font-size='48'" in source
+assert "font-size='54'" in source
 assert "halo_radius = 22" in source
 assert "tile_size = 17" in source
 assert "for star_index in range(34)" in source
@@ -55,8 +55,8 @@ for required_geometry in (
     "for i in range(12)",
         "halo_radius = 22",
         "dot_radius = 9",
-        "r='{halo_radius}' fill='{item['color']}' opacity='0.14'",
-        "r='{dot_radius}' fill='{item['color']}' opacity='0.94'",
+        "r='{halo_radius}' fill='{item['color']}' opacity='0.18'",
+        "r='{dot_radius}' fill='{item['color']}' opacity='0.98'",
     "birthChartCenterGlow",
     "birthChartOuterGlow",
     "stroke-dasharray='4,3'",

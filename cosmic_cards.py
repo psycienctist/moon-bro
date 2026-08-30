@@ -1431,8 +1431,9 @@ def _birth_chart_svg(chart: dict) -> str:
         tile_size = 17 if selected else 14
         zodiac_segments.append(
             f"<g><path d='{sector_path(start, start + 30.0)}' fill='{fill}' stroke='{border if selected else 'rgba(148,163,184,0.18)'}' stroke-width='{2.4 if selected else 1.0}'/>"
-            f"<rect x='{label_x - tile_size:.2f}' y='{label_y - tile_size:.2f}' width='{tile_size * 2:.2f}' height='{tile_size * 2:.2f}' rx='6' fill='rgba(192,132,252,0.78)' stroke='{border if selected else 'rgba(216,180,254,0.44)'}' stroke-width='{1.8 if selected else 0.8}'/>"
-            f"<text x='{label_x:.2f}' y='{label_y + (6 if selected else 5):.2f}' font-size='{22 if selected else 18}' fill='#f8f4ff' text-anchor='middle' font-weight='bold'>{html.escape(symbol)}</text></g>"
+            f"<rect x='{label_x - tile_size - 2:.2f}' y='{label_y - tile_size - 2:.2f}' width='{(tile_size + 2) * 2:.2f}' height='{(tile_size + 2) * 2:.2f}' rx='8' fill='{border}' opacity='0.35' filter='url(#birthChartTileGlow)'/>"
+            f"<rect x='{label_x - tile_size:.2f}' y='{label_y - tile_size:.2f}' width='{tile_size * 2:.2f}' height='{tile_size * 2:.2f}' rx='7' fill='rgba(170,75,235,0.86)' stroke='{border if selected else 'rgba(233,213,255,0.58)'}' stroke-width='{2.2 if selected else 1.1}'/>"
+            f"<text x='{label_x:.2f}' y='{label_y + (7 if selected else 6):.2f}' font-size='{24 if selected else 20}' fill='#fffaff' stroke='rgba(59,16,95,0.42)' stroke-width='0.8' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(symbol)}</text></g>"
         )
 
     stars = []
@@ -1484,7 +1485,9 @@ def _birth_chart_svg(chart: dict) -> str:
         x2, y2 = point(right["longitude"], track_r - 12)
         dash = " stroke-dasharray='4,3'" if aspect["label"] == "Square" else " stroke-dasharray='6,3'" if aspect["label"] == "Opposition" else ""
         aspect_lines.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='1.35' opacity='0.54'{dash}/>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='4.8' opacity='0.08' filter='url(#birthChartPlanetBloom)'{dash}/>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='2.15' opacity='0.20'{dash}/>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='0.95' opacity='0.68'{dash}/>"
         )
 
     planet_nodes = []
@@ -1495,9 +1498,11 @@ def _birth_chart_svg(chart: dict) -> str:
         halo_radius = 22 if item["name"] == "Ascendant" else 25
         dot_radius = 9 if item["name"] == "Ascendant" else 11
         planet_nodes.append(
-            f"<g><circle cx='{x:.2f}' cy='{y:.2f}' r='{halo_radius}' fill='{item['color']}' opacity='0.14'/>"
-            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{dot_radius}' fill='{item['color']}' opacity='0.94' stroke='rgba(248,244,255,0.42)' stroke-width='1.2'/>"
-            f"<text x='{x:.2f}' y='{y - (18 if item['name'] == 'Ascendant' else 16):.2f}' font-size='{font_size}' fill='{item['color']}' stroke='rgba(5,8,17,0.72)' stroke-width='1.4' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(item['symbol'])}</text></g>"
+            f"<g><circle cx='{x:.2f}' cy='{y:.2f}' r='{halo_radius + 8}' fill='{item['color']}' opacity='0.16' filter='url(#birthChartPlanetBloom)'/>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{halo_radius}' fill='{item['color']}' opacity='0.18'/>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{dot_radius + 2}' fill='{item['color']}' opacity='0.26' stroke='{item['color']}' stroke-width='1.4'/>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{dot_radius}' fill='{item['color']}' opacity='0.98' stroke='rgba(255,255,255,0.64)' stroke-width='1.3'/>"
+            f"<text x='{x:.2f}' y='{y - (20 if item['name'] == 'Ascendant' else 18):.2f}' font-size='{font_size}' fill='{item['color']}' stroke='rgba(5,8,17,0.82)' stroke-width='1.8' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(item['symbol'])}</text></g>"
         )
 
     center_label = sun["sign_symbol"] if sun else "✦"
@@ -1505,8 +1510,11 @@ def _birth_chart_svg(chart: dict) -> str:
     <div class='lunatick-birth-chart'>
       <svg viewBox='0 0 {view_size:.0f} {view_size:.0f}' role='img' aria-label='Private LunaTicK birth chart'>
         <defs>
-          <radialGradient id='birthChartCenterGlow' cx='50%' cy='50%' r='50%'><stop offset='0%' stop-color='{brand_glow}' stop-opacity='0.25'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0'/></radialGradient>
-          <radialGradient id='birthChartOuterGlow' cx='50%' cy='50%' r='50%'><stop offset='85%' stop-color='transparent' stop-opacity='0'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0.08'/></radialGradient>
+          <radialGradient id='birthChartCenterGlow' cx='50%' cy='50%' r='50%'><stop offset='0%' stop-color='{brand_glow}' stop-opacity='0.46'/><stop offset='48%' stop-color='{brand_glow}' stop-opacity='0.18'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0'/></radialGradient>
+          <radialGradient id='birthChartOuterGlow' cx='50%' cy='50%' r='50%'><stop offset='76%' stop-color='transparent' stop-opacity='0'/><stop offset='94%' stop-color='{brand_glow}' stop-opacity='0.12'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0.22'/></radialGradient>
+          <radialGradient id='birthChartCenterMedallion' cx='35%' cy='28%' r='78%'><stop offset='0%' stop-color='#e9d5ff' stop-opacity='0.92'/><stop offset='24%' stop-color='#c084fc' stop-opacity='0.94'/><stop offset='68%' stop-color='#7e22ce' stop-opacity='0.96'/><stop offset='100%' stop-color='#35105f' stop-opacity='0.98'/></radialGradient>
+          <filter id='birthChartPlanetBloom' x='-80%' y='-80%' width='260%' height='260%'><feGaussianBlur stdDeviation='5'/></filter>
+          <filter id='birthChartTileGlow' x='-80%' y='-80%' width='260%' height='260%'><feGaussianBlur stdDeviation='3'/></filter>
         </defs>
         {''.join(stars)}
         <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r + 7:.2f}' fill='url(#birthChartOuterGlow)'/>
@@ -1520,9 +1528,11 @@ def _birth_chart_svg(chart: dict) -> str:
         <circle cx='{center:.0f}' cy='{center:.0f}' r='{track_r + 16:.2f}' fill='none' stroke='rgba(148,163,184,0.10)' stroke-width='0.8'/>
         <circle cx='{center:.0f}' cy='{center:.0f}' r='{track_r:.2f}' fill='none' stroke='rgba(148,163,184,0.13)' stroke-width='0.8' stroke-dasharray='3,3'/>
         {''.join(aspect_lines)}
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r + 18:.2f}' fill='url(#birthChartCenterGlow)' opacity='0.62'/>
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r:.2f}' fill='rgba(23,16,48,0.84)' stroke='rgba(216,180,254,0.52)' stroke-width='1.6'/>
-        <text x='{center:.0f}' y='{center + 14:.0f}' font-size='48' fill='{brand_glow}' stroke='rgba(255,255,255,0.16)' stroke-width='1' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(center_label)}</text>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r + 30:.2f}' fill='url(#birthChartCenterGlow)' opacity='0.78'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r + 11:.2f}' fill='none' stroke='rgba(192,132,252,0.28)' stroke-width='2.2'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r:.2f}' fill='url(#birthChartCenterMedallion)' stroke='rgba(245,231,255,0.72)' stroke-width='1.8'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r - 5:.2f}' fill='none' stroke='rgba(255,255,255,0.18)' stroke-width='1'/>
+        <text x='{center:.0f}' y='{center + 18:.0f}' font-size='54' fill='#fffaff' stroke='rgba(77,24,118,0.48)' stroke-width='1.4' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(center_label)}</text>
         {''.join(planet_nodes)}
       </svg>
     </div>
