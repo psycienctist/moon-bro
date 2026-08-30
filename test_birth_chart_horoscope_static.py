@@ -27,6 +27,12 @@ for required_symbol in (
 # never added to shareable_card(), which is the public/member-card boundary.
 assert "render_birth_chart_and_horoscope(profile)" in source
 assert "st.markdown(_birth_chart_svg(chart), unsafe_allow_html=True)" in source
+assert "astro-positions-table-row" in source
+assert "grid-template-columns:1fr 1fr" in source
+assert "font-size='48'" in source
+assert "halo_radius = 22" in source
+assert "tile_size = 17" in source
+assert "for star_index in range(34)" in source
 collect_start = source.index("def render_cosmic_cards_tab")
 chart_call = source.index("render_birth_chart_and_horoscope(profile)", collect_start)
 card_render = source.index("render_collectible_card(my_card", collect_start)
@@ -47,8 +53,10 @@ for required_geometry in (
     "inner_r = view_size * 0.14",
     "for degree in range(0, 360, 5)",
     "for i in range(12)",
-    "r='10' fill='{item['color']}' opacity='0.15'",
-    "r='5' fill='{item['color']}' opacity='0.9'",
+        "halo_radius = 22",
+        "dot_radius = 9",
+        "r='{halo_radius}' fill='{item['color']}' opacity='0.14'",
+        "r='{dot_radius}' fill='{item['color']}' opacity='0.94'",
     "birthChartCenterGlow",
     "birthChartOuterGlow",
     "stroke-dasharray='4,3'",

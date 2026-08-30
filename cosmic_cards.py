@@ -689,9 +689,11 @@ def _render_card_css() -> None:
     .cosmic-card-tile--birth_phase { border-color:#c5a6ff; box-shadow:inset 0 0 18px rgba(197,166,255,.14),0 0 11px rgba(197,166,255,.15); }.cosmic-card-tile--birth_phase .cosmic-card-tile-value { color:#c5a6ff; }
     .cosmic-card-tile--full_moons { border-color:#9c7bff; box-shadow:inset 0 0 18px rgba(156,123,255,.14),0 0 11px rgba(156,123,255,.15); }.cosmic-card-tile--full_moons .cosmic-card-tile-value { color:#9c7bff; }
     .cosmic-card-tile--dominant { border-color:#73dfbf; box-shadow:inset 0 0 18px rgba(115,223,191,.14),0 0 11px rgba(115,223,191,.15); }.cosmic-card-tile--dominant .cosmic-card-tile-value { color:#73dfbf; }
-    .lunatick-birth-chart { max-width:640px; margin:.35rem auto .8rem; border:1px solid rgba(188,140,255,.22); border-radius:18px; background:radial-gradient(circle at center,rgba(36,25,72,.42),rgba(5,8,17,.88) 68%); overflow:hidden; }
+    .lunatick-birth-chart { max-width:760px; margin:.35rem auto .8rem; border:1px solid rgba(188,140,255,.42); border-radius:20px; background:radial-gradient(circle at center,rgba(54,31,96,.58),rgba(5,8,17,.95) 70%); overflow:hidden; box-shadow:0 0 28px rgba(188,140,255,.16),inset 0 0 36px rgba(96,165,250,.09); }
     .lunatick-birth-chart svg { display:block; width:100%; height:auto; }
-    .astro-position-row { margin:.25rem 0; padding:.5rem .6rem; min-height:3.2rem; border:1px solid rgba(188,140,255,.2); border-radius:10px; background:rgba(18,22,42,.72); color:#f0f6fc; line-height:1.35; }
+    .astro-positions-table { margin:.45rem 0 .85rem; padding:.45rem; border:1px solid rgba(188,140,255,.32); border-radius:14px; background:linear-gradient(145deg,rgba(21,23,50,.88),rgba(8,13,27,.92)); box-shadow:inset 0 0 26px rgba(188,140,255,.06); }
+    .astro-positions-table-row { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
+    .astro-position-row { margin:.2rem 0; padding:.58rem .68rem; min-height:3.35rem; border:1px solid rgba(188,140,255,.24); border-radius:10px; background:rgba(18,22,42,.74); color:#f0f6fc; line-height:1.35; }
     .astro-reading-card { margin:.65rem 0 .9rem; padding:.75rem .85rem; border:1px solid rgba(188,140,255,.35); border-radius:14px; background:linear-gradient(145deg,rgba(31,24,62,.78),rgba(9,14,28,.9)); box-shadow:inset 0 0 22px rgba(188,140,255,.08); }
     .astro-reading-kicker { color:#bc8cff; font-size:.62rem; font-weight:800; letter-spacing:1.6px; margin-bottom:.35rem; }
     .astro-reading-text { color:#f0f6fc; font-size:1rem; line-height:1.65; letter-spacing:.01em; }
@@ -1389,7 +1391,7 @@ def _birth_chart_svg(chart: dict) -> str:
     track_r = view_size * 0.30
     inner_r = view_size * 0.14
     element_colors = {"Fire": "#EF4444", "Earth": "#10B981", "Air": "#60A5FA", "Water": "#A78BFA"}
-    element_backgrounds = {"Fire": "rgba(239,68,68,0.15)", "Earth": "rgba(16,185,129,0.15)", "Air": "rgba(96,165,250,0.15)", "Water": "rgba(167,139,250,0.15)"}
+    element_backgrounds = {"Fire": "rgba(239,68,68,0.24)", "Earth": "rgba(16,185,129,0.24)", "Air": "rgba(96,165,250,0.24)", "Water": "rgba(167,139,250,0.24)"}
     elements = {
         "Aries": "Fire", "Leo": "Fire", "Sagittarius": "Fire",
         "Taurus": "Earth", "Virgo": "Earth", "Capricorn": "Earth",
@@ -1424,12 +1426,22 @@ def _birth_chart_svg(chart: dict) -> str:
         border = element_colors[element]
         selected = sign == sun_sign
         if selected:
-            fill = fill.replace("0.15", "0.35")
+            fill = fill.replace("0.24", "0.46")
         label_x, label_y = point(mid, (outer_r + sign_r) / 2)
+        tile_size = 17 if selected else 14
         zodiac_segments.append(
-            f"<g><path d='{sector_path(start, start + 30.0)}' fill='{fill}' stroke='{border if selected else 'rgba(148,163,184,0.08)'}' stroke-width='{1.5 if selected else 0.5}'/>"
-            f"<text x='{label_x:.2f}' y='{label_y + 1:.2f}' font-size='{13 if selected else 10}' fill='{border if selected else 'rgba(148,163,184,0.5)'}' text-anchor='middle' font-weight='{ 'bold' if selected else 'normal' }'>{html.escape(symbol)}</text></g>"
+            f"<g><path d='{sector_path(start, start + 30.0)}' fill='{fill}' stroke='{border if selected else 'rgba(148,163,184,0.18)'}' stroke-width='{2.4 if selected else 1.0}'/>"
+            f"<rect x='{label_x - tile_size:.2f}' y='{label_y - tile_size:.2f}' width='{tile_size * 2:.2f}' height='{tile_size * 2:.2f}' rx='6' fill='rgba(192,132,252,0.78)' stroke='{border if selected else 'rgba(216,180,254,0.44)'}' stroke-width='{1.8 if selected else 0.8}'/>"
+            f"<text x='{label_x:.2f}' y='{label_y + (6 if selected else 5):.2f}' font-size='{22 if selected else 18}' fill='#f8f4ff' text-anchor='middle' font-weight='bold'>{html.escape(symbol)}</text></g>"
         )
+
+    stars = []
+    for star_index in range(34):
+        star_x = 34 + ((star_index * 137) % 572)
+        star_y = 34 + ((star_index * 83) % 572)
+        star_radius = 0.55 + (star_index % 4) * 0.35
+        star_opacity = 0.24 + (star_index % 5) * 0.08
+        stars.append(f"<circle cx='{star_x}' cy='{star_y}' r='{star_radius:.2f}' fill='#e9ddff' opacity='{star_opacity:.2f}'/>")
 
     ticks = []
     for degree in range(0, 360, 5):
@@ -1472,18 +1484,20 @@ def _birth_chart_svg(chart: dict) -> str:
         x2, y2 = point(right["longitude"], track_r - 12)
         dash = " stroke-dasharray='4,3'" if aspect["label"] == "Square" else " stroke-dasharray='6,3'" if aspect["label"] == "Opposition" else ""
         aspect_lines.append(
-            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='0.8' opacity='0.35'{dash}/>"
+            f"<line x1='{x1:.2f}' y1='{y1:.2f}' x2='{x2:.2f}' y2='{y2:.2f}' stroke='{aspect['color']}' stroke-width='1.35' opacity='0.54'{dash}/>"
         )
 
     planet_nodes = []
     for marker in marker_state:
         item = marker["item"]
         x, y = marker["x"], marker["y"]
-        font_size = 7 if item["name"] == "Ascendant" else 9
+        font_size = 12 if item["name"] == "Ascendant" else 17
+        halo_radius = 22 if item["name"] == "Ascendant" else 25
+        dot_radius = 9 if item["name"] == "Ascendant" else 11
         planet_nodes.append(
-            f"<g><circle cx='{x:.2f}' cy='{y:.2f}' r='10' fill='{item['color']}' opacity='0.15'/>"
-            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='5' fill='{item['color']}' opacity='0.9' stroke='rgba(0,0,0,0.4)' stroke-width='0.5'/>"
-            f"<text x='{x:.2f}' y='{y - 9:.2f}' font-size='{font_size}' fill='{item['color']}' text-anchor='middle' font-weight='bold'>{html.escape(item['symbol'])}</text></g>"
+            f"<g><circle cx='{x:.2f}' cy='{y:.2f}' r='{halo_radius}' fill='{item['color']}' opacity='0.14'/>"
+            f"<circle cx='{x:.2f}' cy='{y:.2f}' r='{dot_radius}' fill='{item['color']}' opacity='0.94' stroke='rgba(248,244,255,0.42)' stroke-width='1.2'/>"
+            f"<text x='{x:.2f}' y='{y - (18 if item['name'] == 'Ascendant' else 16):.2f}' font-size='{font_size}' fill='{item['color']}' stroke='rgba(5,8,17,0.72)' stroke-width='1.4' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(item['symbol'])}</text></g>"
         )
 
     center_label = sun["sign_symbol"] if sun else "✦"
@@ -1494,16 +1508,21 @@ def _birth_chart_svg(chart: dict) -> str:
           <radialGradient id='birthChartCenterGlow' cx='50%' cy='50%' r='50%'><stop offset='0%' stop-color='{brand_glow}' stop-opacity='0.25'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0'/></radialGradient>
           <radialGradient id='birthChartOuterGlow' cx='50%' cy='50%' r='50%'><stop offset='85%' stop-color='transparent' stop-opacity='0'/><stop offset='100%' stop-color='{brand_glow}' stop-opacity='0.08'/></radialGradient>
         </defs>
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r + 6:.2f}' fill='url(#birthChartOuterGlow)'/>
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r:.2f}' fill='none' stroke='rgba(148,163,184,0.15)' stroke-width='1'/>
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{sign_r:.2f}' fill='none' stroke='rgba(148,163,184,0.1)' stroke-width='0.5'/>
+        {''.join(stars)}
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r + 7:.2f}' fill='url(#birthChartOuterGlow)'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r + 2:.2f}' fill='none' stroke='rgba(192,132,252,0.22)' stroke-width='3'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{outer_r:.2f}' fill='none' stroke='rgba(216,180,254,0.26)' stroke-width='1.4'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{sign_r + 3:.2f}' fill='none' stroke='rgba(148,163,184,0.20)' stroke-width='1.2'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{sign_r:.2f}' fill='none' stroke='rgba(148,163,184,0.16)' stroke-width='0.8'/>
         {''.join(ticks)}
         {''.join(zodiac_segments)}
         {''.join(f"<line x1='{point(i * 30.0, inner_r)[0]:.2f}' y1='{point(i * 30.0, inner_r)[1]:.2f}' x2='{point(i * 30.0, sign_r)[0]:.2f}' y2='{point(i * 30.0, sign_r)[1]:.2f}' stroke='rgba(148,163,184,0.12)' stroke-width='0.5'/>" for i in range(12))}
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{track_r:.2f}' fill='none' stroke='rgba(148,163,184,0.06)' stroke-width='0.5' stroke-dasharray='3,3'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{track_r + 16:.2f}' fill='none' stroke='rgba(148,163,184,0.10)' stroke-width='0.8'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{track_r:.2f}' fill='none' stroke='rgba(148,163,184,0.13)' stroke-width='0.8' stroke-dasharray='3,3'/>
         {''.join(aspect_lines)}
-        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r:.2f}' fill='url(#birthChartCenterGlow)' stroke='rgba(192,132,252,0.2)' stroke-width='1'/>
-        <text x='{center:.0f}' y='{center + 10:.0f}' font-size='28' fill='{brand_glow}' text-anchor='middle' font-weight='bold'>{html.escape(center_label)}</text>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r + 18:.2f}' fill='url(#birthChartCenterGlow)' opacity='0.62'/>
+        <circle cx='{center:.0f}' cy='{center:.0f}' r='{inner_r:.2f}' fill='rgba(23,16,48,0.84)' stroke='rgba(216,180,254,0.52)' stroke-width='1.6'/>
+        <text x='{center:.0f}' y='{center + 14:.0f}' font-size='48' fill='{brand_glow}' stroke='rgba(255,255,255,0.16)' stroke-width='1' paint-order='stroke' text-anchor='middle' font-weight='bold'>{html.escape(center_label)}</text>
         {''.join(planet_nodes)}
       </svg>
     </div>
@@ -1556,14 +1575,17 @@ def render_birth_chart_and_horoscope(profile: dict) -> None:
     st.markdown(_birth_chart_svg(chart), unsafe_allow_html=True)
 
     st.markdown("##### Planetary Positions")
-    position_columns = st.columns(2)
-    for index, item in enumerate(chart["positions"]):
-        with position_columns[index % 2]:
-            st.markdown(
-                f"<div class='astro-position-row'><span style='color:{item['color']};font-size:1.3rem;'>{html.escape(item['symbol'])}</span> "
-                f"<strong>{html.escape(item['name'])}</strong><br><span style='color:{sign_color(item['sign'])};'>{html.escape(item['sign_symbol'])} {html.escape(item['sign'])} {item['degree']:.1f}°</span></div>",
-                unsafe_allow_html=True,
-            )
+    position_cells = []
+    for item in chart["positions"]:
+        position_cells.append(
+            f"<div class='astro-position-row'><span style='color:{item['color']};font-size:1.45rem;line-height:1;'>{html.escape(item['symbol'])}</span> "
+            f"<strong>{html.escape(item['name'])}</strong><br><span style='color:{sign_color(item['sign'])};'>{html.escape(item['sign_symbol'])} {html.escape(item['sign'])} {item['degree']:.1f}°</span></div>"
+        )
+    paired_rows = []
+    for index in range(0, len(position_cells), 2):
+        right = position_cells[index + 1] if index + 1 < len(position_cells) else "<div></div>"
+        paired_rows.append(f"<div class='astro-positions-table-row'>{position_cells[index]}{right}</div>")
+    st.markdown(f"<div class='astro-positions-table' role='table'>{''.join(paired_rows)}</div>", unsafe_allow_html=True)
 
     ascendant = chart.get("ascendant")
     if ascendant:
