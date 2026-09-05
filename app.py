@@ -3,6 +3,7 @@ import ephem
 import importlib
 import math
 import requests
+import json
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
@@ -1080,11 +1081,9 @@ ZODIAC_SIGNS = [
     ("Pisces", "♓", "Dreamy, intuitive mood. Meditate and create art."),
 ]
 
-
 def get_zodiac_sign(lon_deg):
     idx = int(lon_deg / 30) % 12
     return ZODIAC_SIGNS[idx]
-
 
 def get_moon_phase_name(phase_frac: float):
     phases = [
@@ -1096,7 +1095,6 @@ def get_moon_phase_name(phase_frac: float):
         if phases[i][0] <= phase_frac < phases[i + 1][0]:
             return phases[i][1], phases[i][2]
     return "New Moon", "🌑"
-
 
 def get_celestial_data(date_utc: datetime):
     obs = ephem.Observer()
@@ -1125,40 +1123,150 @@ def get_celestial_data(date_utc: datetime):
         "next_full_dt": nfm_dt, "age_days": phase_frac * 29.53,
     }
 
-
-@st.cache_data(ttl=3600)
-def get_ai_insight(natal, current, aspect):
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+# ---------------------------------------------------------------------------
+# NEW: Free Groq AI Mirror (replaces DeepSeek)
+# ---------------------------------------------------------------------------
+def get_ai_mirror(journal_text: str, current_moon: dict, natal_moon: dict) -> dict | None:
+    """
+    Uses Groq's free API (Llama 3 70B) to generate a poetic, mirroring reflection.
+    Costs $0. No data retained by Groq.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
+        st.warning("Groq API key not found. Please add it to your secrets.")
         return None
 
-    prompt = f"""
-    As a cosmic guide, provide a short, poetic, and encouraging astrology insight (max 3 sentences).
-    User Natal: Sun in {natal['sun_sign']}, Moon in {natal['moon_sign']}.
-    Current Sky: Moon in {current['moon_sign']} ({current['phase_name']}).
-    Natal-Current Aspect: {aspect}.
-    Tone: Mystical, empowering, and modern.
-    """
+    # 1. Calculate the real aspect (Natal vs Current Moon)
+    diff = abs((current_moon['moon_lon'] - natal_moon['moon_lon']) % 360)
+    if diff < 8: aspect = "Conjunct — your inner world is aligning with the outer sky"
+    elif 60 < diff < 80: aspect = "Sextile — an open channel for flow"
+    elif 90 < diff < 100: aspect = "Square — tension asking to be released"
+    elif 120 < diff < 130: aspect = "Trine — natural grace surrounds you"
+    elif 170 < diff < 190: aspect = "Opposition — seeking balance in reflection"
+    else: aspect = "Quiet transit — the Moon whispers subtly"
+
+    # 2. Build the engineered prompt
+    system_prompt = (
+        "You are a poetic mirror, not an advisor. You reflect the user's inner state back to them "
+        "using the current lunar phase as a metaphor. Never say 'you should'. Always validate. "
+        "Return your response strictly as a JSON object with keys: 'emotion', 'metaphor', and 'question'. "
+        "Keep each value short and precise (max 1 sentence each)."
+    )
+
+    user_prompt = f"""
+[CONTEXT: USER'S CURRENT SKY]
+The Moon is currently in {current_moon['moon_sign']} at {current_moon['illum']*100:.0f}% illumination ({current_moon['phase_name']}).
+The user's natal Moon is in {natal_moon['moon_sign']}.
+The specific aspect between their natal and current moon is: {aspect}.
+
+[CONTEXT: USER'S RAW WORDS]
+The user just wrote this in their journal:
+---
+{journal_text}
+---
+
+[TASK]
+Read their raw words carefully.
+Return your response strictly as a valid JSON object with these exact keys:
+- "emotion": State the core, singular emotion you detect in their writing (e.g., "Grief", "Restlessness", "Quiet hope").
+- "metaphor": Weave that emotion into the current Moon's symbolism and the aspect.
+- "question": End with a single question that turns their gaze inward (do not ask a yes/no question).
+
+Tone: warm, precise, cosmic. No fluff.
+"""
 
     try:
         response = requests.post(
-            "https://api.deepseek.com/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": "You are a mystical cosmic guide for the Lunatick app."},
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
             },
-            timeout=10,
+            json={
+                "model": "llama3-70b-8192",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.75,
+                "max_tokens": 180,
+            },
+            timeout=15,
         )
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception:
+        
+        if response.status_code == 200:
+            result = response.json()
+            content = result["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
+            return parsed
+        elif response.status_code == 429:
+            st.info("The Moon is receiving too many whispers at once. Try again in a minute.")
+            return None
+        else:
+            st.error(f"Groq API error: {response.status_code} - {response.text}")
+            return None
+
+    except json.JSONDecodeError:
+        st.warning("The mirror spoke in riddles. Try again.")
+        return None
+    except Exception as e:
+        st.error(f"Connection error: {e}")
         return None
 
+# ---------------------------------------------------------------------------
+# CUSTOM JOURNAL TAB WITH AI BUTTON (overrides journal_ui.render_journal_tab)
+# ---------------------------------------------------------------------------
+def custom_render_journal_tab():
+    """Renders the original journal UI and adds a Lunar Reflection button below."""
+    # Call the original journal rendering
+    journal_ui.render_journal_tab()
+    
+    # Now add the AI mirror button using the current journal text from session state
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🌙 See your lunar reflection", type="primary", use_container_width=True):
+            raw_entry = st.session_state.get("journal_freewrite_input", "").strip()
+            if raw_entry:
+                with st.spinner("The Moon is listening..."):
+                    # Get current celestial data
+                    now_utc = datetime.now(timezone.utc)
+                    current = get_celestial_data(now_utc)
+                    
+                    # Get natal data from birth_date in session
+                    birth_date = st.session_state.get("birth_date")
+                    if birth_date:
+                        if hasattr(birth_date, 'date') and not isinstance(birth_date, datetime):
+                            birth_dt = datetime.combine(birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                        elif isinstance(birth_date, datetime):
+                            birth_dt = birth_date
+                        else:
+                            birth_dt = datetime.now(timezone.utc)
+                        natal = get_celestial_data(birth_dt)
+                    else:
+                        st.warning("Please set your birth date in the sidebar or settings first.")
+                        natal = None
+                    
+                    if natal:
+                        insight = get_ai_mirror(raw_entry, current, natal)
+                        if insight:
+                            st.markdown("---")
+                            st.markdown(f"**{insight.get('emotion', '...')}**")
+                            st.markdown(f"*{insight.get('metaphor', '...')}*")
+                            st.caption(f"💭 {insight.get('question', '...')}")
+                            st.markdown("---")
+                        else:
+                            st.info("The mirror is quiet right now. Please try again in a moment.")
+            else:
+                st.warning("Write something in your journal first.")
 
+# Replace the original render_journal_tab with our custom version
+journal_ui.render_journal_tab = custom_render_journal_tab
+
+# ---------------------------------------------------------------------------
+# Original render functions (Home, Tones, Calendar, Settings)
+# ---------------------------------------------------------------------------
 def render_home():
     now_utc = datetime.now(timezone.utc)
     current = get_celestial_data(now_utc)
@@ -1263,12 +1371,8 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-
 def render_tones():
     """Render Lunatick's client-side, user-controlled Web Audio tone space."""
-    # This local import deliberately leaves the existing top-level imports
-    # untouched. The component runs in an isolated browser iframe, so no audio
-    # or listening data is sent to the server.
     import streamlit.components.v1 as components
 
     tone_generator_html = r"""
@@ -1822,23 +1926,17 @@ def render_tones():
 
     components.html(tone_generator_html, height=520, scrolling=False)
 
-
 def render_calendar():
-    """Render the phone-first Track calendar implementation."""
     track_calendar.render_track_tab()
 
-
 def _is_backup_owner() -> bool:
-    """Allow full-database export only for the email configured in Cloud secrets."""
     try:
         backup_config = st.secrets.get("backup", {})
         owner_email = str(backup_config.get("owner_email", "")).strip().lower()
     except Exception:
         return False
-
     current_email = str(st.session_state.get("email", "")).strip().lower()
     return bool(owner_email and current_email and owner_email == current_email)
-
 
 def render_settings():
     st.markdown("""
@@ -2078,11 +2176,6 @@ def render_settings():
             st.success("Journal entries cleared.")
     st.button("Log out of this account", type="secondary", on_click=auth.logout)
 
-
-# Sync phase
-if "current_phase" not in st.session_state:
-    st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
-
 # ---------------------------------------------------------------------------
 # Main App — Fixed Bottom Navigation
 # ---------------------------------------------------------------------------
@@ -2093,14 +2186,9 @@ if st.query_params.get("reading_requests") == "1":
     st.session_state.nav_page = "Reading Requests"
     st.query_params.pop("reading_requests", None)
 
-# A calendar day uses a lightweight query route so the compact HTML grid stays
-# horizontal on phones. Preserve Track on that route even if Streamlit creates
-# a fresh script session for the browser navigation.
 if str(st.query_params.get("track_day", "")).strip():
     st.session_state.nav_page = "Calendar"
 
-# Community usernames use this lightweight route to open the same safe public
-# profile surface without placing immutable account identifiers in the UI.
 requested_profile = str(st.query_params.get("profile", "")).strip().lstrip("@")
 if requested_profile:
     st.session_state.profile_hub_lookup = requested_profile
@@ -2108,18 +2196,13 @@ if requested_profile:
     st.session_state.nav_page = "Profile"
     st.query_params.pop("profile", None)
 
-# Existing sessions may still point to a former standalone social tab. Move
-# those users directly into the unified Community destination on the next run.
 if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
     st.session_state.nav_page = "Community"
 
-
 def set_nav_page(page_name: str) -> None:
-    """Switch destinations and clear a date-selection route when leaving Track."""
     st.session_state.nav_page = page_name
     if page_name != "Calendar":
         st.query_params.pop("track_day", None)
-
 
 PAGE_HELP_GUIDES = {
     "Home": {
@@ -2213,21 +2296,10 @@ PAGE_HELP_GUIDES = {
     },
 }
 
-
 def toggle_profile_drawer() -> None:
-    """Toggle the isolated profile overlay without changing the active page."""
     st.session_state["profile_drawer_open"] = not st.session_state.get("profile_drawer_open", False)
 
-
-def open_profile_hub(return_page: str) -> None:
-    """Open the standalone social profile page and preserve the calling destination."""
-    st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
-    st.session_state.profile_hub_section = "profile"
-    st.session_state.nav_page = "Profile"
-
-
 def render_profile_launcher(page_name: str) -> None:
-    """Render the fixed profile entry point outside normal layout flow."""
     if page_name == "Profile":
         return
     with st.container(key="lunatick-profile-button"):
@@ -2239,13 +2311,10 @@ def render_profile_launcher(page_name: str) -> None:
             on_click=toggle_profile_drawer,
         )
 
-
 def render_page_help(page_name: str) -> None:
-    """Render a fixed page guide without adding normal-flow layout height."""
     guide = PAGE_HELP_GUIDES.get(page_name, PAGE_HELP_GUIDES["Home"])
     slug = page_name.lower().replace(" ", "_")
     state_key = f"lunatick_page_help_open_{slug}"
-
     with st.container(key="lunatick-page-help-button"):
         toggled = st.button(
             "?",
@@ -2253,13 +2322,10 @@ def render_page_help(page_name: str) -> None:
             help=f"Open the {guide['title'].lower()}",
             type="secondary",
         )
-
     if toggled:
         st.session_state[state_key] = not st.session_state.get(state_key, False)
-
     if not st.session_state.get(state_key, False):
         return
-
     guide_items = "".join(f"<li>{item}</li>" for item in guide["items"])
     with st.container(key="lunatick-page-help-popover"):
         st.markdown(
@@ -2281,8 +2347,7 @@ def render_page_help(page_name: str) -> None:
             st.session_state[state_key] = False
             st.rerun()
 
-
-# Render one destination in the normal page body.
+# Render the active page
 current_page = st.session_state.nav_page
 
 if current_page == "Home":
@@ -2307,8 +2372,6 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
-# Both fixed controls sit outside normal page flow, so neither shifts destinations
-# or extends compact Home/Connect screens.
 render_profile_launcher(current_page)
 if profile_drawer is not None:
     try:
@@ -2327,7 +2390,6 @@ NAV_ITEMS = [
 
 with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
-
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
         nav_label = (
             f"{icon}\n{compact_label}"
