@@ -1229,15 +1229,13 @@ def custom_render_journal_tab():
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🌙 See your lunar reflection", type="primary", use_container_width=True):
+        if st.button("🌙 See your lunar reflection", type="primary", use_container_width=True, key="lunar_reflection_button"):
             raw_entry = st.session_state.get("journal_freewrite_input", "").strip()
             if raw_entry:
                 with st.spinner("The Moon is listening..."):
-                    # Get current celestial data
                     now_utc = datetime.now(timezone.utc)
                     current = get_celestial_data(now_utc)
                     
-                    # Get natal data from birth_date in session
                     birth_date = st.session_state.get("birth_date")
                     if birth_date:
                         if hasattr(birth_date, 'date') and not isinstance(birth_date, datetime):
