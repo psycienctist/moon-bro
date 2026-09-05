@@ -3,8 +3,6 @@ import ephem
 import importlib
 import math
 import requests
-import json
-import random
 from datetime import datetime, timezone, timedelta
 
 # ---------------------------------------------------------------------------
@@ -30,31 +28,48 @@ import database_backup
 import supabase_backup
 import supabase_store
 
-# Reload helpers (same as original)
+# Streamlit can retain imported helper modules across a live-code update. If
+# the Settings UI has been refreshed before auth.py, reload this one module so
+# the paired profile-save and public-profile interfaces are both available.
 if not all(
     hasattr(auth, method)
     for method in ("update_presence_profile", "get_public_profile", "request_password_reset")
 ):
     auth = importlib.reload(auth)
 
+# Reload Journal when a warm Streamlit worker retained the former
+# reflection/prompt renderer instead of the approved private free-writing view.
 if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "private_freewrite_v1":
     journal_ui = importlib.reload(journal_ui)
 
+# The backup Settings view can be updated before its server-only adapter in a
+# warm Streamlit process. Reload only when the required snapshot reader is absent.
 if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
     supabase_store = importlib.reload(supabase_store)
 
+# The Message Board renderer must be refreshed before Community: a warm worker
+# otherwise retains the former render_boards_tab() signature without compact=.
 if getattr(boards, "BOARD_MODULE_VERSION", None) != "compact_feed_v3":
     boards = importlib.reload(boards)
 
+# The Connect page is an imported module. Require the focused Talk surface so
+# a warm worker cannot retain the former profile and moderation-heavy Community UI.
 if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_surface_toggle_v2":
     community = importlib.reload(community)
 
+# Reading Requests owns private reader matching and conversations. Reload it on
+# deployment so the Home entry point never targets a stale request workflow.
 if getattr(reading_requests, "READING_REQUESTS_MODULE_VERSION", None) != "reader_requests_private_messages_v1":
     reading_requests = importlib.reload(reading_requests)
 
+# A warm Streamlit worker can retain an older Cosmic Card renderer and routing
+# function after app.py updates. Require the complete approved visual-trade
+# module version rather than checking only a helper that older releases share.
 if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "birth_chart_svg_v2":
     cosmic_cards = importlib.reload(cosmic_cards)
 
+# The phone-first Track renderer is also an imported module. Reload it only
+# when a warm worker retained the prior calendar implementation.
 if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "upcoming_events_v1":
     track_calendar = importlib.reload(track_calendar)
 
@@ -84,6 +99,8 @@ LUNATICK_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
+    /* Keep LunaTicK dark regardless of the device's OS/browser preference.
+       This also makes native form controls advertise a dark color scheme. */
     :root, html, body, .stApp {
         color-scheme: dark !important;
         background-color: #05070a !important;
@@ -95,6 +112,8 @@ LUNATICK_CSS = """
         font-family: 'Inter', sans-serif;
     }
 
+    /* The Home Reading Requests entry replaces the taller Moon-status copy,
+       preserving the existing no-scroll phone composition. */
     .home-reading-request-button {
         align-items: center;
         background: rgba(188, 140, 255, 0.14);
@@ -123,6 +142,9 @@ LUNATICK_CSS = """
         color: #e6edf3 !important;
     }
 
+    /* Streamlit widgets can otherwise inherit a light OS color scheme on
+       mobile browsers. Set foreground, surface, placeholder, caret, and
+       border colors explicitly so Journal entries are always readable. */
     [data-testid="stTextInput"] input,
     [data-testid="stTextArea"] textarea,
     [data-testid="stNumberInput"] input,
@@ -185,6 +207,7 @@ LUNATICK_CSS = """
         animation: lunatick-glow-pulse 8s ease-in-out infinite;
     }
 
+    /* A deliberately slow, low-contrast ambient glow for the Home monitor. */
     @keyframes lunatick-glow-pulse {
         0%, 100% {
             border-color: rgba(110, 64, 201, 0.72);
@@ -284,6 +307,9 @@ LUNATICK_CSS = """
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
 
+    /* Fluid visual feedback for Streamlit expanders, including Cosmic Card
+       term explanations. The opening panel fades/slides in without changing
+       the existing expander content or behavior. */
     [data-testid="stExpander"],
     [data-testid="stExpander"] details {
         border-color: rgba(188, 140, 255, 0.22);
@@ -311,6 +337,8 @@ LUNATICK_CSS = """
         to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Remove Streamlit chrome so the application reads as a focused native
+       experience. App content and the custom Lunatick navigation are intact. */
     #MainMenu,
     [data-testid="stDeployButton"],
     .stDeployButton,
@@ -322,6 +350,8 @@ LUNATICK_CSS = """
         display: none !important;
     }
 
+    /* Preserve the original header overlay so no dark bar consumes space
+       above the Moon Monitor on phone screens. */
     [data-testid="stHeader"] {
         background: transparent !important;
     }
@@ -335,6 +365,12 @@ LUNATICK_CSS = """
         }
     }
 
+    /* ---------------------------------------------------------------------
+       Persistent lower-left Lunatick home logo
+       ---------------------------------------------------------------------
+       Sits at the true bottom-left of the viewport, in the same strip as
+       Streamlit's native "Manage app" control. Does not modify, offset,
+       or depend on the bottom navigation bar in any way. */
     [class*="st-key-lunatick-home-logo"] {
         height: 0 !important;
         margin: 0 !important;
@@ -347,6 +383,7 @@ LUNATICK_CSS = """
         z-index: 1001 !important;
         left: 0 !important;
         bottom: 0 !important;
+        /* The Home logo remains at its original full half-screen width. */
         width: 50vw !important;
         height: 2.625rem !important;
         margin: 0 !important;
@@ -389,6 +426,8 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* Persistent compact Settings control, placed directly beside the
+       lower-left Home logo. It is independent of the fixed navigation rail. */
     [class*="st-key-lunatick-settings-gear"] {
         height: 0 !important;
         margin: 0 !important;
@@ -437,6 +476,7 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* Selected utility destinations use the shared Rising-card gold state. */
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
@@ -448,6 +488,9 @@ LUNATICK_CSS = """
         opacity: 1 !important;
     }
 
+    /* The lower-right area belongs to Streamlit's optional hosted control.
+       Leave it as the native app background when that control is not mounted,
+       rather than drawing a full-width lunar-glass panel that can look broken. */
     @media (max-width: 480px) {
         [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
             width: 50vw !important;
@@ -469,11 +512,21 @@ LUNATICK_CSS = """
         }
     }
 
+    /* ---------------------------------------------------------------------
+       Fixed bottom navigation
+       ---------------------------------------------------------------------
+       The keyed container at the end of this file receives the documented
+       `.st-key-lunatick-bottom-nav` class in Streamlit 1.40+.
+    */
+
+    /* Begin app content flush with the viewport top while retaining enough
+       lower clearance for the fixed navigation and persistent controls. */
     [data-testid="stMainBlockContainer"] {
         padding-bottom: 9rem;
         padding-top: 0 !important;
     }
 
+    /* Pin only the dedicated navigation container to the viewport. */
     .st-key-lunatick-bottom-nav {
         position: fixed;
         z-index: 1000;
@@ -490,12 +543,15 @@ LUNATICK_CSS = """
         -webkit-backdrop-filter: blur(14px);
     }
 
+    /* Centre the contents on wide displays while the bar spans the viewport. */
     .st-key-lunatick-bottom-nav > div {
         max-width: 1400px;
         margin-left: auto;
         margin-right: auto;
     }
 
+    /* The five primary destinations now fit in one fixed row. Streamlit's
+       responsive stacking is overridden only inside this dedicated rail. */
     .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
@@ -508,12 +564,15 @@ LUNATICK_CSS = """
         width: 100% !important;
     }
 
+    /* Five equal columns eliminate horizontal rail scrolling on every screen. */
     .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
         flex: 1 1 0 !important;
         min-width: 0 !important;
         width: auto !important;
     }
 
+    /* These rules are deliberately scoped to the navigation, leaving every
+       other Lunatick button unchanged. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         min-height: 2.7rem;
         padding: 0.35rem 0.35rem;
@@ -523,6 +582,7 @@ LUNATICK_CSS = """
         white-space: nowrap;
     }
 
+    /* Every destination starts as a blue, softly graduated lunar panel. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
         border: 1px solid #38bdf8 !important;
@@ -539,6 +599,7 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* The selected destination uses the dark-purple, purple-bordered state. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="primary"],
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
         background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
@@ -547,6 +608,9 @@ LUNATICK_CSS = """
         color: #f0e6ff !important;
     }
 
+    /* Streamlit portals fixed controls through their own keyed element
+       wrappers. Keep Home and Settings in the established blue/purple system
+       while the five destinations inherit distinct Cosmic Card tile accents. */
     [class*="st-key-bottom_nav_calendar"] { --nav-card-accent: #d8dee9; --nav-card-glow: rgba(216, 222, 233, 0.20); }
     [class*="st-key-bottom_nav_cosmic_cards"] { --nav-card-accent: #9c7bff; --nav-card-glow: rgba(156, 123, 255, 0.22); }
     [class*="st-key-bottom_nav_community"] { --nav-card-accent: #66a8ff; --nav-card-glow: rgba(102, 168, 255, 0.22); }
@@ -562,6 +626,9 @@ LUNATICK_CSS = """
         color: #dbeeff !important;
     }
 
+    /* Home and Settings form a paired LunaTicK utility zone. Inactive controls
+       echo the upper logo's purple panel while active controls keep their shared
+       Rising-gold state farther below. This rule deliberately changes paint only. */
     [class*="st-key-lunatick_home_logo_button"] button[kind="secondary"],
     [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-secondary"],
     [class*="st-key-lunatick_settings_gear_button"] button[kind="secondary"],
@@ -582,6 +649,8 @@ LUNATICK_CSS = """
         color: #ffffff !important;
     }
 
+    /* The five destination buttons use the established Cosmic Card border,
+       inset glow, and deep panel surface associated with their tile accent. */
     [class*="st-key-bottom_nav_"] button[kind="secondary"],
     [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"] {
         background: linear-gradient(145deg, rgba(31, 46, 78, 0.92), rgba(8, 14, 29, 0.96)) !important;
@@ -600,6 +669,8 @@ LUNATICK_CSS = """
         color: var(--nav-card-accent) !important;
     }
 
+    /* A selected destination visibly arrives with a short gold bloom. The
+       slower settle remains compact enough for the fixed mobile rail. */
     @keyframes lunatick-nav-active-arrival {
         0% { opacity: 0.30; transform: translateY(5px) scale(0.84); filter: brightness(0.58) saturate(0.72); }
         42% { opacity: 1; transform: translateY(-3px) scale(1.075); filter: brightness(1.38) saturate(1.18); }
@@ -614,6 +685,8 @@ LUNATICK_CSS = """
         will-change: transform, filter, opacity;
     }
 
+    /* Instant touch confirmation is visible before Streamlit changes the
+       destination, then the selected control plays its arrival sequence. */
     [class*="st-key-bottom_nav_"] button:active,
     [class*="st-key-lunatick_home_logo_button"] button:active,
     [class*="st-key-lunatick_settings_gear_button"] button:active {
@@ -622,6 +695,8 @@ LUNATICK_CSS = """
         box-shadow: 0 0 26px rgba(247, 210, 92, 0.58) !important;
     }
 
+    /* Whichever of the seven controls is selected uses the shared Rising-card
+       gold state. Other primary destinations retain their own Card accent. */
     [class*="st-key-bottom_nav_"] button[kind="primary"],
     [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick_home_logo_button"] button[kind="primary"],
@@ -644,6 +719,9 @@ LUNATICK_CSS = """
         }
     }
 
+    /* Keep the longer Connect label compact without changing the shared
+       desktop tab height. Its icon-over-label layout is enabled only on
+       narrow phones below. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
         letter-spacing: -0.01em;
         overflow-wrap: normal;
@@ -653,6 +731,8 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
+        /* Midpoint lift above the hosted platform's bottom-right management
+           overlay. The rail buttons and their horizontal layout are unchanged. */
         [data-testid="stMainBlockContainer"] {
             padding-bottom: calc(8.425rem + env(safe-area-inset-bottom));
             padding-top: 0 !important;
@@ -682,6 +762,8 @@ LUNATICK_CSS = """
             word-break: keep-all !important;
         }
 
+        /* Keep the musical-tone destination as one intact compact label,
+           even on the 375 px-wide phone shown in the report. */
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_tones button {
             font-size: 0.56rem !important;
             letter-spacing: -0.035em;
@@ -692,6 +774,9 @@ LUNATICK_CSS = """
             word-break: keep-all !important;
         }
 
+        /* Journal is the widest remaining compact label on narrow iPhones.
+           Tighten only its own typography and padding so the final "l" cannot
+           create a third line or stretch the otherwise fixed-height rail. */
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_journal button {
             font-size: 0.56rem !important;
             letter-spacing: -0.02em;
@@ -703,6 +788,9 @@ LUNATICK_CSS = """
         }
     }
 
+    /* On tablet and desktop, the persistent sidebar occupies 18.75rem.
+       Keep both navigation rows wholly inside the remaining content region.
+       The mobile rail below 769px deliberately retains its existing geometry. */
     @media (min-width: 769px) {
         .st-key-lunatick-bottom-nav {
             bottom: 2.625rem;
@@ -733,6 +821,12 @@ LUNATICK_CSS = """
         }
     }
 
+    /* ---------------------------------------------------------------------
+       Fixed contextual Help control
+       ---------------------------------------------------------------------
+       The keyed trigger and guide are fixed-position overlays. They do not
+       participate in normal page flow, keeping compact Home/Connect screens
+       and the established fixed navigation unchanged. */
     [class*="st-key-lunatick-page-help-button"],
     [class*="st-key-lunatick-profile-button"],
     .stElementContainer:has(.st-key-lunatick-page-help-button),
@@ -744,6 +838,9 @@ LUNATICK_CSS = """
         pointer-events: none;
     }
 
+    /* Streamlit gives each container a layout wrapper in the parent flex stack.
+       Flatten these two wrappers as well so their normal 1rem row gap cannot
+       contribute invisible scroll height beneath the fixed overlay. */
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-button),
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-popover),
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-profile-button) {
@@ -798,6 +895,8 @@ LUNATICK_CSS = """
         position: fixed !important;
         top: calc(0.9rem + env(safe-area-inset-top)) !important;
         right: calc(2rem + env(safe-area-inset-right)) !important;
+        /* Streamlit's transparent header sits at z-index 999990. The Help
+           trigger must be above it for physical taps, not only DOM clicks. */
         z-index: 1000001 !important;
         width: 2.15rem !important;
         height: 2.15rem !important;
@@ -981,9 +1080,11 @@ ZODIAC_SIGNS = [
     ("Pisces", "♓", "Dreamy, intuitive mood. Meditate and create art."),
 ]
 
+
 def get_zodiac_sign(lon_deg):
     idx = int(lon_deg / 30) % 12
     return ZODIAC_SIGNS[idx]
+
 
 def get_moon_phase_name(phase_frac: float):
     phases = [
@@ -995,6 +1096,7 @@ def get_moon_phase_name(phase_frac: float):
         if phases[i][0] <= phase_frac < phases[i + 1][0]:
             return phases[i][1], phases[i][2]
     return "New Moon", "🌑"
+
 
 def get_celestial_data(date_utc: datetime):
     obs = ephem.Observer()
@@ -1023,139 +1125,40 @@ def get_celestial_data(date_utc: datetime):
         "next_full_dt": nfm_dt, "age_days": phase_frac * 29.53,
     }
 
-# ---------------------------------------------------------------------------
-# NEW: Free Groq AI Mirror (replaces DeepSeek)
-# ---------------------------------------------------------------------------
-def get_ai_mirror(journal_text: str, current_moon: dict, natal_moon: dict) -> dict | None:
-    api_key = st.secrets.get("GROQ_API_KEY")
+
+@st.cache_data(ttl=3600)
+def get_ai_insight(natal, current, aspect):
+    api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key:
-        st.warning("Groq API key not found. Please add it to your secrets.")
         return None
 
-    diff = abs((current_moon['moon_lon'] - natal_moon['moon_lon']) % 360)
-    if diff < 8: aspect = "Conjunct — your inner world is aligning with the outer sky"
-    elif 60 < diff < 80: aspect = "Sextile — an open channel for flow"
-    elif 90 < diff < 100: aspect = "Square — tension asking to be released"
-    elif 120 < diff < 130: aspect = "Trine — natural grace surrounds you"
-    elif 170 < diff < 190: aspect = "Opposition — seeking balance in reflection"
-    else: aspect = "Quiet transit — the Moon whispers subtly"
-
-    system_prompt = (
-        "You are a poetic mirror, not an advisor. You reflect the user's inner state back to them "
-        "using the current lunar phase as a metaphor. Never say 'you should'. Always validate. "
-        "Return your response strictly as a JSON object with keys: 'emotion', 'metaphor', and 'question'. "
-        "Keep each value short and precise (max 1 sentence each)."
-    )
-
-    user_prompt = f"""
-[CONTEXT: USER'S CURRENT SKY]
-The Moon is currently in {current_moon['moon_sign']} at {current_moon['illum']*100:.0f}% illumination ({current_moon['phase_name']}).
-The user's natal Moon is in {natal_moon['moon_sign']}.
-The specific aspect between their natal and current moon is: {aspect}.
-
-[CONTEXT: USER'S RAW WORDS]
-The user just wrote this in their journal:
----
-{journal_text}
----
-
-[TASK]
-Read their raw words carefully.
-Return your response strictly as a valid JSON object with these exact keys:
-- "emotion": State the core, singular emotion you detect in their writing (e.g., "Grief", "Restlessness", "Quiet hope").
-- "metaphor": Weave that emotion into the current Moon's symbolism and the aspect.
-- "question": End with a single question that turns their gaze inward (do not ask a yes/no question).
-
-Tone: warm, precise, cosmic. No fluff.
-"""
+    prompt = f"""
+    As a cosmic guide, provide a short, poetic, and encouraging astrology insight (max 3 sentences).
+    User Natal: Sun in {natal['sun_sign']}, Moon in {natal['moon_sign']}.
+    Current Sky: Moon in {current['moon_sign']} ({current['phase_name']}).
+    Natal-Current Aspect: {aspect}.
+    Tone: Mystical, empowering, and modern.
+    """
 
     try:
         response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            "https://api.deepseek.com/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "llama3-70b-8192",
+                "model": "deepseek-chat",
                 "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "system", "content": "You are a mystical cosmic guide for the Lunatick app."},
+                    {"role": "user", "content": prompt},
                 ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.75,
-                "max_tokens": 180,
+                "stream": False,
             },
-            timeout=15,
+            timeout=10,
         )
-        if response.status_code == 200:
-            result = response.json()
-            content = result["choices"][0]["message"]["content"]
-            parsed = json.loads(content)
-            return parsed
-        elif response.status_code == 429:
-            st.info("The Moon is receiving too many whispers at once. Try again in a minute.")
-            return None
-        else:
-            st.error(f"Groq API error: {response.status_code} - {response.text}")
-            return None
-    except json.JSONDecodeError:
-        st.warning("The mirror spoke in riddles. Try again.")
-        return None
-    except Exception as e:
-        st.error(f"Connection error: {e}")
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception:
         return None
 
-# ---------------------------------------------------------------------------
-# CUSTOM JOURNAL TAB WITH AI BUTTON (FIXED DUPLICATE KEY)
-# ---------------------------------------------------------------------------
-if "lunar_button_key" not in st.session_state:
-    st.session_state.lunar_button_key = f"lunar_reflection_button_{random.randint(0, 1000000)}"
-LUNAR_BUTTON_KEY = st.session_state.lunar_button_key
 
-_original_render_journal_tab = journal_ui.render_journal_tab
-
-def custom_render_journal_tab():
-    _original_render_journal_tab()
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("🌙 See your lunar reflection", type="primary", use_container_width=True, key=LUNAR_BUTTON_KEY):
-            raw_entry = st.session_state.get("journal_freewrite_input", "").strip()
-            if raw_entry:
-                with st.spinner("The Moon is listening..."):
-                    now_utc = datetime.now(timezone.utc)
-                    current = get_celestial_data(now_utc)
-                    birth_date = st.session_state.get("birth_date")
-                    if birth_date:
-                        if hasattr(birth_date, 'date') and not isinstance(birth_date, datetime):
-                            birth_dt = datetime.combine(birth_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-                        elif isinstance(birth_date, datetime):
-                            birth_dt = birth_date
-                        else:
-                            birth_dt = datetime.now(timezone.utc)
-                        natal = get_celestial_data(birth_dt)
-                    else:
-                        st.warning("Please set your birth date in the sidebar or settings first.")
-                        natal = None
-                    if natal:
-                        insight = get_ai_mirror(raw_entry, current, natal)
-                        if insight:
-                            st.markdown("---")
-                            st.markdown(f"**{insight.get('emotion', '...')}**")
-                            st.markdown(f"*{insight.get('metaphor', '...')}*")
-                            st.caption(f"💭 {insight.get('question', '...')}")
-                            st.markdown("---")
-                        else:
-                            st.info("The mirror is quiet right now. Please try again in a moment.")
-            else:
-                st.warning("Write something in your journal first.")
-
-journal_ui.render_journal_tab = custom_render_journal_tab
-
-# ---------------------------------------------------------------------------
-# Original render functions (Home, Tones, Calendar, Settings)
-# ---------------------------------------------------------------------------
 def render_home():
     now_utc = datetime.now(timezone.utc)
     current = get_celestial_data(now_utc)
@@ -1260,7 +1263,12 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
+
 def render_tones():
+    """Render Lunatick's client-side, user-controlled Web Audio tone space."""
+    # This local import deliberately leaves the existing top-level imports
+    # untouched. The component runs in an isolated browser iframe, so no audio
+    # or listening data is sent to the server.
     import streamlit.components.v1 as components
 
     tone_generator_html = r"""
@@ -1814,17 +1822,23 @@ def render_tones():
 
     components.html(tone_generator_html, height=520, scrolling=False)
 
+
 def render_calendar():
+    """Render the phone-first Track calendar implementation."""
     track_calendar.render_track_tab()
 
+
 def _is_backup_owner() -> bool:
+    """Allow full-database export only for the email configured in Cloud secrets."""
     try:
         backup_config = st.secrets.get("backup", {})
         owner_email = str(backup_config.get("owner_email", "")).strip().lower()
     except Exception:
         return False
+
     current_email = str(st.session_state.get("email", "")).strip().lower()
     return bool(owner_email and current_email and owner_email == current_email)
+
 
 def render_settings():
     st.markdown("""
@@ -2064,6 +2078,11 @@ def render_settings():
             st.success("Journal entries cleared.")
     st.button("Log out of this account", type="secondary", on_click=auth.logout)
 
+
+# Sync phase
+if "current_phase" not in st.session_state:
+    st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
+
 # ---------------------------------------------------------------------------
 # Main App — Fixed Bottom Navigation
 # ---------------------------------------------------------------------------
@@ -2074,9 +2093,14 @@ if st.query_params.get("reading_requests") == "1":
     st.session_state.nav_page = "Reading Requests"
     st.query_params.pop("reading_requests", None)
 
+# A calendar day uses a lightweight query route so the compact HTML grid stays
+# horizontal on phones. Preserve Track on that route even if Streamlit creates
+# a fresh script session for the browser navigation.
 if str(st.query_params.get("track_day", "")).strip():
     st.session_state.nav_page = "Calendar"
 
+# Community usernames use this lightweight route to open the same safe public
+# profile surface without placing immutable account identifiers in the UI.
 requested_profile = str(st.query_params.get("profile", "")).strip().lstrip("@")
 if requested_profile:
     st.session_state.profile_hub_lookup = requested_profile
@@ -2084,13 +2108,18 @@ if requested_profile:
     st.session_state.nav_page = "Profile"
     st.query_params.pop("profile", None)
 
+# Existing sessions may still point to a former standalone social tab. Move
+# those users directly into the unified Community destination on the next run.
 if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
     st.session_state.nav_page = "Community"
 
+
 def set_nav_page(page_name: str) -> None:
+    """Switch destinations and clear a date-selection route when leaving Track."""
     st.session_state.nav_page = page_name
     if page_name != "Calendar":
         st.query_params.pop("track_day", None)
+
 
 PAGE_HELP_GUIDES = {
     "Home": {
@@ -2184,10 +2213,21 @@ PAGE_HELP_GUIDES = {
     },
 }
 
+
 def toggle_profile_drawer() -> None:
+    """Toggle the isolated profile overlay without changing the active page."""
     st.session_state["profile_drawer_open"] = not st.session_state.get("profile_drawer_open", False)
 
+
+def open_profile_hub(return_page: str) -> None:
+    """Open the standalone social profile page and preserve the calling destination."""
+    st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
+    st.session_state.profile_hub_section = "profile"
+    st.session_state.nav_page = "Profile"
+
+
 def render_profile_launcher(page_name: str) -> None:
+    """Render the fixed profile entry point outside normal layout flow."""
     if page_name == "Profile":
         return
     with st.container(key="lunatick-profile-button"):
@@ -2199,10 +2239,13 @@ def render_profile_launcher(page_name: str) -> None:
             on_click=toggle_profile_drawer,
         )
 
+
 def render_page_help(page_name: str) -> None:
+    """Render a fixed page guide without adding normal-flow layout height."""
     guide = PAGE_HELP_GUIDES.get(page_name, PAGE_HELP_GUIDES["Home"])
     slug = page_name.lower().replace(" ", "_")
     state_key = f"lunatick_page_help_open_{slug}"
+
     with st.container(key="lunatick-page-help-button"):
         toggled = st.button(
             "?",
@@ -2210,10 +2253,13 @@ def render_page_help(page_name: str) -> None:
             help=f"Open the {guide['title'].lower()}",
             type="secondary",
         )
+
     if toggled:
         st.session_state[state_key] = not st.session_state.get(state_key, False)
+
     if not st.session_state.get(state_key, False):
         return
+
     guide_items = "".join(f"<li>{item}</li>" for item in guide["items"])
     with st.container(key="lunatick-page-help-popover"):
         st.markdown(
@@ -2235,7 +2281,8 @@ def render_page_help(page_name: str) -> None:
             st.session_state[state_key] = False
             st.rerun()
 
-# Render the active page
+
+# Render one destination in the normal page body.
 current_page = st.session_state.nav_page
 
 if current_page == "Home":
@@ -2260,6 +2307,8 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
+# Both fixed controls sit outside normal page flow, so neither shifts destinations
+# or extends compact Home/Connect screens.
 render_profile_launcher(current_page)
 if profile_drawer is not None:
     try:
@@ -2278,6 +2327,7 @@ NAV_ITEMS = [
 
 with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
+
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
         nav_label = (
             f"{icon}\n{compact_label}"
