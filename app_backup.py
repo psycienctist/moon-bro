@@ -9,13 +9,20 @@ from datetime import datetime, timezone, timedelta
 # Import modules
 # ---------------------------------------------------------------------------
 import journal as journal_ui
-import lunatick_talk_ui as talk_ui
-import lunatick_talk_db as talk_db
 import cosmic_cards
+try:
+    import profile_drawer
+except Exception:
+    profile_drawer = None
+
+if profile_drawer is not None and getattr(profile_drawer, "DRAWER_MODULE_VERSION", None) != "profile_drawer_isolated_v3":
+    profile_drawer = importlib.reload(profile_drawer)
 import track_calendar
 import boards
 import chat_room
 import community
+import reading_requests
+import moderation
 import auth
 import database_backup
 import supabase_backup
@@ -40,23 +47,30 @@ if getattr(journal_ui, "JOURNAL_MODULE_VERSION", None) != "private_freewrite_v1"
 if not hasattr(supabase_store.SupabaseStore, "list_backup_rows"):
     supabase_store = importlib.reload(supabase_store)
 
-# The Community page is likewise an imported module. Require the current
-# public-profile card version so a warm worker cannot retain the older lookup UI.
-if (
-    getattr(community, "COMMUNITY_MODULE_VERSION", None) != "public_profile_card_v1"
-    or not all(hasattr(community, attribute) for attribute in ("_render_public_profile_lookup", "moderation"))
-):
+# The Message Board renderer must be refreshed before Community: a warm worker
+# otherwise retains the former render_boards_tab() signature without compact=.
+if getattr(boards, "BOARD_MODULE_VERSION", None) != "compact_feed_v3":
+    boards = importlib.reload(boards)
+
+# The Connect page is an imported module. Require the focused Talk surface so
+# a warm worker cannot retain the former profile and moderation-heavy Community UI.
+if getattr(community, "COMMUNITY_MODULE_VERSION", None) != "talk_surface_toggle_v2":
     community = importlib.reload(community)
+
+# Reading Requests owns private reader matching and conversations. Reload it on
+# deployment so the Home entry point never targets a stale request workflow.
+if getattr(reading_requests, "READING_REQUESTS_MODULE_VERSION", None) != "reader_requests_private_messages_v1":
+    reading_requests = importlib.reload(reading_requests)
 
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
 # module version rather than checking only a helper that older releases share.
-if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "public_value_privacy_v3":
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "birth_chart_svg_v2":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 # The phone-first Track renderer is also an imported module. Reload it only
 # when a warm worker retained the prior calendar implementation.
-if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "mobile_grid_private_entries_v2":
+if getattr(track_calendar, "TRACK_MODULE_VERSION", None) != "upcoming_events_v1":
     track_calendar = importlib.reload(track_calendar)
 
 
@@ -85,14 +99,94 @@ LUNATICK_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
-    html, body, .stApp {
+    /* Keep LunaTicK dark regardless of the device's OS/browser preference.
+       This also makes native form controls advertise a dark color scheme. */
+    :root, html, body, .stApp {
+        color-scheme: dark !important;
+        background-color: #05070a !important;
+        color: #e6edf3 !important;
         overflow-x: hidden;
     }
 
     .stApp {
-        background-color: #05070a;
-        color: #e6edf3;
         font-family: 'Inter', sans-serif;
+    }
+
+    /* The Home Reading Requests entry replaces the taller Moon-status copy,
+       preserving the existing no-scroll phone composition. */
+    .home-reading-request-button {
+        align-items: center;
+        background: rgba(188, 140, 255, 0.14);
+        border: 1px solid rgba(188, 140, 255, 0.68);
+        border-radius: 8px;
+        color: #f0f6fc !important;
+        display: flex;
+        font-size: 0.8rem;
+        font-weight: 700;
+        justify-content: center;
+        letter-spacing: 0.04em;
+        margin-top: 0.48rem;
+        min-height: 2.1rem;
+        padding: 0.28rem 0.7rem;
+        text-decoration: none !important;
+    }
+    .home-reading-request-button:hover {
+        background: rgba(188, 140, 255, 0.28);
+        border-color: #bc8cff;
+        color: #ffffff !important;
+    }
+
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"] {
+        background-color: #05070a !important;
+        color: #e6edf3 !important;
+    }
+
+    /* Streamlit widgets can otherwise inherit a light OS color scheme on
+       mobile browsers. Set foreground, surface, placeholder, caret, and
+       border colors explicitly so Journal entries are always readable. */
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTimeInput"] input,
+    [data-testid="stSelectbox"] input,
+    [data-testid="stMultiSelect"] input {
+        background-color: #0d1117 !important;
+        color: #f0f6fc !important;
+        -webkit-text-fill-color: #f0f6fc !important;
+        caret-color: #bc8cff !important;
+        border-color: #4c3a78 !important;
+    }
+
+    [data-testid="stTextInput"] [data-baseweb="input"],
+    [data-testid="stTextArea"] [data-baseweb="textarea"],
+    [data-testid="stNumberInput"] [data-baseweb="input"],
+    [data-testid="stDateInput"] [data-baseweb="input"],
+    [data-testid="stTimeInput"] [data-baseweb="input"],
+    [data-testid="stSelectbox"] [data-baseweb="select"],
+    [data-testid="stMultiSelect"] [data-baseweb="select"] {
+        background-color: #0d1117 !important;
+        border-color: #4c3a78 !important;
+    }
+
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder,
+    [data-testid="stNumberInput"] input::placeholder,
+    [data-testid="stDateInput"] input::placeholder,
+    [data-testid="stTimeInput"] input::placeholder {
+        color: #9aa7bd !important;
+        -webkit-text-fill-color: #9aa7bd !important;
+        opacity: 1 !important;
+    }
+
+    [data-testid="stTextInput"] input:focus,
+    [data-testid="stTextArea"] textarea:focus,
+    [data-testid="stNumberInput"] input:focus,
+    [data-testid="stDateInput"] input:focus,
+    [data-testid="stTimeInput"] input:focus {
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 0 1px #bc8cff !important;
     }
 
     h1, h2, h3, h4 {
@@ -256,8 +350,10 @@ LUNATICK_CSS = """
         display: none !important;
     }
 
+    /* Preserve the original header overlay so no dark bar consumes space
+       above the Moon Monitor on phone screens. */
     [data-testid="stHeader"] {
-        background: transparent;
+        background: transparent !important;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -300,11 +396,11 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button {
         align-items: center;
-        background: linear-gradient(135deg, rgba(13, 31, 60, 0.98), rgba(45, 27, 105, 0.98));
-        border: 1px solid rgba(188, 140, 255, 0.62);
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
         border-radius: 0;
-        box-shadow: 0 0 12px rgba(110, 64, 201, 0.22);
-        color: #d2a8ff;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+        color: #dbeeff !important;
         display: flex;
         font-family: 'Orbitron', sans-serif;
         font-size: 0.72rem;
@@ -324,9 +420,9 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:hover,
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button:focus-visible {
-        border-color: #bc8cff;
-        box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
-        color: #f0e6ff;
+        border-color: #7dd3fc;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.42);
+        color: #f0fbff;
         outline: none;
     }
 
@@ -356,11 +452,11 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button {
         align-items: center;
-        background: linear-gradient(135deg, rgba(24, 29, 48, 0.98), rgba(45, 27, 105, 0.98));
-        border: 1px solid rgba(188, 140, 255, 0.62);
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
         border-radius: 0;
-        box-shadow: 0 0 12px rgba(110, 64, 201, 0.22);
-        color: #d2a8ff;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+        color: #dbeeff !important;
         display: flex;
         font-size: 1rem;
         height: 100%;
@@ -374,22 +470,21 @@ LUNATICK_CSS = """
 
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:hover,
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button:focus-visible {
-        border-color: #bc8cff;
-        box-shadow: 0 0 18px rgba(188, 140, 255, 0.38);
-        color: #f0e6ff;
+        border-color: #7dd3fc;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.42);
+        color: #f0fbff;
         outline: none;
     }
 
-    /* Match the selected red state used by Streamlit's primary rail buttons.
-       This targets the actual rendered button state rather than a container key. */
+    /* Selected utility destinations use the shared Rising-card gold state. */
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
-        background: #ff4b4b !important;
-        border-color: #ff7575 !important;
-        box-shadow: 0 0 18px rgba(255, 75, 75, 0.42) !important;
-        color: #ffffff !important;
+        background: linear-gradient(135deg, #3d2f0a 0%, #6b5015 55%, #221804 100%) !important;
+        border-color: #f7d25c !important;
+        box-shadow: 0 0 18px rgba(247, 210, 92, 0.42) !important;
+        color: #fff3c4 !important;
         opacity: 1 !important;
     }
 
@@ -487,25 +582,151 @@ LUNATICK_CSS = """
         white-space: nowrap;
     }
 
-    /* Inactive nav buttons are bordered with the Cosmic Chart blue (#1f6feb).
-       Active (primary) buttons keep their existing Streamlit red style. Both
-       possible Streamlit attribute conventions are matched, mirroring the
-       primary-state overrides above. */
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="secondary"],
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-secondary"] {
-        border-color: #1f6feb !important;
+    /* Every destination starts as a blue, softly graduated lunar panel. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+        color: #dbeeff !important;
+        transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
     }
 
-    /* Keep the longer Connect label compact on one line without changing
-       any other bottom-navigation button. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button:hover,
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button:focus-visible {
+        border-color: #7dd3fc !important;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.42) !important;
+        color: #f0fbff !important;
+        outline: none;
+    }
+
+    /* The selected destination uses the dark-purple, purple-bordered state. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="primary"],
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
+        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
+        color: #f0e6ff !important;
+    }
+
+    /* Streamlit portals fixed controls through their own keyed element
+       wrappers. Keep Home and Settings in the established blue/purple system
+       while the five destinations inherit distinct Cosmic Card tile accents. */
+    [class*="st-key-bottom_nav_calendar"] { --nav-card-accent: #d8dee9; --nav-card-glow: rgba(216, 222, 233, 0.20); }
+    [class*="st-key-bottom_nav_cosmic_cards"] { --nav-card-accent: #9c7bff; --nav-card-glow: rgba(156, 123, 255, 0.22); }
+    [class*="st-key-bottom_nav_community"] { --nav-card-accent: #66a8ff; --nav-card-glow: rgba(102, 168, 255, 0.22); }
+    [class*="st-key-bottom_nav_journal"] { --nav-card-accent: #c5a6ff; --nav-card-glow: rgba(197, 166, 255, 0.20); }
+    [class*="st-key-bottom_nav_tones"] { --nav-card-accent: #73dfbf; --nav-card-glow: rgba(115, 223, 191, 0.20); }
+
+    [class*="st-key-bottom_nav_"] button,
+    [class*="st-key-lunatick_home_logo_button"] button,
+    [class*="st-key-lunatick_settings_gear_button"] button {
+        background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
+        border: 1px solid #38bdf8 !important;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.28) !important;
+        color: #dbeeff !important;
+    }
+
+    /* Home and Settings form a paired LunaTicK utility zone. Inactive controls
+       echo the upper logo's purple panel while active controls keep their shared
+       Rising-gold state farther below. This rule deliberately changes paint only. */
+    [class*="st-key-lunatick_home_logo_button"] button[kind="secondary"],
+    [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-secondary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[kind="secondary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[data-testid="stBaseButton-secondary"] {
+        background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
+        border-color: #bc8cff !important;
+        box-shadow: 0 0 18px rgba(188, 140, 255, 0.42) !important;
+        color: #f0e6ff !important;
+    }
+
+    [class*="st-key-lunatick_home_logo_button"] button[kind="secondary"]:hover,
+    [class*="st-key-lunatick_home_logo_button"] button:focus-visible,
+    [class*="st-key-lunatick_settings_gear_button"] button[kind="secondary"]:hover,
+    [class*="st-key-lunatick_settings_gear_button"] button:focus-visible {
+        background: linear-gradient(135deg, #2d1755 0%, #512696 55%, #21113f 100%) !important;
+        border-color: #ddc8ff !important;
+        box-shadow: 0 0 21px rgba(188, 140, 255, 0.54) !important;
+        color: #ffffff !important;
+    }
+
+    /* The five destination buttons use the established Cosmic Card border,
+       inset glow, and deep panel surface associated with their tile accent. */
+    [class*="st-key-bottom_nav_"] button[kind="secondary"],
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"] {
+        background: linear-gradient(145deg, rgba(31, 46, 78, 0.92), rgba(8, 14, 29, 0.96)) !important;
+        border-color: var(--nav-card-accent) !important;
+        box-shadow: inset 0 0 18px var(--nav-card-glow), 0 0 11px var(--nav-card-glow) !important;
+        color: var(--nav-card-accent) !important;
+    }
+
+    [class*="st-key-bottom_nav_"] button[kind="secondary"]:hover,
+    [class*="st-key-bottom_nav_"] button[kind="secondary"]:focus-visible,
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"]:hover,
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"]:focus-visible {
+        background: linear-gradient(145deg, rgba(42, 59, 99, 0.92), rgba(13, 24, 48, 0.94)) !important;
+        border-color: var(--nav-card-accent) !important;
+        box-shadow: inset 0 0 18px var(--nav-card-glow), 0 0 18px var(--nav-card-glow) !important;
+        color: var(--nav-card-accent) !important;
+    }
+
+    /* A selected destination visibly arrives with a short gold bloom. The
+       slower settle remains compact enough for the fixed mobile rail. */
+    @keyframes lunatick-nav-active-arrival {
+        0% { opacity: 0.30; transform: translateY(5px) scale(0.84); filter: brightness(0.58) saturate(0.72); }
+        42% { opacity: 1; transform: translateY(-3px) scale(1.075); filter: brightness(1.38) saturate(1.18); }
+        72% { opacity: 1; transform: translateY(1px) scale(0.985); filter: brightness(1.08); }
+        100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+    }
+
+    [class*="st-key-bottom_nav_"] button,
+    [class*="st-key-lunatick_home_logo_button"] button,
+    [class*="st-key-lunatick_settings_gear_button"] button {
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, color 220ms ease, transform 220ms ease, filter 220ms ease, opacity 220ms ease !important;
+        will-change: transform, filter, opacity;
+    }
+
+    /* Instant touch confirmation is visible before Streamlit changes the
+       destination, then the selected control plays its arrival sequence. */
+    [class*="st-key-bottom_nav_"] button:active,
+    [class*="st-key-lunatick_home_logo_button"] button:active,
+    [class*="st-key-lunatick_settings_gear_button"] button:active {
+        transform: scale(0.92) !important;
+        filter: brightness(1.28) saturate(1.18) !important;
+        box-shadow: 0 0 26px rgba(247, 210, 92, 0.58) !important;
+    }
+
+    /* Whichever of the seven controls is selected uses the shared Rising-card
+       gold state. Other primary destinations retain their own Card accent. */
+    [class*="st-key-bottom_nav_"] button[kind="primary"],
+    [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-primary"],
+    [class*="st-key-lunatick_home_logo_button"] button[kind="primary"],
+    [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-primary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[kind="primary"],
+    [class*="st-key-lunatick_settings_gear_button"] button[data-testid="stBaseButton-primary"] {
+        background: linear-gradient(135deg, #3d2f0a 0%, #6b5015 55%, #221804 100%) !important;
+        border-color: #f7d25c !important;
+        box-shadow: 0 0 18px rgba(247, 210, 92, 0.42) !important;
+        color: #fff3c4 !important;
+        animation: lunatick-nav-active-arrival 760ms cubic-bezier(0.16, 0.88, 0.26, 1) both;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [class*="st-key-bottom_nav_"] button,
+        [class*="st-key-lunatick_home_logo_button"] button,
+        [class*="st-key-lunatick_settings_gear_button"] button {
+            animation: none !important;
+            transition: none !important;
+        }
+    }
+
+    /* Keep the longer Connect label compact without changing the shared
+       desktop tab height. Its icon-over-label layout is enabled only on
+       narrow phones below. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
-        /* Preserve the shared tab typography and height. Only the horizontal
-           padding is tightened so "Connect" fits as a complete second line. */
         letter-spacing: -0.01em;
         overflow-wrap: normal;
         padding-left: 0.06rem !important;
         padding-right: 0.06rem !important;
-        white-space: pre-line !important;
         word-break: keep-all;
     }
 
@@ -537,6 +758,20 @@ LUNATICK_CSS = """
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
             padding-left: 0.04rem !important;
             padding-right: 0.04rem !important;
+            white-space: pre-line !important;
+            word-break: keep-all !important;
+        }
+
+        /* Keep the musical-tone destination as one intact compact label,
+           even on the 375 px-wide phone shown in the report. */
+        .st-key-lunatick-bottom-nav .st-key-bottom_nav_tones button {
+            font-size: 0.56rem !important;
+            letter-spacing: -0.035em;
+            overflow-wrap: normal !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            white-space: pre-line !important;
+            word-break: keep-all !important;
         }
 
         /* Journal is the widest remaining compact label on narrow iPhones.
@@ -553,6 +788,252 @@ LUNATICK_CSS = """
         }
     }
 
+    /* On tablet and desktop, the persistent sidebar occupies 18.75rem.
+       Keep both navigation rows wholly inside the remaining content region.
+       The mobile rail below 769px deliberately retains its existing geometry. */
+    @media (min-width: 769px) {
+        .st-key-lunatick-bottom-nav {
+            bottom: 2.625rem;
+        }
+
+        [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
+            left: 0 !important;
+            width: calc(100vw - 2.625rem) !important;
+        }
+
+        [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
+            left: calc(100vw - 2.625rem) !important;
+        }
+
+        .stAppViewContainer:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-lunatick-bottom-nav {
+            left: 18.75rem;
+            right: 0;
+            width: auto;
+        }
+
+        .stAppViewContainer:has([data-testid="stSidebar"][aria-expanded="true"]) [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
+            left: 18.75rem !important;
+            width: calc(100vw - 21.375rem) !important;
+        }
+
+        .stAppViewContainer:has([data-testid="stSidebar"][aria-expanded="true"]) [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] {
+            left: calc(100vw - 2.625rem) !important;
+        }
+    }
+
+    /* ---------------------------------------------------------------------
+       Fixed contextual Help control
+       ---------------------------------------------------------------------
+       The keyed trigger and guide are fixed-position overlays. They do not
+       participate in normal page flow, keeping compact Home/Connect screens
+       and the established fixed navigation unchanged. */
+    [class*="st-key-lunatick-page-help-button"],
+    [class*="st-key-lunatick-profile-button"],
+    .stElementContainer:has(.st-key-lunatick-page-help-button),
+    .stElementContainer:has(.st-key-lunatick-page-help-popover),
+    .stElementContainer:has(.st-key-lunatick-profile-button) {
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none;
+    }
+
+    /* Streamlit gives each container a layout wrapper in the parent flex stack.
+       Flatten these two wrappers as well so their normal 1rem row gap cannot
+       contribute invisible scroll height beneath the fixed overlay. */
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-button),
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-popover),
+    [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-profile-button) {
+        display: contents !important;
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] {
+        position: fixed !important;
+        top: calc(0.9rem + env(safe-area-inset-top)) !important;
+        left: calc(2rem + env(safe-area-inset-left)) !important;
+        z-index: 1000001 !important;
+        width: 2.15rem !important;
+        height: 2.15rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto !important;
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button {
+        align-items: center;
+        background: linear-gradient(145deg, rgba(47, 30, 91, 0.98), rgba(17, 13, 39, 0.98)) !important;
+        border: 1px solid rgba(188, 140, 255, 0.90) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 0 16px rgba(188, 140, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+        color: #f0e6ff !important;
+        display: flex;
+        font-size: 1rem !important;
+        height: 2.15rem !important;
+        justify-content: center;
+        line-height: 1;
+        min-height: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto !important;
+        transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        width: 2.15rem !important;
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button:hover,
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button:focus-visible {
+        background: linear-gradient(145deg, #593bb0, #25184f) !important;
+        border-color: #e0ccff !important;
+        box-shadow: 0 0 20px rgba(188, 140, 255, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.30) !important;
+        outline: none;
+        transform: scale(1.06);
+    }
+
+    [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button:active {
+        transform: scale(0.93);
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
+        position: fixed !important;
+        top: calc(0.9rem + env(safe-area-inset-top)) !important;
+        right: calc(2rem + env(safe-area-inset-right)) !important;
+        /* Streamlit's transparent header sits at z-index 999990. The Help
+           trigger must be above it for physical taps, not only DOM clicks. */
+        z-index: 1000001 !important;
+        width: 2.15rem !important;
+        height: 2.15rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto !important;
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button {
+        align-items: center;
+        background: linear-gradient(145deg, rgba(194, 218, 255, 0.96), rgba(130, 164, 232, 0.95)) !important;
+        border: 1px solid rgba(239, 245, 255, 0.98) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 0 16px rgba(138, 178, 255, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+        color: #172340 !important;
+        display: flex;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.92rem !important;
+        font-weight: 900;
+        height: 2.15rem !important;
+        justify-content: center;
+        line-height: 1;
+        min-height: 0 !important;
+        padding: 0 !important;
+        pointer-events: auto !important;
+        transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        width: 2.15rem !important;
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button:hover,
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button:focus-visible {
+        background: linear-gradient(145deg, #f4f8ff, #b8d2ff) !important;
+        border-color: #ffffff !important;
+        box-shadow: 0 0 20px rgba(188, 140, 255, 0.54), inset 0 1px 0 rgba(255, 255, 255, 0.74) !important;
+        outline: none;
+        transform: scale(1.06);
+    }
+
+    [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button:active {
+        transform: scale(0.93);
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] {
+        position: fixed !important;
+        top: calc(3.85rem + env(safe-area-inset-top)) !important;
+        right: calc(2rem + env(safe-area-inset-right)) !important;
+        z-index: 1000000 !important;
+        pointer-events: auto;
+        width: min(21rem, calc(100vw - 1.5rem)) !important;
+        max-height: min(28rem, calc(100dvh - 10.75rem - env(safe-area-inset-bottom))) !important;
+        margin: 0 !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        padding: 0.85rem !important;
+        background:
+            radial-gradient(circle at 88% 8%, rgba(125, 211, 252, 0.16), transparent 12rem),
+            linear-gradient(145deg, rgba(18, 27, 53, 0.78), rgba(7, 12, 25, 0.72)) !important;
+        backdrop-filter: blur(14px) saturate(125%) !important;
+        -webkit-backdrop-filter: blur(14px) saturate(125%) !important;
+        border: 1px solid rgba(188, 140, 255, 0.62) !important;
+        border-radius: 0.9rem !important;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.56), 0 0 24px rgba(110, 64, 201, 0.20) !important;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-title {
+        color: #f0e6ff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        line-height: 1.35;
+        margin: 0 0 0.35rem;
+        text-transform: uppercase;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-intro {
+        color: #b9c7dc;
+        font-family: 'Crimson Pro', serif;
+        font-size: 0.98rem;
+        line-height: 1.35;
+        margin: 0 0 0.55rem;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-list {
+        color: #dbeeff;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] .lunatick-help-list li {
+        margin: 0.26rem 0;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] {
+        margin-top: 0.7rem !important;
+    }
+
+    [class*="st-key-lunatick-page-help-popover"] [data-testid="stButton"] button {
+        background: rgba(40, 26, 76, 0.72) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        border: 1px solid #bc8cff !important;
+        border-radius: 0.55rem !important;
+        color: #f0e6ff !important;
+        font-size: 0.76rem !important;
+        min-height: 2rem !important;
+    }
+
+    @media (max-width: 480px) {
+        [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] {
+            top: calc(0.9rem + env(safe-area-inset-top)) !important;
+            left: calc(1.25rem + env(safe-area-inset-left)) !important;
+        }
+
+        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] {
+            top: calc(0.9rem + env(safe-area-inset-top)) !important;
+            right: calc(1.25rem + env(safe-area-inset-right)) !important;
+        }
+
+        [class*="st-key-lunatick-page-help-popover"] {
+            top: calc(3.85rem + env(safe-area-inset-top)) !important;
+            right: calc(1.25rem + env(safe-area-inset-right)) !important;
+            width: calc(100vw - 2.5rem) !important;
+            max-height: calc(100dvh - 10.25rem - env(safe-area-inset-bottom)) !important;
+            padding: 0.75rem !important;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [class*="st-key-lunatick-page-help-button"] [data-testid="stButton"] button,
+        [class*="st-key-lunatick-profile-button"] [data-testid="stButton"] button {
+            transition: none !important;
+        }
+    }
+
     ::-webkit-scrollbar { width: 6px; }
 </style>
 """
@@ -562,10 +1043,10 @@ st.html(LUNATICK_CSS)
 # Init DBs early (needed for auth profiles)
 # ---------------------------------------------------------------------------
 journal_ui.init_db()
-talk_db.init_db()
 cosmic_cards.init_cards_db()
 boards.init_boards_db()
 chat_room.init_chat_db()
+reading_requests.init_reading_requests_db()
 auth.init_auth_db()
 
 # ---------------------------------------------------------------------------
@@ -757,7 +1238,7 @@ def render_home():
         </div>
         <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
             <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
-            <div style="color:#e6edf3; line-height:1.4; font-size:0.9rem;">{current['moon_vibe']}</div>
+            <a class="home-reading-request-button" href="?reading_requests=1" aria-label="Open Reading Requests">✦ Reading Requests</a>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -765,14 +1246,14 @@ def render_home():
     st.markdown(f"""
     <div class="stats-row">
         <div class="stat-card">
-            <div class="stat-label">Phase</div>
-            <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
-            <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
-        </div>
-        <div class="stat-card">
             <div class="stat-label">Glow</div>
             <div class="stat-val">{current["illum"]*100:.1f}%</div>
             <div class="stat-label" style="font-size:0.55rem;">Surface</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Phase</div>
+            <div class="stat-val" style="font-size:1.5rem;">{current["phase_emoji"]}</div>
+            <div class="stat-label" style="font-size:0.55rem;">{current["phase_name"]}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Age</div>
@@ -853,9 +1334,9 @@ def render_tones():
 
         .intro {
           color: var(--muted);
-          font-size: 0.88rem;
-          line-height: 1.5;
-          margin: 0.55rem 0 1.15rem;
+          font-size: 0.82rem;
+          line-height: 1.38;
+          margin: 0.42rem 0 0.72rem;
         }
 
         .section-label {
@@ -870,9 +1351,9 @@ def render_tones():
 
         .presets {
           display: grid;
-          gap: 0.5rem;
+          gap: 0.4rem;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          margin-bottom: 1rem;
+          margin-bottom: 0.62rem;
         }
 
         button, input, select { font: inherit; }
@@ -888,8 +1369,8 @@ def render_tones():
 
         .preset {
           background: rgba(255, 255, 255, 0.045);
-          min-height: 3.45rem;
-          padding: 0.55rem 0.65rem;
+          min-height: 2.65rem;
+          padding: 0.4rem 0.55rem;
           text-align: left;
         }
 
@@ -920,9 +1401,9 @@ def render_tones():
 
         .controls {
           display: grid;
-          gap: 0.85rem;
+          gap: 0.52rem;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          margin: 0.7rem 0 1rem;
+          margin: 0.46rem 0 0.62rem;
         }
 
         .control { min-width: 0; }
@@ -960,7 +1441,7 @@ def render_tones():
 
         .actions {
           display: grid;
-          gap: 0.65rem;
+          gap: 0.52rem;
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
@@ -1000,10 +1481,10 @@ def render_tones():
 
         .status {
           color: var(--muted);
-          font-size: 0.78rem;
-          line-height: 1.45;
-          margin: 0.85rem 0 0;
-          min-height: 1.15rem;
+          font-size: 0.72rem;
+          line-height: 1.32;
+          margin: 0.5rem 0 0;
+          min-height: 1rem;
         }
 
         .status[data-state="playing"] { color: var(--mint); }
@@ -1011,13 +1492,30 @@ def render_tones():
 
         .note {
           color: #72809b;
-          font-size: 0.67rem;
-          line-height: 1.42;
-          margin: 0.45rem 0 0;
+          font-size: 0.61rem;
+          line-height: 1.32;
+          margin: 0.28rem 0 0;
+        }
+
+        @media (max-width: 480px) {
+          .tone-space { padding: 0.75rem; }
+          .eyebrow { font-size: 0.56rem; margin-bottom: 0.24rem; }
+          h1 { font-size: 1.2rem; }
+          .intro { font-size: 0.76rem; margin: 0.3rem 0 0.48rem; }
+          .section-label { font-size: 0.58rem; margin-bottom: 0.3rem; }
+          .presets { gap: 0.32rem; margin-bottom: 0.45rem; }
+          .preset { min-height: 2.35rem; padding: 0.3rem 0.45rem; }
+          .preset-name { font-size: 0.72rem; }
+          .preset-frequency { font-size: 0.59rem; margin-top: 0.08rem; }
+          .controls { gap: 0.38rem; margin: 0.35rem 0 0.5rem; }
+          select, input[type="number"] { min-height: 2.22rem; }
+          .action { min-height: 2.42rem; font-size: 0.78rem; padding: 0.42rem 0.5rem; }
+          .status { font-size: 0.66rem; margin-top: 0.38rem; }
+          .note { font-size: 0.55rem; margin-top: 0.22rem; }
         }
 
         @media (max-width: 360px) {
-          .controls { grid-template-columns: 1fr; }
+          .actions { gap: 0.42rem; }
         }
       </style>
     </head>
@@ -1025,7 +1523,7 @@ def render_tones():
       <main class="tone-space" aria-labelledby="tones-title">
         <div class="eyebrow">Lunatick sound space</div>
         <h1 id="tones-title">Healing tones</h1>
-        <p class="intro">Choose a tone, set a gentle listening level, and take a moment for yourself.</p>
+        <p class="intro">Binaural sine tones shift every 11 seconds. Set your beat difference, sequence, and listening level.</p>
 
         <span class="section-label">Tone presets</span>
         <div class="presets" aria-label="Tone presets">
@@ -1049,42 +1547,21 @@ def render_tones():
           </button>
         </div>
 
-        <!-- Mode Toggle (Standard / Binaural only) -->
-        <div class="mode-toggle" role="group" aria-label="Audio mode">
-          <button id="mode-standard" class="active">Standard</button>
-          <button id="mode-binaural">Binaural (Headphones)</button>
-        </div>
-
         <div class="controls">
           <div class="control">
             <label class="section-label" for="frequency">Base frequency</label>
             <input id="frequency" type="number" min="100" max="1000" step="1" value="432" inputmode="numeric">
           </div>
-          <div class="control" id="beat-control" style="display: none;">
-            <label class="section-label" for="beat">Beat frequency (Hz)</label>
+          <div class="control">
+            <label class="section-label" for="beat">Beat difference (Hz)</label>
             <input id="beat" type="number" min="0" max="20" step="0.01" value="7.83" inputmode="decimal">
           </div>
           <div class="control">
-            <label class="section-label" for="waveform">Waveform</label>
-            <select id="waveform">
-              <option value="sine">Sine — soft</option>
-              <option value="triangle">Triangle — warm</option>
-              <option value="sawtooth">Sawtooth — bright</option>
-            </select>
-          </div>
-          <div class="control">
-            <label class="section-label" for="cycle-mode">Cycle mode</label>
+            <label class="section-label" for="cycle-mode">Tone sequence</label>
             <select id="cycle-mode">
               <option value="random">Random</option>
               <option value="sweep">Chakra Sweep</option>
             </select>
-          </div>
-          <div class="control">
-            <label class="section-label" for="speed">Cycle speed (seconds)</label>
-            <div class="volume-line">
-              <input id="speed" type="range" min="2" max="12" step="1" value="5" aria-describedby="speed-value">
-              <output id="speed-value" for="speed">5s</output>
-            </div>
           </div>
           <div class="control">
             <label class="section-label" for="volume">Listening volume</label>
@@ -1100,7 +1577,7 @@ def render_tones():
           <button id="stop" class="action stop" type="button" disabled>Stop tone</button>
         </div>
 
-        <p id="status" class="status" role="status" aria-live="polite" data-state="idle">Ready — Moon is selected at 432 Hz.</p>
+        <p id="status" class="status" role="status" aria-live="polite" data-state="idle">Ready — Moon is selected for binaural sine playback.</p>
         <p class="note">For personal relaxation only. This feature is not medical treatment or a substitute for professional care.</p>
       </main>
 
@@ -1110,34 +1587,28 @@ def render_tones():
           const presetButtons = [...document.querySelectorAll(".preset")];
           const frequencyInput = document.getElementById("frequency");
           const beatInput = document.getElementById("beat");
-          const waveform = document.getElementById("waveform");
+          const cycleModeSelect = document.getElementById("cycle-mode");
           const volume = document.getElementById("volume");
           const volumeValue = document.getElementById("volume-value");
-          const speedInput = document.getElementById("speed");
-          const speedValue = document.getElementById("speed-value");
-          const cycleModeSelect = document.getElementById("cycle-mode");
           const startButton = document.getElementById("start");
           const stopButton = document.getElementById("stop");
           const status = document.getElementById("status");
-          const modeStandard = document.getElementById("mode-standard");
-          const modeBinaural = document.getElementById("mode-binaural");
-          const beatControl = document.getElementById("beat-control");
+
+          const LOCKED_WAVEFORM = "sine";
+          const AUTO_SHIFT_INTERVAL_MS = 11000;
+          const GLIDE_DURATION_SECONDS = 2.5;
+          const presetFrequencies = [174, 285, 432, 528, 639, 741];
 
           let audioContext = null;
           let leftOsc = null;
           let rightOsc = null;
           let leftGain = null;
           let rightGain = null;
-          let isBinaural = false;
-          let isRandom = false; // true if any cyclic mode (random or sweep)
-          let beatFrequency = 7.83;
           let selectedFrequency = 432;
-          let randomInterval = null;
-          let cycleDelay = 5000; // Default 5 seconds
-          const glideDuration = 2.5; // Fixed 2.5 second glide
-          let sequenceIndex = 0;
-          let sequenceDirection = 1; // 1 for ascending, -1 for descending
-          const presetFrequencies = [174, 285, 432, 528, 639, 741];
+          let beatFrequency = 7.83;
+          let shiftInterval = null;
+          let sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
+          let sequenceDirection = 1;
 
           function setStatus(message, state = "idle") {
             status.textContent = message;
@@ -1145,7 +1616,7 @@ def render_tones():
           }
 
           function selectedPresetName(freq) {
-            const button = presetButtons.find(b => Number(b.dataset.frequency) === freq);
+            const button = presetButtons.find((item) => Number(item.dataset.frequency) === freq);
             return button ? button.querySelector(".preset-name").textContent : "Custom";
           }
 
@@ -1156,95 +1627,91 @@ def render_tones():
           function setPlayingUI(isPlaying) {
             startButton.disabled = isPlaying;
             stopButton.disabled = !isPlaying;
-            presetButtons.forEach(btn => btn.disabled = isPlaying && isRandom);
           }
 
           function updateVolumeLabel() {
             volumeValue.textContent = `${volume.value}%`;
           }
 
-          function updateSpeedLabel() {
-            cycleDelay = Number(speedInput.value) * 1000;
-            speedValue.textContent = `${speedInput.value}s`;
-            // If cyclic mode is running, reset interval with new delay
-            if (isRandom && randomInterval) {
-              clearInterval(randomInterval);
-              randomInterval = setInterval(() => {
-                cycleNext();
-              }, cycleDelay);
-            }
-          }
-
           function highlightPreset(freq) {
-            presetButtons.forEach(btn => {
-              const isActive = Number(btn.dataset.frequency) === freq;
-              btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+            presetButtons.forEach((button) => {
+              button.setAttribute("aria-pressed", String(Number(button.dataset.frequency) === freq));
             });
           }
 
-          function setFrequency(freq) {
-            selectedFrequency = freq;
-            highlightPreset(freq);
-            const now = audioContext.currentTime;
-            if (isBinaural && leftOsc && rightOsc && audioContext) {
+          function sequenceLabel() {
+            return cycleModeSelect.value === "sweep" ? "Chakra Sweep" : "Random";
+          }
+
+          function applyFrequency(freq, announce = true) {
+            selectedFrequency = Math.min(1000, Math.max(100, Number(freq) || 432));
+            frequencyInput.value = selectedFrequency;
+            sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
+            highlightPreset(selectedFrequency);
+
+            if (audioContext && leftOsc && rightOsc) {
+              const now = audioContext.currentTime;
               leftOsc.frequency.cancelScheduledValues(now);
-              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
+              leftOsc.frequency.exponentialRampToValueAtTime(selectedFrequency, now + GLIDE_DURATION_SECONDS);
               rightOsc.frequency.cancelScheduledValues(now);
-              rightOsc.frequency.exponentialRampToValueAtTime(freq + beatFrequency, now + glideDuration);
-            } else if (leftOsc && audioContext) {
-              leftOsc.frequency.cancelScheduledValues(now);
-              leftOsc.frequency.exponentialRampToValueAtTime(freq, now + glideDuration);
+              rightOsc.frequency.exponentialRampToValueAtTime(
+                selectedFrequency + beatFrequency,
+                now + GLIDE_DURATION_SECONDS,
+              );
             }
-            // Update status
-            const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
-            if (isRandom) {
-              setStatus(`${modeName}: ${selectedPresetName(freq)} (${freq} Hz)${isBinaural ? ` + ${beatFrequency} Hz beat` : ''}`, "playing");
-            } else {
-              setStatus(`Playing ${selectedPresetName(freq)} at ${freq} Hz.`, "playing");
+
+            if (announce) {
+              const state = leftOsc && rightOsc ? "playing" : "idle";
+              setStatus(
+                `${state === "playing" ? "Playing" : "Ready"} binaural sine — ${selectedPresetName(selectedFrequency)} ` +
+                `(${selectedFrequency} Hz + ${beatFrequency} Hz beat, ${sequenceLabel()}). Shifts every 11 seconds.`,
+                state,
+              );
             }
           }
 
-          function cycleNext() {
-            let nextFreq;
-            if (cycleModeSelect.value === 'random') {
-              // Random pick
-              const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-              nextFreq = presetFrequencies[randomIndex];
+          function shiftToNextPreset() {
+            let nextIndex;
+            if (cycleModeSelect.value === "random") {
+              nextIndex = Math.floor(Math.random() * presetFrequencies.length);
             } else {
-              // Chakra Sweep: sequential up and down
-              nextFreq = presetFrequencies[sequenceIndex];
               sequenceIndex += sequenceDirection;
               if (sequenceIndex >= presetFrequencies.length - 1) {
+                sequenceIndex = presetFrequencies.length - 1;
                 sequenceDirection = -1;
               } else if (sequenceIndex <= 0) {
+                sequenceIndex = 0;
                 sequenceDirection = 1;
               }
+              nextIndex = sequenceIndex;
             }
-            setFrequency(nextFreq);
+            applyFrequency(presetFrequencies[nextIndex]);
           }
 
           function stopTone() {
             const now = audioContext ? audioContext.currentTime : 0;
-            if (randomInterval) {
-              clearInterval(randomInterval);
-              randomInterval = null;
+            if (shiftInterval) {
+              clearInterval(shiftInterval);
+              shiftInterval = null;
             }
-            if (leftOsc) {
+            if (leftOsc && leftGain) {
               leftGain.gain.cancelScheduledValues(now);
               leftGain.gain.setValueAtTime(Math.max(leftGain.gain.value, 0), now);
               leftGain.gain.linearRampToValueAtTime(0, now + 0.10);
               leftOsc.stop(now + 0.11);
-              leftOsc = null; leftGain = null;
             }
-            if (rightOsc) {
+            if (rightOsc && rightGain) {
               rightGain.gain.cancelScheduledValues(now);
               rightGain.gain.setValueAtTime(Math.max(rightGain.gain.value, 0), now);
               rightGain.gain.linearRampToValueAtTime(0, now + 0.10);
               rightOsc.stop(now + 0.11);
-              rightOsc = null; rightGain = null;
             }
+            leftOsc = null;
+            rightOsc = null;
+            leftGain = null;
+            rightGain = null;
             setPlayingUI(false);
-            setStatus("Tone stopped. Ready when you are.");
+            setStatus("Tone stopped. Ready for binaural sine playback.");
           }
 
           async function startTone() {
@@ -1260,209 +1727,92 @@ def render_tones():
               if (audioContext.state === "suspended") {
                 await audioContext.resume();
               }
-
               if (leftOsc || rightOsc) {
                 stopTone();
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100));
               }
 
-              // Determine starting frequency
-              let startFreq = selectedFrequency;
-              if (isRandom) {
-                // Reset sequence for sweep
-                sequenceIndex = 0;
-                sequenceDirection = 1;
-                if (cycleModeSelect.value === 'random') {
-                  const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-                  startFreq = presetFrequencies[randomIndex];
-                } else {
-                  startFreq = presetFrequencies[0];
-                }
-                highlightPreset(startFreq);
-                // Start the interval
-                randomInterval = setInterval(() => {
-                  cycleNext();
-                }, cycleDelay);
-              }
+              const now = audioContext.currentTime;
+              leftOsc = audioContext.createOscillator();
+              leftGain = audioContext.createGain();
+              const leftPanner = audioContext.createStereoPanner();
+              leftPanner.pan.value = -1;
+              leftOsc.type = LOCKED_WAVEFORM;
+              leftOsc.frequency.setValueAtTime(selectedFrequency, now);
+              leftGain.gain.setValueAtTime(0, now);
+              leftGain.gain.linearRampToValueAtTime(currentGain(), now + 0.12);
+              leftOsc.connect(leftGain);
+              leftGain.connect(leftPanner);
+              leftPanner.connect(audioContext.destination);
+              leftOsc.start();
 
-              if (isBinaural) {
-                // Left channel
-                leftOsc = audioContext.createOscillator();
-                leftGain = audioContext.createGain();
-                const leftPanner = audioContext.createStereoPanner();
-                leftPanner.pan.value = -1;
-                leftOsc.type = waveform.value;
-                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
-                leftGain.gain.setValueAtTime(0, audioContext.currentTime);
-                leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-                leftOsc.connect(leftGain);
-                leftGain.connect(leftPanner);
-                leftPanner.connect(audioContext.destination);
-                leftOsc.start();
+              rightOsc = audioContext.createOscillator();
+              rightGain = audioContext.createGain();
+              const rightPanner = audioContext.createStereoPanner();
+              rightPanner.pan.value = 1;
+              rightOsc.type = LOCKED_WAVEFORM;
+              rightOsc.frequency.setValueAtTime(selectedFrequency + beatFrequency, now);
+              rightGain.gain.setValueAtTime(0, now);
+              rightGain.gain.linearRampToValueAtTime(currentGain(), now + 0.12);
+              rightOsc.connect(rightGain);
+              rightGain.connect(rightPanner);
+              rightPanner.connect(audioContext.destination);
+              rightOsc.start();
 
-                // Right channel
-                const rightFreq = startFreq + beatFrequency;
-                rightOsc = audioContext.createOscillator();
-                rightGain = audioContext.createGain();
-                const rightPanner = audioContext.createStereoPanner();
-                rightPanner.pan.value = 1;
-                rightOsc.type = waveform.value;
-                rightOsc.frequency.setValueAtTime(rightFreq, audioContext.currentTime);
-                rightGain.gain.setValueAtTime(0, audioContext.currentTime);
-                rightGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-                rightOsc.connect(rightGain);
-                rightGain.connect(rightPanner);
-                rightPanner.connect(audioContext.destination);
-                rightOsc.start();
-
-                leftOsc.onended = () => { leftOsc = null; };
-                rightOsc.onended = () => { rightOsc = null; };
-
-                setPlayingUI(true);
-                const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
-                setStatus(`${modeName}: ${selectedPresetName(startFreq)} (${startFreq} Hz + ${beatFrequency} Hz beat)`, "playing");
-              } else {
-                // Standard mono
-                leftOsc = audioContext.createOscillator();
-                leftGain = audioContext.createGain();
-                leftOsc.type = waveform.value;
-                leftOsc.frequency.setValueAtTime(startFreq, audioContext.currentTime);
-                leftGain.gain.setValueAtTime(0, audioContext.currentTime);
-                leftGain.gain.linearRampToValueAtTime(currentGain(), audioContext.currentTime + 0.12);
-                leftOsc.connect(leftGain);
-                leftGain.connect(audioContext.destination);
-                leftOsc.start();
-
-                leftOsc.onended = () => { leftOsc = null; };
-
-                setPlayingUI(true);
-                const modeName = cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep';
-                setStatus(`${modeName}: ${selectedPresetName(startFreq)} (${startFreq} Hz)`, "playing");
-              }
+              shiftInterval = setInterval(shiftToNextPreset, AUTO_SHIFT_INTERVAL_MS);
+              setPlayingUI(true);
+              applyFrequency(selectedFrequency);
             } catch (error) {
               console.error("Unable to start tone", error);
-              leftOsc = null; rightOsc = null;
+              leftOsc = null;
+              rightOsc = null;
+              leftGain = null;
+              rightGain = null;
               setPlayingUI(false);
               setStatus("The tone could not start. Check browser audio permissions and try again.", "error");
             }
           }
 
-          function updateActiveFrequency() {
-            const rawValue = Number(frequencyInput.value);
-            selectedFrequency = Math.min(1000, Math.max(100, Number.isFinite(rawValue) ? rawValue : 432));
-            frequencyInput.value = selectedFrequency;
-            highlightPreset(selectedFrequency);
-            if (!isRandom && leftOsc) {
-              setFrequency(selectedFrequency);
-            } else if (!isRandom) {
-              setStatus(`Ready — ${selectedPresetName(selectedFrequency)} is selected at ${selectedFrequency} Hz.`);
-            }
-          }
+          presetButtons.forEach((button) => {
+            button.addEventListener("click", () => applyFrequency(Number(button.dataset.frequency)));
+          });
 
-          function updateBeat() {
+          frequencyInput.addEventListener("change", () => applyFrequency(frequencyInput.value));
+          beatInput.addEventListener("change", () => {
             const rawValue = Number(beatInput.value);
             beatFrequency = Math.min(20, Math.max(0, Number.isFinite(rawValue) ? rawValue : 7.83));
             beatInput.value = beatFrequency;
-            if (isBinaural && leftOsc && rightOsc && audioContext) {
+            if (audioContext && rightOsc) {
               rightOsc.frequency.cancelScheduledValues(audioContext.currentTime);
               rightOsc.frequency.setTargetAtTime(selectedFrequency + beatFrequency, audioContext.currentTime, 0.03);
-              setStatus(`Binaural: ${selectedPresetName(selectedFrequency)} (${selectedFrequency}Hz + ${beatFrequency}Hz beat)`, "playing");
-            } else {
-              setStatus(`Binaural mode ready. Beat set to ${beatFrequency} Hz.`);
             }
-          }
-
-          function clearPresetSelection() {
-            presetButtons.forEach(button => button.setAttribute("aria-pressed", "false"));
-          }
-
-          // Preset Buttons
-          presetButtons.forEach(button => {
-            button.addEventListener("click", () => {
-              if (isRandom) return;
-              selectedFrequency = Number(button.dataset.frequency);
-              frequencyInput.value = selectedFrequency;
-              presetButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
-              updateActiveFrequency();
-            });
+            applyFrequency(selectedFrequency);
           });
-
-          // Cycle mode selector (activates cyclic mode)
           cycleModeSelect.addEventListener("change", () => {
-            isRandom = true;
-            if (leftOsc) {
-              clearInterval(randomInterval);
-              sequenceIndex = 0;
-              sequenceDirection = 1;
-              if (cycleModeSelect.value === 'random') {
-                const randomIndex = Math.floor(Math.random() * presetFrequencies.length);
-                setFrequency(presetFrequencies[randomIndex]);
-              } else {
-                setFrequency(presetFrequencies[0]);
-              }
-              randomInterval = setInterval(() => {
-                cycleNext();
-              }, cycleDelay);
-            } else {
-              setStatus(`Cycle mode: ${cycleModeSelect.value === 'random' ? 'Random' : 'Chakra Sweep'}`);
-            }
+            sequenceIndex = presetFrequencies.indexOf(selectedFrequency);
+            sequenceDirection = 1;
+            applyFrequency(selectedFrequency);
           });
-
-          // Mode Toggle (Standard/Binaural)
-          modeStandard.addEventListener("click", () => {
-            isBinaural = false;
-            isRandom = false;
-            modeStandard.classList.add("active");
-            modeBinaural.classList.remove("active");
-            beatControl.style.display = "none";
-            if (leftOsc || rightOsc) stopTone();
-            setPlayingUI(false);
-            setStatus("Standard mode. Select a frequency.");
-          });
-
-          modeBinaural.addEventListener("click", () => {
-            isBinaural = true;
-            isRandom = false;
-            modeBinaural.classList.add("active");
-            modeStandard.classList.remove("active");
-            beatControl.style.display = "block";
-            if (leftOsc || rightOsc) stopTone();
-            setPlayingUI(false);
-            setStatus(`Binaural mode. Beat set to ${beatFrequency} Hz.`);
-          });
-
-          frequencyInput.addEventListener("change", updateActiveFrequency);
-          beatInput.addEventListener("change", updateBeat);
-
-          waveform.addEventListener("change", () => {
-            if (leftOsc) leftOsc.type = waveform.value;
-            if (rightOsc) rightOsc.type = waveform.value;
-          });
-
           volume.addEventListener("input", () => {
             updateVolumeLabel();
-            const currentGainValue = currentGain();
+            const gain = currentGain();
             if (leftGain && audioContext) {
               leftGain.gain.cancelScheduledValues(audioContext.currentTime);
-              leftGain.gain.setTargetAtTime(currentGainValue, audioContext.currentTime, 0.025);
+              leftGain.gain.setTargetAtTime(gain, audioContext.currentTime, 0.025);
             }
             if (rightGain && audioContext) {
               rightGain.gain.cancelScheduledValues(audioContext.currentTime);
-              rightGain.gain.setTargetAtTime(currentGainValue, audioContext.currentTime, 0.025);
+              rightGain.gain.setTargetAtTime(gain, audioContext.currentTime, 0.025);
             }
           });
-
-          speedInput.addEventListener("input", updateSpeedLabel);
-
           startButton.addEventListener("click", startTone);
           stopButton.addEventListener("click", stopTone);
 
           window.addEventListener("pagehide", () => {
+            if (shiftInterval) clearInterval(shiftInterval);
             if (leftOsc) { try { leftOsc.stop(); } catch (_) {} }
             if (rightOsc) { try { rightOsc.stop(); } catch (_) {} }
-            if (audioContext && audioContext.state !== "closed") {
-              audioContext.close();
-            }
+            if (audioContext && audioContext.state !== "closed") audioContext.close();
           });
         })();
       </script>
@@ -1470,7 +1820,7 @@ def render_tones():
     </html>
     """
 
-    components.html(tone_generator_html, height=800, scrolling=False)
+    components.html(tone_generator_html, height=520, scrolling=False)
 
 
 def render_calendar():
@@ -1593,6 +1943,12 @@ def render_settings():
         else:
             st.toast("Your public Cosmic Card remains visible; its derived values are now private.")
         st.rerun()
+
+    if moderation.is_moderator():
+        st.markdown("---")
+        st.markdown("### 🛡️ Community moderation")
+        st.caption("Review and manage public LunaTicK Talk content. Private Journals remain unavailable.")
+        moderation.render_moderation_console()
 
     st.markdown("---")
     st.markdown("### 🔐 Password & Sign-in")
@@ -1727,17 +2083,15 @@ def render_settings():
 if "current_phase" not in st.session_state:
     st.session_state.current_phase = get_celestial_data(datetime.now(timezone.utc))["phase_name"]
 
-# Soft seed for talk (safe if already done)
-try:
-    talk_db.seed_talk_posts()
-except Exception:
-    pass
-
 # ---------------------------------------------------------------------------
 # Main App — Fixed Bottom Navigation
 # ---------------------------------------------------------------------------
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
+
+if st.query_params.get("reading_requests") == "1":
+    st.session_state.nav_page = "Reading Requests"
+    st.query_params.pop("reading_requests", None)
 
 # A calendar day uses a lightweight query route so the compact HTML grid stays
 # horizontal on phones. Preserve Track on that route even if Streamlit creates
@@ -1745,9 +2099,18 @@ if "nav_page" not in st.session_state:
 if str(st.query_params.get("track_day", "")).strip():
     st.session_state.nav_page = "Calendar"
 
+# Community usernames use this lightweight route to open the same safe public
+# profile surface without placing immutable account identifiers in the UI.
+requested_profile = str(st.query_params.get("profile", "")).strip().lstrip("@")
+if requested_profile:
+    st.session_state.profile_hub_lookup = requested_profile
+    st.session_state.profile_return_page = "Community"
+    st.session_state.nav_page = "Profile"
+    st.query_params.pop("profile", None)
+
 # Existing sessions may still point to a former standalone social tab. Move
 # those users directly into the unified Community destination on the next run.
-if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk"}:
+if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
     st.session_state.nav_page = "Community"
 
 
@@ -1758,6 +2121,167 @@ def set_nav_page(page_name: str) -> None:
         st.query_params.pop("track_day", None)
 
 
+PAGE_HELP_GUIDES = {
+    "Home": {
+        "title": "Home guide",
+        "intro": "A private snapshot of your current lunar rhythm and personal cosmic chart.",
+        "items": (
+            "Moon Monitor shows the countdown to the next full moon.",
+            "Your Cosmic Chart uses your saved private birth data; it is not posted to community spaces.",
+            "Reading Requests opens the free community matching area for astrology readings.",
+            "Glow, Phase, and Age summarize the current lunar cycle.",
+        ),
+    },
+    "Calendar": {
+        "title": "Inspect guide",
+        "intro": "Browse the lunar calendar, upcoming celestial moments, and your own private notes.",
+        "items": (
+            "Use the arrow controls to move between months.",
+            "Moon icons indicate the lunar phase for each day.",
+            "Marked events highlight notable lunar or celestial dates.",
+            "Private notes stay visible only to you.",
+        ),
+    },
+    "Cosmic Cards": {
+        "title": "Collect guide",
+        "intro": "Create and manage a Cosmic Card while keeping your exact birth details private.",
+        "items": (
+            "Add your birth date, local time, and a city or postal code to begin.",
+            "Confirm the resolved place, coordinates, and timezone before saving.",
+            "Rising is calculated from a tropical Placidus chart using Swiss Ephemeris.",
+            "Settings controls whether derived card values are visible on your public profile.",
+        ),
+    },
+    "Community": {
+        "title": "Connect guide",
+        "intro": "Choose a live conversation or a lasting community discussion.",
+        "items": (
+            "Live Chat refreshes lightly so the room stays current.",
+            "Message Board supports upvotes, downvotes, and Newest, Top, or Controversial sorting.",
+            "Reading Requests are free, community-only, and open private messages only after a match.",
+            "Keep personal birth details and private information out of public posts.",
+        ),
+    },
+    "Journal": {
+        "title": "Reflect guide",
+        "intro": "A personal writing space intended only for your own saved reflections.",
+        "items": (
+            "Write freely, then save an entry when you are ready.",
+            "Saved journal entries are private by design.",
+            "Use Clear to discard unsaved text from the current writing area.",
+        ),
+    },
+    "Tones": {
+        "title": "Correct guide",
+        "intro": "Set a gentle listening tone for personal relaxation and reflection.",
+        "items": (
+            "Choose a preset or set your own frequency and waveform.",
+            "Binaural mode is designed for headphone listening.",
+            "Adjust cycle speed and listening volume before starting a tone.",
+            "This feature is for personal relaxation only and is not medical treatment.",
+        ),
+    },
+    "Profile": {
+        "title": "Profile guide",
+        "intro": "Your public LunaTicK presence and your private card-collection connections.",
+        "items": (
+            "Search an exact public @username to view a member profile.",
+            "Send a card trade to request a mutual connection; the other member must accept it.",
+            "Accepted connections can display Cosmic Cards when the owner has activated one.",
+            "Profiles never reveal private birth inputs, account email, or location details.",
+        ),
+    },
+    "Settings": {
+        "title": "Settings guide",
+        "intro": "Manage your profile, private birth-chart inputs, visibility preferences, and account options.",
+        "items": (
+            "Your sign-in email remains private; your public profile uses your chosen handle and display name.",
+            "Birth date, time, coordinates, and resolved place are private inputs.",
+            "Use Cosmic Card privacy to choose whether derived values appear on your public card.",
+            "Moderation tools appear here only for authorized moderators.",
+        ),
+    },
+    "Reading Requests": {
+        "title": "Reading Requests guide",
+        "intro": "Request or volunteer for a free community astrology reading.",
+        "items": (
+            "Readers can describe their availability and areas of practice.",
+            "Requesters can share only the details they choose to provide.",
+            "Private lightweight messages become available only to matched participants.",
+            "Do not publish exact birth details in public discussion areas.",
+        ),
+    },
+}
+
+
+def toggle_profile_drawer() -> None:
+    """Toggle the isolated profile overlay without changing the active page."""
+    st.session_state["profile_drawer_open"] = not st.session_state.get("profile_drawer_open", False)
+
+
+def open_profile_hub(return_page: str) -> None:
+    """Open the standalone social profile page and preserve the calling destination."""
+    st.session_state.profile_return_page = return_page if return_page != "Profile" else "Home"
+    st.session_state.profile_hub_section = "profile"
+    st.session_state.nav_page = "Profile"
+
+
+def render_profile_launcher(page_name: str) -> None:
+    """Render the fixed profile entry point outside normal layout flow."""
+    if page_name == "Profile":
+        return
+    with st.container(key="lunatick-profile-button"):
+        st.button(
+            "👤",
+            key=f"lunatick_profile_open_{page_name.lower().replace(' ', '_')}",
+            help="Open your profile, find members, and trade Cosmic Cards",
+            type="secondary",
+            on_click=toggle_profile_drawer,
+        )
+
+
+def render_page_help(page_name: str) -> None:
+    """Render a fixed page guide without adding normal-flow layout height."""
+    guide = PAGE_HELP_GUIDES.get(page_name, PAGE_HELP_GUIDES["Home"])
+    slug = page_name.lower().replace(" ", "_")
+    state_key = f"lunatick_page_help_open_{slug}"
+
+    with st.container(key="lunatick-page-help-button"):
+        toggled = st.button(
+            "?",
+            key=f"lunatick_page_help_toggle_{slug}",
+            help=f"Open the {guide['title'].lower()}",
+            type="secondary",
+        )
+
+    if toggled:
+        st.session_state[state_key] = not st.session_state.get(state_key, False)
+
+    if not st.session_state.get(state_key, False):
+        return
+
+    guide_items = "".join(f"<li>{item}</li>" for item in guide["items"])
+    with st.container(key="lunatick-page-help-popover"):
+        st.markdown(
+            f"""
+            <section class="lunatick-help-content" role="dialog" aria-label="{guide['title']}">
+              <div class="lunatick-help-title">? {guide['title']}</div>
+              <p class="lunatick-help-intro">{guide['intro']}</p>
+              <ul class="lunatick-help-list">{guide_items}</ul>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "Close guide",
+            key=f"lunatick_page_help_close_{slug}",
+            use_container_width=True,
+            type="secondary",
+        ):
+            st.session_state[state_key] = False
+            st.rerun()
+
+
 # Render one destination in the normal page body.
 current_page = st.session_state.nav_page
 
@@ -1765,8 +2289,12 @@ if current_page == "Home":
     render_home()
 elif current_page == "Community":
     community.render_community()
+elif current_page == "Reading Requests":
+    reading_requests.render_reading_requests()
 elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
+elif current_page == "Profile":
+    cosmic_cards.render_profile_hub()
 elif current_page == "Journal":
     journal_ui.render_journal_tab()
 elif current_page == "Calendar":
@@ -1779,12 +2307,22 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
+# Both fixed controls sit outside normal page flow, so neither shifts destinations
+# or extends compact Home/Connect screens.
+render_profile_launcher(current_page)
+if profile_drawer is not None:
+    try:
+        profile_drawer.render_profile_drawer(cosmic_cards)
+    except Exception:
+        st.session_state["profile_drawer_open"] = False
+render_page_help(current_page)
+
 NAV_ITEMS = [
+    ("Calendar", "📅", "Inspect"),
+    ("Cosmic Cards", "🃏", "Collect"),
     ("Community", "👥", "Connect"),
-    ("Journal", "📓", "Journal"),
-    ("Calendar", "📅", "Track"),
-    ("Cosmic Cards", "🃏", "Deal"),
-    ("Tones", "🎵", "Heal"),
+    ("Journal", "📓", "Reflect"),
+    ("Tones", "🎵", "Correct"),
 ]
 
 with st.container(key="lunatick-bottom-nav"):
@@ -1793,7 +2331,7 @@ with st.container(key="lunatick-bottom-nav"):
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
         nav_label = (
             f"{icon}\n{compact_label}"
-            if page_name in ("Community", "Journal")
+            if page_name in ("Community", "Journal", "Tones")
             else f"{icon} {compact_label}"
         )
         with column:
