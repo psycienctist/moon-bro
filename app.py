@@ -1221,6 +1221,27 @@ def custom_render_journal_tab():
     """Renders the original journal UI and adds a Lunar Reflection button below."""
     # Call the original journal rendering
     journal_ui.render_journal_tab()
+    # ... rest of the button code
+
+# Replace the original render_journal_tab with our custom version
+journal_ui.render_journal_tab = custom_render_journal_tab
+```
+
+---
+
+Replace That Entire Block With This:
+
+```python
+# ---------------------------------------------------------------------------
+# CUSTOM JOURNAL TAB WITH AI BUTTON (overrides journal_ui.render_journal_tab)
+# ---------------------------------------------------------------------------
+# Save a reference to the original function before we override it
+_original_render_journal_tab = journal_ui.render_journal_tab
+
+def custom_render_journal_tab():
+    """Renders the original journal UI and adds a Lunar Reflection button below."""
+    # Call the original journal rendering (using the saved reference)
+    _original_render_journal_tab()
     
     # Now add the AI mirror button using the current journal text from session state
     st.markdown("---")
