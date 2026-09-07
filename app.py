@@ -579,7 +579,8 @@ LUNATICK_CSS = """
         border-radius: 0.7rem;
         font-size: 0.7rem;
         line-height: 1.15;
-        white-space: nowrap;
+        /* FIX: allow line breaks so emoji and text can stack vertically */
+        white-space: pre-line;
     }
 
     /* Every destination starts as a blue, softly graduated lunar panel. */
@@ -2329,11 +2330,8 @@ with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-        nav_label = (
-            f"{icon}\n{compact_label}"
-            if page_name in ("Community", "Journal", "Tones")
-            else f"{icon} {compact_label}"
-        )
+        # Always use a newline to stack the emoji above the label text
+        nav_label = f"{icon}\n{compact_label}"
         with column:
             st.button(
                 nav_label,
