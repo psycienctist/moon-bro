@@ -579,8 +579,11 @@ LUNATICK_CSS = """
         border-radius: 0.7rem;
         font-size: 0.7rem;
         line-height: 1.15;
-        /* FIX: allow line breaks so emoji and text can stack vertically */
-        white-space: pre-line;
+        white-space: pre-line !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     /* Every destination starts as a blue, softly graduated lunar panel. */
@@ -754,6 +757,11 @@ LUNATICK_CSS = """
             min-height: 2.55rem;
             padding: 0.3rem 0.2rem;
             font-size: 0.63rem;
+            white-space: pre-line !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
 
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
@@ -2330,7 +2338,6 @@ with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-        # Always use a newline to stack the emoji above the label text
         nav_label = f"{icon}\n{compact_label}"
         with column:
             st.button(
