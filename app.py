@@ -1,3 +1,8 @@
+Here's your complete corrected app.py with the nav-button fix applied. The only changes are in the CSS — I've added rules that push white-space: pre-line (and centered alignment) down into Streamlit's inner label wrappers (<div>, <p>, and the markdown container), which is where the newline character actually lives in Streamlit 1.40+.
+
+Copy this whole file over your existing app.py, restart the app, then hard-refresh (or open in a private tab) on your phone.
+
+```python
 import streamlit as st
 import ephem
 import importlib
@@ -586,6 +591,25 @@ LUNATICK_CSS = """
         justify-content: center !important;
     }
 
+    /* Streamlit 1.40+ wraps the button label inside an inner div and a <p>
+       (inside a markdown container). The newline we pass in the label lives
+       inside those inner elements, so white-space must be forced down to them
+       as well. Otherwise the browser collapses the \n and both the emoji and
+       the text render on a single line. */
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button *,
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
+        white-space: pre-line !important;
+        text-align: center !important;
+        margin: 0 !important;
+        line-height: 1.15 !important;
+    }
+
+    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
+        display: block !important;
+        width: 100% !important;
+    }
+
     /* Every destination starts as a blue, softly graduated lunar panel. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
@@ -762,6 +786,17 @@ LUNATICK_CSS = """
             flex-direction: column !important;
             align-items: center !important;
             justify-content: center !important;
+        }
+
+        /* The same inner-wrapper rule from the desktop block is repeated here
+           so narrow phones stack emoji above label instead of on one line. */
+        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button *,
+        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
+        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
+            white-space: pre-line !important;
+            text-align: center !important;
+            margin: 0 !important;
+            line-height: 1.15 !important;
         }
 
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
@@ -2369,3 +2404,31 @@ with st.container(key="lunatick-settings-gear"):
         on_click=set_nav_page,
         args=("Settings",),
     )
+```
+
+---
+
+What changed (only the CSS, nothing else):
+
+1. In the main nav-button block, right after the existing .st-key-lunatick-bottom-nav [data-testid="stButton"] > button { … } rule, I added:
+
+```css
+.st-key-lunatick-bottom-nav [data-testid="stButton"] > button *,
+.st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
+.st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
+    white-space: pre-line !important;
+    text-align: center !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+.st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
+    display: block !important;
+    width: 100% !important;
+}
+```
+
+2. In the mobile @media (max-width: 480px) block, right after that block's own .st-key-lunatick-bottom-nav [data-testid="stButton"] > button { … } rule, I added the same child-selector block (minus the markdown-container width rule, which is already global).
+
+Everything else — imports, functions, page routing, NAV_ITEMS, label formatting with \n — is unchanged.
+
+After you replace the file, stop and restart the Streamlit app, then hard-refresh on your phone (or open in a private tab) to bust the cached CSS. You should now see the emoji on the top line and the label underneath it, on all five tabs.
