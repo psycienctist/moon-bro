@@ -99,6 +99,8 @@ LUNATICK_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
+    /* Keep LunaTicK dark regardless of the device's OS/browser preference.
+       This also makes native form controls advertise a dark color scheme. */
     :root, html, body, .stApp {
         color-scheme: dark !important;
         background-color: #05070a !important;
@@ -110,6 +112,8 @@ LUNATICK_CSS = """
         font-family: 'Inter', sans-serif;
     }
 
+    /* The Home Reading Requests entry replaces the taller Moon-status copy,
+       preserving the existing no-scroll phone composition. */
     .home-reading-request-button {
         align-items: center;
         background: rgba(188, 140, 255, 0.14);
@@ -138,6 +142,9 @@ LUNATICK_CSS = """
         color: #e6edf3 !important;
     }
 
+    /* Streamlit widgets can otherwise inherit a light OS color scheme on
+       mobile browsers. Set foreground, surface, placeholder, caret, and
+       border colors explicitly so Journal entries are always readable. */
     [data-testid="stTextInput"] input,
     [data-testid="stTextArea"] textarea,
     [data-testid="stNumberInput"] input,
@@ -200,6 +207,7 @@ LUNATICK_CSS = """
         animation: lunatick-glow-pulse 8s ease-in-out infinite;
     }
 
+    /* A deliberately slow, low-contrast ambient glow for the Home monitor. */
     @keyframes lunatick-glow-pulse {
         0%, 100% {
             border-color: rgba(110, 64, 201, 0.72);
@@ -299,6 +307,9 @@ LUNATICK_CSS = """
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
 
+    /* Fluid visual feedback for Streamlit expanders, including Cosmic Card
+       term explanations. The opening panel fades/slides in without changing
+       the existing expander content or behavior. */
     [data-testid="stExpander"],
     [data-testid="stExpander"] details {
         border-color: rgba(188, 140, 255, 0.22);
@@ -326,6 +337,8 @@ LUNATICK_CSS = """
         to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Remove Streamlit chrome so the application reads as a focused native
+       experience. App content and the custom Lunatick navigation are intact. */
     #MainMenu,
     [data-testid="stDeployButton"],
     .stDeployButton,
@@ -337,6 +350,8 @@ LUNATICK_CSS = """
         display: none !important;
     }
 
+    /* Preserve the original header overlay so no dark bar consumes space
+       above the Moon Monitor on phone screens. */
     [data-testid="stHeader"] {
         background: transparent !important;
     }
@@ -352,7 +367,10 @@ LUNATICK_CSS = """
 
     /* ---------------------------------------------------------------------
        Persistent lower-left Lunatick home logo
-       --------------------------------------------------------------------- */
+       ---------------------------------------------------------------------
+       Sits at the true bottom-left of the viewport, in the same strip as
+       Streamlit's native "Manage app" control. Does not modify, offset,
+       or depend on the bottom navigation bar in any way. */
     [class*="st-key-lunatick-home-logo"] {
         height: 0 !important;
         margin: 0 !important;
@@ -365,6 +383,7 @@ LUNATICK_CSS = """
         z-index: 1001 !important;
         left: 0 !important;
         bottom: 0 !important;
+        /* The Home logo remains at its original full half-screen width. */
         width: 50vw !important;
         height: 2.625rem !important;
         margin: 0 !important;
@@ -407,6 +426,8 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* Persistent compact Settings control, placed directly beside the
+       lower-left Home logo. It is independent of the fixed navigation rail. */
     [class*="st-key-lunatick-settings-gear"] {
         height: 0 !important;
         margin: 0 !important;
@@ -455,6 +476,7 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* Selected utility destinations use the shared Rising-card gold state. */
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[kind="primary"],
     [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick-settings-gear"] [data-testid="stButton"] > button[kind="primary"],
@@ -466,6 +488,9 @@ LUNATICK_CSS = """
         opacity: 1 !important;
     }
 
+    /* The lower-right area belongs to Streamlit's optional hosted control.
+       Leave it as the native app background when that control is not mounted,
+       rather than drawing a full-width lunar-glass panel that can look broken. */
     @media (max-width: 480px) {
         [class*="st-key-lunatick-home-logo"] [data-testid="stButton"] {
             width: 50vw !important;
@@ -489,12 +514,19 @@ LUNATICK_CSS = """
 
     /* ---------------------------------------------------------------------
        Fixed bottom navigation
-       --------------------------------------------------------------------- */
+       ---------------------------------------------------------------------
+       The keyed container at the end of this file receives the documented
+       `.st-key-lunatick-bottom-nav` class in Streamlit 1.40+.
+    */
+
+    /* Begin app content flush with the viewport top while retaining enough
+       lower clearance for the fixed navigation and persistent controls. */
     [data-testid="stMainBlockContainer"] {
         padding-bottom: 9rem;
         padding-top: 0 !important;
     }
 
+    /* Pin only the dedicated navigation container to the viewport. */
     .st-key-lunatick-bottom-nav {
         position: fixed;
         z-index: 1000;
@@ -511,12 +543,15 @@ LUNATICK_CSS = """
         -webkit-backdrop-filter: blur(14px);
     }
 
+    /* Centre the contents on wide displays while the bar spans the viewport. */
     .st-key-lunatick-bottom-nav > div {
         max-width: 1400px;
         margin-left: auto;
         margin-right: auto;
     }
 
+    /* The five primary destinations now fit in one fixed row. Streamlit's
+       responsive stacking is overridden only inside this dedicated rail. */
     .st-key-lunatick-bottom-nav [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
@@ -529,38 +564,25 @@ LUNATICK_CSS = """
         width: 100% !important;
     }
 
+    /* Five equal columns eliminate horizontal rail scrolling on every screen. */
     .st-key-lunatick-bottom-nav [data-testid="stColumn"] {
         flex: 1 1 0 !important;
         min-width: 0 !important;
         width: auto !important;
     }
 
-    /* The button keeps its native inline-flex layout so the five tabs remain
-       in a single horizontal rail. We only allow whitespace to wrap so the
-       newline we pass in the label can render as a stack inside the <p>. */
+    /* These rules are deliberately scoped to the navigation, leaving every
+       other Lunatick button unchanged. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         min-height: 2.7rem;
         padding: 0.35rem 0.35rem;
         border-radius: 0.7rem;
         font-size: 0.7rem;
         line-height: 1.15;
-        white-space: pre-line !important;
+        white-space: nowrap;
     }
 
-    /* Streamlit 1.40+ wraps the button label inside an inner <p> that lives
-       in a markdown container. The \n we pass in the label is preserved by
-       that <p>'s default whitespace, so we force pre-line onto it (and onto
-       the markdown container) without touching the button's own display
-       mode. That keeps the rail horizontal while the emoji and text stack. */
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"],
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] p {
-        white-space: pre-line !important;
-        text-align: center !important;
-        margin: 0 !important;
-        line-height: 1.15 !important;
-    }
-
+    /* Every destination starts as a blue, softly graduated lunar panel. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
         border: 1px solid #38bdf8 !important;
@@ -577,6 +599,7 @@ LUNATICK_CSS = """
         outline: none;
     }
 
+    /* The selected destination uses the dark-purple, purple-bordered state. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[kind="primary"],
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
         background: linear-gradient(135deg, #21113f 0%, #3b1b72 55%, #180c30 100%) !important;
@@ -585,6 +608,9 @@ LUNATICK_CSS = """
         color: #f0e6ff !important;
     }
 
+    /* Streamlit portals fixed controls through their own keyed element
+       wrappers. Keep Home and Settings in the established blue/purple system
+       while the five destinations inherit distinct Cosmic Card tile accents. */
     [class*="st-key-bottom_nav_calendar"] { --nav-card-accent: #d8dee9; --nav-card-glow: rgba(216, 222, 233, 0.20); }
     [class*="st-key-bottom_nav_cosmic_cards"] { --nav-card-accent: #9c7bff; --nav-card-glow: rgba(156, 123, 255, 0.22); }
     [class*="st-key-bottom_nav_community"] { --nav-card-accent: #66a8ff; --nav-card-glow: rgba(102, 168, 255, 0.22); }
@@ -600,6 +626,9 @@ LUNATICK_CSS = """
         color: #dbeeff !important;
     }
 
+    /* Home and Settings form a paired LunaTicK utility zone. Inactive controls
+       echo the upper logo's purple panel while active controls keep their shared
+       Rising-gold state farther below. This rule deliberately changes paint only. */
     [class*="st-key-lunatick_home_logo_button"] button[kind="secondary"],
     [class*="st-key-lunatick_home_logo_button"] button[data-testid="stBaseButton-secondary"],
     [class*="st-key-lunatick_settings_gear_button"] button[kind="secondary"],
@@ -620,6 +649,8 @@ LUNATICK_CSS = """
         color: #ffffff !important;
     }
 
+    /* The five destination buttons use the established Cosmic Card border,
+       inset glow, and deep panel surface associated with their tile accent. */
     [class*="st-key-bottom_nav_"] button[kind="secondary"],
     [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-secondary"] {
         background: linear-gradient(145deg, rgba(31, 46, 78, 0.92), rgba(8, 14, 29, 0.96)) !important;
@@ -638,6 +669,8 @@ LUNATICK_CSS = """
         color: var(--nav-card-accent) !important;
     }
 
+    /* A selected destination visibly arrives with a short gold bloom. The
+       slower settle remains compact enough for the fixed mobile rail. */
     @keyframes lunatick-nav-active-arrival {
         0% { opacity: 0.30; transform: translateY(5px) scale(0.84); filter: brightness(0.58) saturate(0.72); }
         42% { opacity: 1; transform: translateY(-3px) scale(1.075); filter: brightness(1.38) saturate(1.18); }
@@ -652,6 +685,8 @@ LUNATICK_CSS = """
         will-change: transform, filter, opacity;
     }
 
+    /* Instant touch confirmation is visible before Streamlit changes the
+       destination, then the selected control plays its arrival sequence. */
     [class*="st-key-bottom_nav_"] button:active,
     [class*="st-key-lunatick_home_logo_button"] button:active,
     [class*="st-key-lunatick_settings_gear_button"] button:active {
@@ -660,6 +695,8 @@ LUNATICK_CSS = """
         box-shadow: 0 0 26px rgba(247, 210, 92, 0.58) !important;
     }
 
+    /* Whichever of the seven controls is selected uses the shared Rising-card
+       gold state. Other primary destinations retain their own Card accent. */
     [class*="st-key-bottom_nav_"] button[kind="primary"],
     [class*="st-key-bottom_nav_"] button[data-testid="stBaseButton-primary"],
     [class*="st-key-lunatick_home_logo_button"] button[kind="primary"],
@@ -682,6 +719,9 @@ LUNATICK_CSS = """
         }
     }
 
+    /* Keep the longer Connect label compact without changing the shared
+       desktop tab height. Its icon-over-label layout is enabled only on
+       narrow phones below. */
     .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
         letter-spacing: -0.01em;
         overflow-wrap: normal;
@@ -691,6 +731,8 @@ LUNATICK_CSS = """
     }
 
     @media (max-width: 480px) {
+        /* Midpoint lift above the hosted platform's bottom-right management
+           overlay. The rail buttons and their horizontal layout are unchanged. */
         [data-testid="stMainBlockContainer"] {
             padding-bottom: calc(8.425rem + env(safe-area-inset-bottom));
             padding-top: 0 !important;
@@ -711,16 +753,6 @@ LUNATICK_CSS = """
             min-height: 2.55rem;
             padding: 0.3rem 0.2rem;
             font-size: 0.63rem;
-            white-space: pre-line !important;
-        }
-
-        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
-        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"],
-        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] p {
-            white-space: pre-line !important;
-            text-align: center !important;
-            margin: 0 !important;
-            line-height: 1.15 !important;
         }
 
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
@@ -730,6 +762,8 @@ LUNATICK_CSS = """
             word-break: keep-all !important;
         }
 
+        /* Keep the musical-tone destination as one intact compact label,
+           even on the 375 px-wide phone shown in the report. */
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_tones button {
             font-size: 0.56rem !important;
             letter-spacing: -0.035em;
@@ -740,6 +774,9 @@ LUNATICK_CSS = """
             word-break: keep-all !important;
         }
 
+        /* Journal is the widest remaining compact label on narrow iPhones.
+           Tighten only its own typography and padding so the final "l" cannot
+           create a third line or stretch the otherwise fixed-height rail. */
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_journal button {
             font-size: 0.56rem !important;
             letter-spacing: -0.02em;
@@ -751,6 +788,9 @@ LUNATICK_CSS = """
         }
     }
 
+    /* On tablet and desktop, the persistent sidebar occupies 18.75rem.
+       Keep both navigation rows wholly inside the remaining content region.
+       The mobile rail below 769px deliberately retains its existing geometry. */
     @media (min-width: 769px) {
         .st-key-lunatick-bottom-nav {
             bottom: 2.625rem;
@@ -783,7 +823,10 @@ LUNATICK_CSS = """
 
     /* ---------------------------------------------------------------------
        Fixed contextual Help control
-       --------------------------------------------------------------------- */
+       ---------------------------------------------------------------------
+       The keyed trigger and guide are fixed-position overlays. They do not
+       participate in normal page flow, keeping compact Home/Connect screens
+       and the established fixed navigation unchanged. */
     [class*="st-key-lunatick-page-help-button"],
     [class*="st-key-lunatick-profile-button"],
     .stElementContainer:has(.st-key-lunatick-page-help-button),
@@ -795,6 +838,9 @@ LUNATICK_CSS = """
         pointer-events: none;
     }
 
+    /* Streamlit gives each container a layout wrapper in the parent flex stack.
+       Flatten these two wrappers as well so their normal 1rem row gap cannot
+       contribute invisible scroll height beneath the fixed overlay. */
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-button),
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-page-help-popover),
     [data-testid="stLayoutWrapper"]:has(.st-key-lunatick-profile-button) {
@@ -849,6 +895,8 @@ LUNATICK_CSS = """
         position: fixed !important;
         top: calc(0.9rem + env(safe-area-inset-top)) !important;
         right: calc(2rem + env(safe-area-inset-right)) !important;
+        /* Streamlit's transparent header sits at z-index 999990. The Help
+           trigger must be above it for physical taps, not only DOM clicks. */
         z-index: 1000001 !important;
         width: 2.15rem !important;
         height: 2.15rem !important;
@@ -1218,6 +1266,9 @@ def render_home():
 
 def render_tones():
     """Render Lunatick's client-side, user-controlled Web Audio tone space."""
+    # This local import deliberately leaves the existing top-level imports
+    # untouched. The component runs in an isolated browser iframe, so no audio
+    # or listening data is sent to the server.
     import streamlit.components.v1 as components
 
     tone_generator_html = r"""
@@ -2042,9 +2093,14 @@ if st.query_params.get("reading_requests") == "1":
     st.session_state.nav_page = "Reading Requests"
     st.query_params.pop("reading_requests", None)
 
+# A calendar day uses a lightweight query route so the compact HTML grid stays
+# horizontal on phones. Preserve Track on that route even if Streamlit creates
+# a fresh script session for the browser navigation.
 if str(st.query_params.get("track_day", "")).strip():
     st.session_state.nav_page = "Calendar"
 
+# Community usernames use this lightweight route to open the same safe public
+# profile surface without placing immutable account identifiers in the UI.
 requested_profile = str(st.query_params.get("profile", "")).strip().lstrip("@")
 if requested_profile:
     st.session_state.profile_hub_lookup = requested_profile
@@ -2052,6 +2108,8 @@ if requested_profile:
     st.session_state.nav_page = "Profile"
     st.query_params.pop("profile", None)
 
+# Existing sessions may still point to a former standalone social tab. Move
+# those users directly into the unified Community destination on the next run.
 if st.session_state.nav_page in {"Chat", "Boards", "LunaTick Talk", "LunaTicK Talk"}:
     st.session_state.nav_page = "Community"
 
@@ -2249,6 +2307,8 @@ else:
     st.session_state.nav_page = "Home"
     st.rerun()
 
+# Both fixed controls sit outside normal page flow, so neither shifts destinations
+# or extends compact Home/Connect screens.
 render_profile_launcher(current_page)
 if profile_drawer is not None:
     try:
@@ -2269,7 +2329,11 @@ with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-        nav_label = f"{icon}\n{compact_label}"
+        nav_label = (
+            f"{icon}\n{compact_label}"
+            if page_name in ("Community", "Journal", "Tones")
+            else f"{icon} {compact_label}"
+        )
         with column:
             st.button(
                 nav_label,
