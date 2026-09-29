@@ -586,25 +586,6 @@ LUNATICK_CSS = """
         justify-content: center !important;
     }
 
-    /* Streamlit 1.40+ wraps the button label inside an inner div and a <p>
-       (inside a markdown container). The newline we pass in the label lives
-       inside those inner elements, so white-space must be forced down to them
-       as well. Otherwise the browser collapses the \n and both the emoji and
-       the text render on a single line. */
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button *,
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
-        white-space: pre-line !important;
-        text-align: center !important;
-        margin: 0 !important;
-        line-height: 1.15 !important;
-    }
-
-    .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
-        display: block !important;
-        width: 100% !important;
-    }
-
     /* Every destination starts as a blue, softly graduated lunar panel. */
     .st-key-lunatick-bottom-nav [data-testid="stButton"] > button {
         background: linear-gradient(135deg, #071a31 0%, #0b3159 55%, #07111f 100%) !important;
@@ -781,17 +762,6 @@ LUNATICK_CSS = """
             flex-direction: column !important;
             align-items: center !important;
             justify-content: center !important;
-        }
-
-        /* The same inner-wrapper rule from the desktop block is repeated here
-           so narrow phones stack emoji above label instead of on one line. */
-        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button *,
-        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button p,
-        .st-key-lunatick-bottom-nav [data-testid="stButton"] > button [data-testid="stMarkdownContainer"] {
-            white-space: pre-line !important;
-            text-align: center !important;
-            margin: 0 !important;
-            line-height: 1.15 !important;
         }
 
         .st-key-lunatick-bottom-nav .st-key-bottom_nav_community button {
@@ -2398,4 +2368,3 @@ with st.container(key="lunatick-settings-gear"):
         help="Open Settings",
         on_click=set_nav_page,
         args=("Settings",),
-    )
