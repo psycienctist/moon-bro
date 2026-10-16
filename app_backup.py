@@ -1,9 +1,11 @@
 import streamlit as st
 import ephem
 import importlib
+import json
 import math
 import requests
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time as dt_time
+from zoneinfo import ZoneInfo
 
 # ---------------------------------------------------------------------------
 # Import modules
@@ -65,7 +67,7 @@ if getattr(reading_requests, "READING_REQUESTS_MODULE_VERSION", None) != "reader
 # A warm Streamlit worker can retain an older Cosmic Card renderer and routing
 # function after app.py updates. Require the complete approved visual-trade
 # module version rather than checking only a helper that older releases share.
-if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "birth_chart_svg_v2":
+if getattr(cosmic_cards, "CARD_MODULE_VERSION", None) != "birth_chart_horoscope_v1":
     cosmic_cards = importlib.reload(cosmic_cards)
 
 # The phone-first Track renderer is also an imported module. Reload it only
@@ -306,6 +308,58 @@ LUNATICK_CSS = """
     .etitle { color: #fff; font-weight: 600; font-size: 0.9rem; }
     .edesc { color: #8b949e; font-size: 0.75rem; line-height: 1.2; }
     .event-date { color: #ff7b72; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; margin-top: 0.3rem; }
+
+    .lunar-events-widget {
+        background: rgba(13, 17, 23, 0.78);
+        border: 1px solid rgba(188, 140, 255, 0.42);
+        border-radius: 11px;
+        box-shadow: inset 0 0 20px rgba(31, 111, 235, 0.04);
+        margin: 0.15rem auto 0.55rem;
+        max-width: 720px;
+        overflow: hidden;
+        padding: 0.42rem 0.62rem 0.5rem;
+        text-align: left;
+    }
+    .lunar-events-title {
+        color: #bc8cff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 1.6px;
+        margin: 0 0 0.25rem;
+        text-align: center;
+    }
+    .lunar-event-row {
+        align-items: center;
+        border-top: 1px solid rgba(188, 140, 255, 0.12);
+        display: grid;
+        gap: 0.35rem;
+        grid-template-columns: 1.15rem minmax(0, 1fr) auto auto;
+        min-height: 1.55rem;
+        padding: 0.2rem 0.05rem;
+    }
+    .lunar-event-phase { color: #f0f6fc; font-size: 0.73rem; font-weight: 600; min-width: 0; }
+    .lunar-event-date, .lunar-event-countdown {
+        color: #9aa7bd;
+        font-size: 0.64rem;
+        white-space: nowrap;
+    }
+    .lunar-event-countdown { color: #58a6ff; font-weight: 700; }
+    .lunar-event-badge {
+        border: 1px solid rgba(188, 140, 255, 0.35);
+        border-radius: 8px;
+        color: #d2a8ff;
+        font-size: 0.52rem;
+        letter-spacing: 0.4px;
+        padding: 0.08rem 0.25rem;
+        text-transform: uppercase;
+    }
+    @media (max-width: 520px) {
+        .lunar-events-widget { margin-left: 0; margin-right: 0; padding-left: 0.5rem; padding-right: 0.5rem; }
+        .lunar-event-row { grid-template-columns: 1rem minmax(0, 1fr) auto auto; }
+        .lunar-event-phase { font-size: 0.68rem; }
+        .lunar-event-date, .lunar-event-countdown { font-size: 0.58rem; }
+    }
 
     /* Fluid visual feedback for Streamlit expanders, including Cosmic Card
        term explanations. The opening panel fades/slides in without changing
@@ -624,6 +678,23 @@ LUNATICK_CSS = """
         border: 1px solid #38bdf8 !important;
         box-shadow: 0 0 12px rgba(56, 189, 248, 0.28) !important;
         color: #dbeeff !important;
+    }
+
+    /* Keep every destination button in a consistent two-row composition:
+       centered emoji on top, existing description beneath. */
+    [class*="st-key-bottom_nav_"] button {
+        align-items: center !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        line-height: 1.08 !important;
+        white-space: pre-line !important;
+    }
+    [class*="st-key-bottom_nav_"] button p {
+        line-height: 1.08 !important;
+        margin: 0 !important;
+        text-align: center !important;
+        white-space: pre-line !important;
     }
 
     /* Home and Settings form a paired LunaTicK utility zone. Inactive controls
@@ -1126,6 +1197,176 @@ def get_celestial_data(date_utc: datetime):
     }
 
 
+def get_upcoming_lunar_events(now_utc: datetime | None = None, count: int = 3):
+    """Return the next lunar milestones in Eastern Time for the Home widget."""
+    eastern = ZoneInfo("America/New_York")
+    now = now_utc or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    phases = (
+        ("New Moon", "🌑", ephem.next_new_moon),
+        ("First Quarter", "🌓", ephem.next_first_quarter_moon),
+        ("Full Moon", "🌕", ephem.next_full_moon),
+        ("Last Quarter", "🌗", ephem.next_last_quarter_moon),
+    )
+    events = []
+    for kind, emoji, finder in phases:
+        event_utc = ephem.Date(finder(ephem.Date(now))).datetime().replace(tzinfo=timezone.utc)
+        local = event_utc.astimezone(eastern)
+        seconds_away = max(0, (event_utc - now).total_seconds())
+        events.append({
+            "kind": kind,
+            "emoji": emoji,
+            "display_date": local.strftime("%b %-d"),
+            "days_away": int((seconds_away + 86399) // 86400),
+            "is_eclipse": False,
+            "timestamp": event_utc.timestamp(),
+        })
+    return sorted(events, key=lambda event: event["timestamp"])[:max(0, count)]
+
+
+def render_upcoming_lunar_events_widget(now_utc: datetime) -> None:
+    """Render the compact, chronological lunar milestones on Home."""
+    events = get_upcoming_lunar_events(now_utc, count=3)
+    rows = []
+    for event in events:
+        badge = '<span class="lunar-event-badge">Eclipse</span>' if event["is_eclipse"] else ""
+        rows.append(
+            f"""
+            <div class="lunar-event-row">
+                <span aria-hidden="true">{event['emoji']}</span>
+                <span class="lunar-event-phase">{event['kind']}</span>
+                <span class="lunar-event-date">{event['display_date']}</span>
+                <span class="lunar-event-countdown">{event['days_away']}d</span>
+                {badge}
+            </div>
+            """
+        )
+
+    st.html(
+        """
+        <section class="lunar-events-widget" aria-label="Upcoming lunar events">
+          <div class="lunar-events-title">UPCOMING LUNAR EVENTS</div>
+          {rows}
+        </section>
+        """.format(rows="".join(rows)),
+    )
+
+
+_LUNAR_EASTERN_ZONE = ZoneInfo("America/New_York")
+_LUNAR_REMINDER_HOUR = 19
+_LUNAR_REMINDER_MINUTE = 0
+_LUNAR_REMINDER_COUNT = 8
+
+
+def _app_lunar_eve_reminder(event_utc: datetime, kind: str) -> dict[str, str | int]:
+    eastern_event_date = event_utc.astimezone(_LUNAR_EASTERN_ZONE).date()
+    reminder_date = eastern_event_date - timedelta(days=1)
+    reminder_local = datetime.combine(
+        reminder_date,
+        dt_time(_LUNAR_REMINDER_HOUR, _LUNAR_REMINDER_MINUTE),
+        tzinfo=_LUNAR_EASTERN_ZONE,
+    )
+    return {
+        "kind": kind,
+        "label": f"{kind} Moon",
+        "local_date": reminder_date.isoformat(),
+        "reminder_iso": reminder_local.isoformat(),
+        "timestamp_ms": int(reminder_local.timestamp() * 1000),
+    }
+
+
+def _app_upcoming_lunar_eve_reminders(
+    now_utc: datetime | None = None,
+    count: int = _LUNAR_REMINDER_COUNT,
+) -> list[dict[str, str | int]]:
+    now_utc = now_utc or datetime.now(timezone.utc)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    now_utc = now_utc.astimezone(timezone.utc)
+    observer_date = ephem.Date(now_utc)
+    candidates: list[dict[str, str | int]] = []
+    for kind, finder in (("Full", ephem.next_full_moon), ("New", ephem.next_new_moon)):
+        event = finder(observer_date)
+        for _ in range(count + 2):
+            event_utc = ephem.Date(event).datetime().replace(tzinfo=timezone.utc)
+            reminder = _app_lunar_eve_reminder(event_utc, kind)
+            if int(reminder["timestamp_ms"]) > int(now_utc.timestamp() * 1000):
+                candidates.append(reminder)
+            event = finder(event)
+    unique = {int(item["timestamp_ms"]): item for item in candidates}
+    return sorted(unique.values(), key=lambda item: int(item["timestamp_ms"]))[:count]
+
+
+def _app_format_lunar_reminder(item: dict[str, str | int]) -> str:
+    reminder = datetime.fromtimestamp(
+        int(item["timestamp_ms"]) / 1000,
+        tz=_LUNAR_EASTERN_ZONE,
+    )
+    return f"{item['label']} · {reminder.strftime('%b %-d, %Y at %-I:%M %p ET')}"
+
+
+def _render_lunar_eve_reminders() -> None:
+    """Render silent browser reminders without requiring a companion module."""
+    import streamlit.components.v1 as components
+
+    reminders = _app_upcoming_lunar_eve_reminders()
+    payload = json.dumps(reminders, separators=(",", ":"))
+    first_three = " · ".join(_app_format_lunar_reminder(item) for item in reminders[:3])
+    st.markdown("### 🌘 Lunar eve reminders")
+    st.caption(
+        "Optional, silent browser reminders at 7:00 PM Eastern on the evening before every Full Moon and New Moon."
+    )
+    st.markdown(
+        f'<div class="lunar-reminder-preview">Next: {first_three}</div>',
+        unsafe_allow_html=True,
+    )
+    components.html(
+        f"""
+        <style>
+          body {{ margin: 0; background: transparent; color: #c9d1d9; font-family: Inter, sans-serif; }}
+          .wrap {{ display: flex; align-items: center; gap: 10px; min-height: 34px; }}
+          button {{ border: 1px solid #bc8cff; border-radius: 9px; padding: 7px 12px; background: linear-gradient(135deg, #241547, #140d2c); color: #f0f6fc; font-weight: 700; cursor: pointer; }}
+          button:hover {{ box-shadow: 0 0 12px rgba(188,140,255,.35); }}
+          #status {{ font-size: 12px; color: #9aa7bd; }}
+        </style>
+        <div class="wrap"><button id="enable" type="button">Enable silent reminders</button><span id="status" role="status" aria-live="polite"></span></div>
+        <script>
+          const events = {payload};
+          const storageKey = "lunatick_lunar_eve_reminders_v1";
+          const button = document.getElementById("enable");
+          const status = document.getElementById("status");
+          let timers = [];
+          function clearTimers() {{ timers.forEach(clearTimeout); timers = []; }}
+          function schedule() {{
+            clearTimers(); const now = Date.now();
+            events.forEach((event) => {{
+              const delay = Number(event.timestamp_ms) - now;
+              if (delay <= 0 || delay > 2147483647) return;
+              timers.push(setTimeout(() => {{
+                if (Notification.permission === "granted") new Notification("LunaTicK · " + event.label, {{ body: "A lunar threshold arrives tomorrow. Take a quiet moment to notice.", silent: true, tag: "lunatick-" + event.timestamp_ms }});
+              }}, delay));
+            }});
+          }}
+          function setEnabled() {{ localStorage.setItem(storageKey, JSON.stringify({{ enabled: true }})); button.textContent = "Silent reminders enabled"; status.textContent = "No sound · 7:00 PM ET · browser must remain available"; schedule(); }}
+          async function enable() {{
+            if (!("Notification" in window)) {{ status.textContent = "This browser does not support notifications."; return; }}
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") setEnabled(); else status.textContent = "Permission was not granted.";
+          }}
+          button.addEventListener("click", enable);
+          try {{ const saved = JSON.parse(localStorage.getItem(storageKey) || "null"); if (saved && saved.enabled && Notification.permission === "granted") setEnabled(); }} catch (_) {{}}
+        </script>
+        """,
+        height=48,
+        scrolling=False,
+    )
+    st.caption(
+        "Browser limitation: Streamlit can schedule these while the browser session is available, but it cannot deliver a true OS push notification after the app is fully closed."
+    )
+
+
 @st.cache_data(ttl=3600)
 def get_ai_insight(natal, current, aspect):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
@@ -1242,6 +1483,8 @@ def render_home():
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    render_upcoming_lunar_events_widget(now_utc)
 
     st.markdown(f"""
     <div class="stats-row">
@@ -1944,6 +2187,9 @@ def render_settings():
             st.toast("Your public Cosmic Card remains visible; its derived values are now private.")
         st.rerun()
 
+    st.markdown("---")
+    _render_lunar_eve_reminders()
+
     if moderation.is_moderator():
         st.markdown("---")
         st.markdown("### 🛡️ Community moderation")
@@ -2329,11 +2575,7 @@ with st.container(key="lunatick-bottom-nav"):
     nav_columns = st.columns(len(NAV_ITEMS), gap="small")
 
     for column, (page_name, icon, compact_label) in zip(nav_columns, NAV_ITEMS):
-        nav_label = (
-            f"{icon}\n{compact_label}"
-            if page_name in ("Community", "Journal", "Tones")
-            else f"{icon} {compact_label}"
-        )
+        nav_label = f"{icon}\n{compact_label}"
         with column:
             st.button(
                 nav_label,
