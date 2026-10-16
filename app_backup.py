@@ -1,11 +1,11 @@
 import streamlit as st
 import ephem
 import importlib
-import json
 import math
 import requests
-from datetime import datetime, timezone, timedelta, time as dt_time
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone, timedelta
+import lunar_notifications
+import lunar_events
 
 # ---------------------------------------------------------------------------
 # Import modules
@@ -1197,38 +1197,9 @@ def get_celestial_data(date_utc: datetime):
     }
 
 
-def get_upcoming_lunar_events(now_utc: datetime | None = None, count: int = 3):
-    """Return the next lunar milestones in Eastern Time for the Home widget."""
-    eastern = ZoneInfo("America/New_York")
-    now = now_utc or datetime.now(timezone.utc)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
-    now = now.astimezone(timezone.utc)
-    phases = (
-        ("New Moon", "🌑", ephem.next_new_moon),
-        ("First Quarter", "🌓", ephem.next_first_quarter_moon),
-        ("Full Moon", "🌕", ephem.next_full_moon),
-        ("Last Quarter", "🌗", ephem.next_last_quarter_moon),
-    )
-    events = []
-    for kind, emoji, finder in phases:
-        event_utc = ephem.Date(finder(ephem.Date(now))).datetime().replace(tzinfo=timezone.utc)
-        local = event_utc.astimezone(eastern)
-        seconds_away = max(0, (event_utc - now).total_seconds())
-        events.append({
-            "kind": kind,
-            "emoji": emoji,
-            "display_date": local.strftime("%b %-d"),
-            "days_away": int((seconds_away + 86399) // 86400),
-            "is_eclipse": False,
-            "timestamp": event_utc.timestamp(),
-        })
-    return sorted(events, key=lambda event: event["timestamp"])[:max(0, count)]
-
-
 def render_upcoming_lunar_events_widget(now_utc: datetime) -> None:
     """Render the compact, chronological lunar milestones on Home."""
-    events = get_upcoming_lunar_events(now_utc, count=3)
+    events = lunar_events.get_upcoming_lunar_events(now_utc, count=3)
     rows = []
     for event in events:
         badge = '<span class="lunar-event-badge">Eclipse</span>' if event["is_eclipse"] else ""
@@ -1251,119 +1222,6 @@ def render_upcoming_lunar_events_widget(now_utc: datetime) -> None:
           {rows}
         </section>
         """.format(rows="".join(rows)),
-    )
-
-
-_LUNAR_EASTERN_ZONE = ZoneInfo("America/New_York")
-_LUNAR_REMINDER_HOUR = 19
-_LUNAR_REMINDER_MINUTE = 0
-_LUNAR_REMINDER_COUNT = 8
-
-
-def _app_lunar_eve_reminder(event_utc: datetime, kind: str) -> dict[str, str | int]:
-    eastern_event_date = event_utc.astimezone(_LUNAR_EASTERN_ZONE).date()
-    reminder_date = eastern_event_date - timedelta(days=1)
-    reminder_local = datetime.combine(
-        reminder_date,
-        dt_time(_LUNAR_REMINDER_HOUR, _LUNAR_REMINDER_MINUTE),
-        tzinfo=_LUNAR_EASTERN_ZONE,
-    )
-    return {
-        "kind": kind,
-        "label": f"{kind} Moon",
-        "local_date": reminder_date.isoformat(),
-        "reminder_iso": reminder_local.isoformat(),
-        "timestamp_ms": int(reminder_local.timestamp() * 1000),
-    }
-
-
-def _app_upcoming_lunar_eve_reminders(
-    now_utc: datetime | None = None,
-    count: int = _LUNAR_REMINDER_COUNT,
-) -> list[dict[str, str | int]]:
-    now_utc = now_utc or datetime.now(timezone.utc)
-    if now_utc.tzinfo is None:
-        now_utc = now_utc.replace(tzinfo=timezone.utc)
-    now_utc = now_utc.astimezone(timezone.utc)
-    observer_date = ephem.Date(now_utc)
-    candidates: list[dict[str, str | int]] = []
-    for kind, finder in (("Full", ephem.next_full_moon), ("New", ephem.next_new_moon)):
-        event = finder(observer_date)
-        for _ in range(count + 2):
-            event_utc = ephem.Date(event).datetime().replace(tzinfo=timezone.utc)
-            reminder = _app_lunar_eve_reminder(event_utc, kind)
-            if int(reminder["timestamp_ms"]) > int(now_utc.timestamp() * 1000):
-                candidates.append(reminder)
-            event = finder(event)
-    unique = {int(item["timestamp_ms"]): item for item in candidates}
-    return sorted(unique.values(), key=lambda item: int(item["timestamp_ms"]))[:count]
-
-
-def _app_format_lunar_reminder(item: dict[str, str | int]) -> str:
-    reminder = datetime.fromtimestamp(
-        int(item["timestamp_ms"]) / 1000,
-        tz=_LUNAR_EASTERN_ZONE,
-    )
-    return f"{item['label']} · {reminder.strftime('%b %-d, %Y at %-I:%M %p ET')}"
-
-
-def _render_lunar_eve_reminders() -> None:
-    """Render silent browser reminders without requiring a companion module."""
-    import streamlit.components.v1 as components
-
-    reminders = _app_upcoming_lunar_eve_reminders()
-    payload = json.dumps(reminders, separators=(",", ":"))
-    first_three = " · ".join(_app_format_lunar_reminder(item) for item in reminders[:3])
-    st.markdown("### 🌘 Lunar eve reminders")
-    st.caption(
-        "Optional, silent browser reminders at 7:00 PM Eastern on the evening before every Full Moon and New Moon."
-    )
-    st.markdown(
-        f'<div class="lunar-reminder-preview">Next: {first_three}</div>',
-        unsafe_allow_html=True,
-    )
-    components.html(
-        f"""
-        <style>
-          body {{ margin: 0; background: transparent; color: #c9d1d9; font-family: Inter, sans-serif; }}
-          .wrap {{ display: flex; align-items: center; gap: 10px; min-height: 34px; }}
-          button {{ border: 1px solid #bc8cff; border-radius: 9px; padding: 7px 12px; background: linear-gradient(135deg, #241547, #140d2c); color: #f0f6fc; font-weight: 700; cursor: pointer; }}
-          button:hover {{ box-shadow: 0 0 12px rgba(188,140,255,.35); }}
-          #status {{ font-size: 12px; color: #9aa7bd; }}
-        </style>
-        <div class="wrap"><button id="enable" type="button">Enable silent reminders</button><span id="status" role="status" aria-live="polite"></span></div>
-        <script>
-          const events = {payload};
-          const storageKey = "lunatick_lunar_eve_reminders_v1";
-          const button = document.getElementById("enable");
-          const status = document.getElementById("status");
-          let timers = [];
-          function clearTimers() {{ timers.forEach(clearTimeout); timers = []; }}
-          function schedule() {{
-            clearTimers(); const now = Date.now();
-            events.forEach((event) => {{
-              const delay = Number(event.timestamp_ms) - now;
-              if (delay <= 0 || delay > 2147483647) return;
-              timers.push(setTimeout(() => {{
-                if (Notification.permission === "granted") new Notification("LunaTicK · " + event.label, {{ body: "A lunar threshold arrives tomorrow. Take a quiet moment to notice.", silent: true, tag: "lunatick-" + event.timestamp_ms }});
-              }}, delay));
-            }});
-          }}
-          function setEnabled() {{ localStorage.setItem(storageKey, JSON.stringify({{ enabled: true }})); button.textContent = "Silent reminders enabled"; status.textContent = "No sound · 7:00 PM ET · browser must remain available"; schedule(); }}
-          async function enable() {{
-            if (!("Notification" in window)) {{ status.textContent = "This browser does not support notifications."; return; }}
-            const permission = await Notification.requestPermission();
-            if (permission === "granted") setEnabled(); else status.textContent = "Permission was not granted.";
-          }}
-          button.addEventListener("click", enable);
-          try {{ const saved = JSON.parse(localStorage.getItem(storageKey) || "null"); if (saved && saved.enabled && Notification.permission === "granted") setEnabled(); }} catch (_) {{}}
-        </script>
-        """,
-        height=48,
-        scrolling=False,
-    )
-    st.caption(
-        "Browser limitation: Streamlit can schedule these while the browser session is available, but it cannot deliver a true OS push notification after the app is fully closed."
     )
 
 
@@ -2188,7 +2046,7 @@ def render_settings():
         st.rerun()
 
     st.markdown("---")
-    _render_lunar_eve_reminders()
+    lunar_notifications.render_lunar_eve_reminders()
 
     if moderation.is_moderator():
         st.markdown("---")
