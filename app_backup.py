@@ -2603,3 +2603,4 @@ with st.container(key="lunatick-settings-gear"):
         key="lunatick_settings_gear_button",
         type="primary" if current_page == "Settings" else "secondary",
         help="Open Settings",
+        on_click=set_nav_page,
