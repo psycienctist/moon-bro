@@ -1,4 +1,4 @@
-from tarot_reading import DECK, MAJORS, POSITIONS, SUITS, _draw_cards
+from tarot_reading import DECK, MAJORS, POSITIONS, SUITS, _combine_three_cards, _draw_cards
 
 
 def test_complete_tarot_deck_has_78_unique_cards():
@@ -27,3 +27,19 @@ def test_draw_has_no_duplicate_cards():
         cards = _draw_cards(count)
         assert len(cards) == count
         assert len({card["name"] for card, _ in cards}) == count
+
+
+
+def test_three_card_reflection_connects_positions_and_guidance():
+    lookup = {card["name"]: card for card in DECK}
+    cards = [
+        (lookup["Justice"], False),
+        (lookup["Six of Swords"], False),
+        (lookup["Ten of Pentacles"], False),
+    ]
+    narrative = _combine_three_cards(cards, "finding a steadier path")
+    assert "What shaped this" in narrative
+    assert "What is present" in narrative
+    assert "A helpful next step" in narrative
+    assert "finding a steadier path" in narrative
+    assert "not a fixed forecast" in narrative
