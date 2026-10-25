@@ -68,7 +68,7 @@ def build_deck() -> list[dict]:
     for index, (name, upright, reversed_meaning, advice) in enumerate(MAJORS):
         deck.append({"name": name, "arcana": "Major Arcana", "upright": upright,
                      "reversed": reversed_meaning, "advice": advice,
-                     "keywords": upright, "image_file": f"RWS_Tarot_{index:02d}_{name.replace(' ', '_')}.jpg"})
+                     "keywords": upright, "image_file": f"RWS Tarot {index:02d} {name.removeprefix('The ')}.jpg"})
     for suit, (element, themes, shadows, advice) in SUITS.items():
         for rank_index, (rank, theme, shadow) in enumerate(RANKS):
             name = f"{rank} of {suit}"
@@ -78,7 +78,7 @@ def build_deck() -> list[dict]:
                 "reversed": f"{shadow}; {shadows}",
                 "advice": advice,
                 "keywords": f"{theme}; {element}",
-                "image_file": f"RWS_Tarot_{rank.upper()}_of_{suit.upper()}.jpg" if rank in ("Ace","Page","Knight","Queen","King") else f"RWS_Tarot_{rank_index+1:02d}_of_{suit.upper()}.jpg",
+                "image_file": f"{ {'Wands': 'Wands', 'Cups': 'Cups', 'Swords': 'Swords', 'Pentacles': 'Pents'}[suit] }{ (rank_index + 1):02d}.jpg",
             })
     return deck
 
