@@ -11,6 +11,11 @@ TIMEOUT_SECONDS = 12
 def _secret(name: str, default: str = "") -> str:
     try:
         value = st.secrets.get(name, default)
+        if not value:
+            try:
+                value = st.secrets.get("tarot_ai", {}).get(name, default)
+            except Exception:
+                value = default
         if value:
             return str(value).strip()
     except Exception:
