@@ -5,7 +5,7 @@ import os
 import requests
 import streamlit as st
 
-TIMEOUT_SECONDS = 18
+TIMEOUT_SECONDS = 12
 
 
 def _secret(name: str, default: str = "") -> str:
@@ -75,7 +75,7 @@ def _gemini(prompt):
     model = _secret("GEMINI_MODEL", "gemini-2.5-flash")
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key": key}, headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "x-goog-api-key": key},
         json={"systemInstruction": {"parts": [{"text": "You are Lunatick's thoughtful Tarot interpreter."}]},
               "contents": [{"role": "user", "parts": [{"text": prompt}]}],
               "generationConfig": {"temperature": 0.85, "maxOutputTokens": 850}},
