@@ -179,60 +179,87 @@ def render_tarot() -> None:
         )
         st.caption("You can leave this blank. Avoid entering private information you would not want saved in the app session.")
     
-        names = [card["name"] for card in DECK]
-        # Compact, mobile-friendly selection controls keep the complete deck available without
-        # loading 78 large images at once; selected cards are shown with their artwork on reveal.
-        selected = []
-        picker_cols = st.columns(3)
+        # Shuffle the complete deck once per session; the grid shows identical backs until reveal.
+        if "tarot_grid_order" not in st.session_state:
+            st.session_state["tarot_grid_order"] = random.sample(DECK, len(DECK))
+        if "tarot_grid_selected" not in st.session_state:
+            st.session_state["tarot_grid_selected"] = []
+        if "tarot_grid_revealed" not in st.session_state:
+            st.session_state["tarot_grid_revealed"] = False
+
         labels = ["What shaped this", "What is present", "A helpful next step"]
-        for i, (col, label) in enumerate(zip(picker_cols, labels)):
-            with col:
-                st.markdown(f"**{i + 1}. {label}**")
-                chosen_name = st.selectbox(
-                    "Choose a card", names, index=(i * 17 + 11) % len(names),
-                    key=f"tarot_selected_card_{i}", label_visibility="collapsed"
-                )
-                selected.append(chosen_name)
-    
-        if len(set(selected)) < 3:
-            st.warning("Choose three different cards to make your reading.")
-        if st.button(
-            "Reveal my three cards", type="primary", use_container_width=True,
-            key="tarot_reveal_selected"
-        ):
-            if len(set(selected)) == 3:
+        selected_indices = st.session_state["tarot_grid_selected"]
+        st.caption(f"Cards selected: {len(selected_indices)} of 3")
+        st.write("Tap any three face-down cards. Their identities stay hidden until you reveal your draw.")
+
+        # Six columns provide a compact grid while keeping each card a comfortable tap target.
+        for start in range(0, len(DECK), 6):
+            cols = st.columns(6)
+            for offset, col in enumerate(cols):
+                grid_index = start + offset
+                if grid_index >= len(DECK):
+                    continue
+                with col:
+                    is_selected = grid_index in selected_indices
+                    if st.session_state["tarot_grid_revealed"] and is_selected:
+                        card_name = st.session_state["tarot_grid_order"][grid_index]["name"]
+                        button_label = "✓"
+                        help_text = card_name
+                    else:
+                        button_label = "✦" if not is_selected else "✓"
+                        help_text = "Selected card" if is_selected else "Face-down tarot card"
+                    disabled = st.session_state["tarot_grid_revealed"] or (len(selected_indices) >= 3 and not is_selected)
+                    if st.button(button_label, key=f"tarot_grid_card_{grid_index}", help=help_text,
+                                 use_container_width=True, disabled=disabled):
+                        if is_selected:
+                            selected_indices.remove(grid_index)
+                        elif len(selected_indices) < 3:
+                            selected_indices.append(grid_index)
+                        st.session_state["tarot_grid_selected"] = selected_indices
+                        st.rerun()
+
+        st.markdown(
+            "<style>div[data-testid=\"st-key-tarot_grid_card_0\"] button{min-height:48px;}"
+            "div[data-testid^=\"st-key-tarot_grid_card_\"] button{min-height:48px;font-size:1.1rem;"
+            "border:1px solid rgba(188,140,255,.55);border-radius:8px;background:rgba(35,22,65,.55);}"
+            "</style>", unsafe_allow_html=True
+        )
+
+        if len(selected_indices) == 3 and not st.session_state["tarot_grid_revealed"]:
+            if st.button("Reveal my three cards", type="primary", use_container_width=True, key="tarot_reveal_grid"):
+                st.session_state["tarot_grid_revealed"] = True
                 st.session_state["tarot_selected_reading"] = {
-                    "cards": [(name, random.random() < 0.28) for name in selected],
+                    "cards": [
+                        (st.session_state["tarot_grid_order"][idx]["name"], random.random() < 0.28)
+                        for idx in selected_indices
+                    ],
                     "intention": intention.strip(),
                 }
-    
-        reading = st.session_state.get("tarot_selected_reading")
-        if reading:
-            reading_names = [name for name, _ in reading["cards"]]
-            if reading_names == selected:
-                st.markdown(
-                    "<style>@keyframes tarotReveal{0%{transform:rotateY(90deg);opacity:.15}100%{transform:rotateY(0);opacity:1}}"
-                    ".tarot-reveal{animation:tarotReveal .65s ease-out both;transform-origin:center;}</style>",
-                    unsafe_allow_html=True
-                )
-                st.markdown("### Your revealed reading")
+                st.rerun()
+
+        if st.session_state["tarot_grid_revealed"]:
+            reading = st.session_state.get("tarot_selected_reading")
+            if reading:
                 lookup = {card["name"]: card for card in DECK}
                 drawn = [(lookup[name], reversed_card) for name, reversed_card in reading["cards"]]
+                st.markdown("### Your revealed reading")
                 reveal_cols = st.columns(3)
                 for col, ((card, reversed_card), position) in zip(reveal_cols, zip(drawn, labels)):
                     with col:
-                        st.markdown("<div class='tarot-reveal'>", unsafe_allow_html=True)
                         _display_card(card, reversed_card, position)
-                        st.markdown("</div>", unsafe_allow_html=True)
                 st.markdown("### Bringing the reading together")
                 st.markdown(_combine_three_cards(drawn, reading.get("intention", "")))
                 st.info(
                     "Reflection, not fate: a difficult theme is not a sentence or a guarantee. "
                     "Use it as a prompt to prepare, seek support, set a boundary, or choose a different approach."
                 )
-            else:
-                st.caption("Your previous reveal is kept below only when it matches your current card choices. Reveal again to update it.")
-    
+            if st.button("Shuffle and draw again", use_container_width=True, key="tarot_grid_shuffle_again"):
+                st.session_state["tarot_grid_order"] = random.sample(DECK, len(DECK))
+                st.session_state["tarot_grid_selected"] = []
+                st.session_state["tarot_grid_revealed"] = False
+                st.session_state.pop("tarot_selected_reading", None)
+                st.rerun()
+
         with st.expander("Browse all 78 cards and their meanings"):
             for card in DECK:
                 st.markdown(f"**{card['name']}** — {card['upright']}.")
