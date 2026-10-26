@@ -1483,7 +1483,7 @@ def render_home():
         </div>
         <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
             <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
-            <a class="home-reading-request-button" href="?tarot=1" aria-label="Open Tarot">✦ Tarot Reading</a>
+            <a class="home-reading-request-button" href="?tarot=1" aria-label="Open Tarot">✦ Reading Requests</a>
         </div>
     </div>
     """, unsafe_allow_html=True)
