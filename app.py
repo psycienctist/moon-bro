@@ -24,6 +24,7 @@ import boards
 import chat_room
 import community
 import reading_requests
+import tarot_reading
 import moderation
 import auth
 import database_backup
@@ -2336,7 +2337,7 @@ if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
 
 if st.query_params.get("reading_requests") == "1":
-    st.session_state.nav_page = "Reading Requests"
+    st.session_state.nav_page = "Tarot"
     st.query_params.pop("reading_requests", None)
 
 # A calendar day uses a lightweight query route so the compact HTML grid stays
@@ -2537,6 +2538,8 @@ elif current_page == "Community":
     community.render_community()
 elif current_page == "Reading Requests":
     reading_requests.render_reading_requests()
+elif current_page == "Tarot":
+    tarot_reading.render_tarot()
 elif current_page == "Cosmic Cards":
     cosmic_cards.render_cosmic_cards_tab()
 elif current_page == "Profile":
