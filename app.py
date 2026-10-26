@@ -24,6 +24,7 @@ import boards
 import chat_room
 import community
 import reading_requests
+import tarot_reading
 import moderation
 import auth
 import database_backup
@@ -1479,7 +1480,7 @@ def render_home():
         </div>
         <div style="margin-top:0.8rem; background:rgba(0,0,0,0.3); padding:0.8rem; border-radius:10px; border:1px solid #1f6feb;">
             <div style="color:{cur_moon_c}; font-size:1.05rem; font-weight:700; margin-bottom:0.28rem;">{current['moon_symbol']} Moon in {current['moon_sign']}</div>
-            <a class="home-reading-request-button" href="?reading_requests=1" aria-label="Open Reading Requests">✦ Reading Requests</a>
+            <a class="home-reading-request-button" href="?tarot=1" aria-label="Open Tarot">✦ Reading Requests</a>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2335,6 +2336,10 @@ if "current_phase" not in st.session_state:
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "Home"
 
+if st.query_params.get("tarot") == "1":
+    st.session_state.nav_page = "Tarot"
+    st.query_params.pop("tarot", None)
+
 if st.query_params.get("reading_requests") == "1":
     st.session_state.nav_page = "Reading Requests"
     st.query_params.pop("reading_requests", None)
@@ -2535,6 +2540,8 @@ if current_page == "Home":
     render_home()
 elif current_page == "Community":
     community.render_community()
+elif current_page == "Tarot":
+    tarot_reading.render_tarot()
 elif current_page == "Reading Requests":
     reading_requests.render_reading_requests()
 elif current_page == "Cosmic Cards":
