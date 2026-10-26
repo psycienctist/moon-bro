@@ -329,45 +329,15 @@ LUNATICK_CSS = """
         margin: 0 0 0.25rem;
         text-align: center;
     }
-    /* Each row is a native <details> disclosure — no JS required. The default
-       marker is suppressed in favor of a custom chevron that rotates on open,
-       and the opening content reuses the same reveal animation already used
-       for Streamlit expanders elsewhere on this page. */
     .lunar-event-row {
-        border-top: 1px solid rgba(188, 140, 255, 0.12);
-    }
-    .lunar-event-row > summary {
         align-items: center;
-        border-left: 2px solid transparent;
-        cursor: pointer;
+        border-top: 1px solid rgba(188, 140, 255, 0.12);
         display: grid;
         gap: 0.35rem;
-        grid-template-columns: 1.15rem minmax(0, 1fr) auto auto auto;
-        list-style: none;
+        grid-template-columns: 1.15rem minmax(0, 1fr) auto auto;
         min-height: 1.55rem;
-        outline: none;
-        padding: 0.2rem 1.15rem 0.2rem 0.3rem;
-        position: relative;
-        transition: background-color 160ms ease, border-left-color 160ms ease;
+        padding: 0.2rem 0.05rem;
     }
-    .lunar-event-row > summary::-webkit-details-marker { display: none; }
-    .lunar-event-row > summary::marker { content: ""; }
-    .lunar-event-row > summary::after {
-        color: #9aa7bd;
-        content: "\203A";
-        font-size: 0.85rem;
-        font-weight: 700;
-        position: absolute;
-        right: 0.1rem;
-        top: 50%;
-        transform: translateY(-50%) rotate(0deg);
-        transition: transform 200ms ease;
-    }
-    .lunar-event-row[open] > summary::after { transform: translateY(-50%) rotate(90deg); }
-    .lunar-event-row > summary:hover { background: rgba(188, 140, 255, 0.06); }
-    .lunar-event-row > summary:focus-visible { box-shadow: inset 0 0 0 1px rgba(188, 140, 255, 0.55); }
-    .lunar-event-row.retrograde > summary { border-left-color: rgba(255, 123, 114, 0.6); background: rgba(255, 123, 114, 0.05); }
-    .lunar-event-row.eclipse > summary { border-left-color: rgba(255, 169, 77, 0.6); background: rgba(255, 169, 77, 0.05); }
     .lunar-event-phase { color: #f0f6fc; font-size: 0.73rem; font-weight: 600; min-width: 0; }
     .lunar-event-date, .lunar-event-countdown {
         color: #9aa7bd;
@@ -384,25 +354,11 @@ LUNATICK_CSS = """
         padding: 0.08rem 0.25rem;
         text-transform: uppercase;
     }
-    .lunar-event-row.eclipse .lunar-event-badge { border-color: rgba(255, 169, 77, 0.5); color: #ffb347; }
-    .lunar-event-row.retrograde .lunar-event-badge { border-color: rgba(255, 123, 114, 0.5); color: #ff7b72; }
-    .lunar-event-insight {
-        animation: lunatick-expander-reveal 220ms ease-out both;
-        color: #c9d1d9;
-        font-size: 0.68rem;
-        line-height: 1.42;
-        padding: 0 1.15rem 0.6rem 1.5rem;
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .lunar-event-insight { animation: none !important; }
-        .lunar-event-row > summary::after { transition: none !important; }
-    }
     @media (max-width: 520px) {
         .lunar-events-widget { margin-left: 0; margin-right: 0; padding-left: 0.5rem; padding-right: 0.5rem; }
-        .lunar-event-row > summary { grid-template-columns: 1rem minmax(0, 1fr) auto auto auto; }
+        .lunar-event-row { grid-template-columns: 1rem minmax(0, 1fr) auto auto; }
         .lunar-event-phase { font-size: 0.68rem; }
         .lunar-event-date, .lunar-event-countdown { font-size: 0.58rem; }
-        .lunar-event-insight { font-size: 0.64rem; padding-left: 1.3rem; }
     }
 
     /* Fluid visual feedback for Streamlit expanders, including Cosmic Card
@@ -1241,142 +1197,8 @@ def get_celestial_data(date_utc: datetime):
     }
 
 
-_MOON_PHASE_INSIGHTS = {
-    "New Moon": (
-        "The Moon sits between Earth and Sun, invisible in our sky — a traditional marker for "
-        "setting intentions and starting fresh."
-    ),
-    "First Quarter": (
-        "Half-lit and rising by midday, this phase often brings decision points — a nudge to act "
-        "on what the New Moon began."
-    ),
-    "Full Moon": (
-        "Fully illuminated and directly opposite the Sun, this phase is tied to culmination, "
-        "visibility, and release."
-    ),
-    "Last Quarter": (
-        "Half-lit and waning, this phase favors letting go, tying up loose ends, and clearing "
-        "space for what's next."
-    ),
-}
-
-# Verified against NASA/EclipseWise (eclipsewise.com) for eclipse dates, and
-# Almanac.com / Farmers' Almanac / Cafe Astrology / EarthSky for retrograde
-# windows. Dates are UTC calendar days; retrogrades list station-to-station.
-_ECLIPSE_EVENTS_UTC = (
-    {
-        "kind": "Annular Solar Eclipse", "emoji": "🌞", "date": "2027-02-06",
-        "insight": (
-            "The Moon passes in front of the Sun but doesn't fully cover it, leaving a bright "
-            "ring. Astrologically read as an intensified New Moon — a sharper, more fated kind "
-            "of reset."
-        ),
-    },
-    {
-        "kind": "Penumbral Lunar Eclipse", "emoji": "🌘", "date": "2027-02-20",
-        "insight": (
-            "The Moon passes through only the faint outer edge of Earth's shadow — a subtle "
-            "dimming. Astrologically read as a softer, extra-emotional Full Moon."
-        ),
-    },
-    {
-        "kind": "Penumbral Lunar Eclipse", "emoji": "🌘", "date": "2027-07-18",
-        "insight": (
-            "The Moon passes through only the faint outer edge of Earth's shadow — a subtle "
-            "dimming. Astrologically read as a softer, extra-emotional Full Moon."
-        ),
-    },
-    {
-        "kind": "Total Solar Eclipse", "emoji": "🌞", "date": "2027-08-02",
-        "insight": (
-            "The Moon fully covers the Sun's disk. Astrologically read as the most charged "
-            "version of a New Moon — abrupt beginnings and fated-feeling resets."
-        ),
-    },
-    {
-        "kind": "Penumbral Lunar Eclipse", "emoji": "🌘", "date": "2027-08-17",
-        "insight": (
-            "The Moon passes through only the faint outer edge of Earth's shadow — a subtle "
-            "dimming. Astrologically read as a softer, extra-emotional Full Moon."
-        ),
-    },
-)
-
-_MERCURY_RETROGRADE_INSIGHT = (
-    "Mercury appears to move backward across our sky. Associated with miscommunication, tech "
-    "hiccups, and travel delays — also a solid window for revisiting, reviewing, and reconnecting."
-)
-_VENUS_RETROGRADE_INSIGHT = (
-    "Venus appears to reverse course. Associated with revisiting relationships, money, and "
-    "personal values — old connections or unresolved matters can resurface."
-)
-_MARS_RETROGRADE_INSIGHT = (
-    "Mars appears to move backward. Associated with stalled momentum and redirected energy — "
-    "better for reassessing goals than forcing new action."
-)
-
-_RETROGRADE_EVENTS_UTC = (
-    {"kind": "Mercury Retrograde", "emoji": "☿", "start": "2026-10-24", "end": "2026-11-13", "insight": _MERCURY_RETROGRADE_INSIGHT},
-    {"kind": "Venus Retrograde", "emoji": "♀", "start": "2026-10-03", "end": "2026-11-13", "insight": _VENUS_RETROGRADE_INSIGHT},
-    {"kind": "Mars Retrograde", "emoji": "♂", "start": "2027-01-10", "end": "2027-04-01", "insight": _MARS_RETROGRADE_INSIGHT},
-    {"kind": "Mercury Retrograde", "emoji": "☿", "start": "2027-02-09", "end": "2027-03-03", "insight": _MERCURY_RETROGRADE_INSIGHT},
-    {"kind": "Mercury Retrograde", "emoji": "☿", "start": "2027-06-10", "end": "2027-07-04", "insight": _MERCURY_RETROGRADE_INSIGHT},
-    {"kind": "Mercury Retrograde", "emoji": "☿", "start": "2027-10-07", "end": "2027-10-28", "insight": _MERCURY_RETROGRADE_INSIGHT},
-)
-
-
-def _resolve_eclipse_events(now_utc: datetime) -> list[dict]:
-    resolved = []
-    for event in _ECLIPSE_EVENTS_UTC:
-        event_date = datetime.fromisoformat(event["date"]).replace(tzinfo=timezone.utc)
-        if event_date < now_utc:
-            continue
-        days_away = max(0, (event_date - now_utc).days)
-        resolved.append({
-            "category": "eclipse",
-            "kind": event["kind"],
-            "emoji": event["emoji"],
-            "display_date": event_date.strftime("%b %-d, %Y"),
-            "days_away": days_away,
-            "status": "upcoming",
-            "insight": event["insight"],
-            "timestamp": event_date.timestamp(),
-        })
-    return resolved
-
-
-def _resolve_retrograde_events(now_utc: datetime) -> list[dict]:
-    resolved = []
-    for event in _RETROGRADE_EVENTS_UTC:
-        start = datetime.fromisoformat(event["start"]).replace(tzinfo=timezone.utc)
-        end = datetime.fromisoformat(event["end"]).replace(tzinfo=timezone.utc)
-        if end < now_utc:
-            continue
-        if start <= now_utc <= end:
-            status = "active"
-            days_away = max(0, (end - now_utc).days)
-            display_date = f"ends {end.strftime('%b %-d')}"
-            relevant_ts = end.timestamp()
-        else:
-            status = "upcoming"
-            days_away = max(0, (start - now_utc).days)
-            display_date = f"{start.strftime('%b %-d')}\u2013{end.strftime('%b %-d')}"
-            relevant_ts = start.timestamp()
-        resolved.append({
-            "category": "retrograde",
-            "kind": event["kind"],
-            "emoji": event["emoji"],
-            "display_date": display_date,
-            "days_away": days_away,
-            "status": status,
-            "insight": event["insight"],
-            "timestamp": relevant_ts,
-        })
-    return resolved
-
-
-def get_upcoming_lunar_events(now_utc: datetime | None = None, count: int = 5):
-    """Return the next lunar milestones, eclipses, and retrogrades for the Home widget."""
+def get_upcoming_lunar_events(now_utc: datetime | None = None, count: int = 3):
+    """Return the next lunar milestones in Eastern Time for the Home widget."""
     eastern = ZoneInfo("America/New_York")
     now = now_utc or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -1394,53 +1216,38 @@ def get_upcoming_lunar_events(now_utc: datetime | None = None, count: int = 5):
         local = event_utc.astimezone(eastern)
         seconds_away = max(0, (event_utc - now).total_seconds())
         events.append({
-            "category": "moon_phase",
             "kind": kind,
             "emoji": emoji,
             "display_date": local.strftime("%b %-d"),
             "days_away": int((seconds_away + 86399) // 86400),
-            "status": "upcoming",
-            "insight": _MOON_PHASE_INSIGHTS[kind],
+            "is_eclipse": False,
             "timestamp": event_utc.timestamp(),
         })
-    events.extend(_resolve_eclipse_events(now))
-    events.extend(_resolve_retrograde_events(now))
     return sorted(events, key=lambda event: event["timestamp"])[:max(0, count)]
 
 
 def render_upcoming_lunar_events_widget(now_utc: datetime) -> None:
-    """Render the compact, chronological, expandable lunar + astrological milestones on Home."""
-    events = get_upcoming_lunar_events(now_utc, count=5)
+    """Render the compact, chronological lunar milestones on Home."""
+    events = get_upcoming_lunar_events(now_utc, count=3)
     rows = []
     for event in events:
-        if event["category"] == "eclipse":
-            badge = '<span class="lunar-event-badge">Eclipse</span>'
-        elif event["status"] == "active":
-            badge = '<span class="lunar-event-badge">Active now</span>'
-        elif event["category"] == "retrograde":
-            badge = '<span class="lunar-event-badge">Retrograde</span>'
-        else:
-            badge = ""
-
+        badge = '<span class="lunar-event-badge">Eclipse</span>' if event["is_eclipse"] else ""
         rows.append(
             f"""
-            <details class="lunar-event-row {event['category']}">
-                <summary>
-                    <span aria-hidden="true">{event['emoji']}</span>
-                    <span class="lunar-event-phase">{event['kind']}</span>
-                    <span class="lunar-event-date">{event['display_date']}</span>
-                    <span class="lunar-event-countdown">{event['days_away']}d</span>
-                    {badge}
-                </summary>
-                <div class="lunar-event-insight">{event['insight']}</div>
-            </details>
+            <div class="lunar-event-row">
+                <span aria-hidden="true">{event['emoji']}</span>
+                <span class="lunar-event-phase">{event['kind']}</span>
+                <span class="lunar-event-date">{event['display_date']}</span>
+                <span class="lunar-event-countdown">{event['days_away']}d</span>
+                {badge}
+            </div>
             """
         )
 
     st.html(
         """
-        <section class="lunar-events-widget" aria-label="Upcoming lunar and astrological events">
-          <div class="lunar-events-title">UPCOMING LUNAR &amp; ASTROLOGICAL EVENTS</div>
+        <section class="lunar-events-widget" aria-label="Upcoming lunar events">
+          <div class="lunar-events-title">UPCOMING LUNAR EVENTS</div>
           {rows}
         </section>
         """.format(rows="".join(rows)),
@@ -2797,5 +2604,3 @@ with st.container(key="lunatick-settings-gear"):
         type="primary" if current_page == "Settings" else "secondary",
         help="Open Settings",
         on_click=set_nav_page,
-        args=("Settings",),
-    )
