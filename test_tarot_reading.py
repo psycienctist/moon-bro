@@ -1,4 +1,6 @@
-from tarot_reading import DECK, MAJORS, POSITIONS, SUITS, _combine_three_cards, _draw_cards
+from datetime import date, timedelta
+
+from tarot_reading import DECK, MAJORS, POSITIONS, SUITS, _combine_three_cards, _daily_draw, _draw_cards
 
 
 def test_complete_tarot_deck_has_78_unique_cards():
@@ -42,4 +44,35 @@ def test_three_card_reflection_connects_positions_and_guidance():
     assert "What is present" in narrative
     assert "A helpful next step" in narrative
     assert "finding a steadier path" in narrative
+    assert "not a fixed forecast" in narrative
+
+
+
+def test_daily_draw_is_stable_for_account_and_date():
+    today = date(2026, 10, 26)
+    first = _daily_draw("account-a", today)
+    second = _daily_draw("account-a", today)
+    assert [(c["name"], rev) for c, rev in first] == [(c["name"], rev) for c, rev in second]
+    assert len({c["name"] for c, _ in first}) == 3
+
+
+def test_daily_draw_changes_with_date_or_account():
+    today = date(2026, 10, 26)
+    baseline = [(c["name"], rev) for c, rev in _daily_draw("account-a", today)]
+    next_day = [(c["name"], rev) for c, rev in _daily_draw("account-a", today + timedelta(days=1))]
+    other_account = [(c["name"], rev) for c, rev in _daily_draw("account-b", today)]
+    assert baseline != next_day
+    assert baseline != other_account
+
+
+def test_combined_reading_uses_specific_third_card_guidance():
+    lookup = {card["name"]: card for card in DECK}
+    cards = [
+        (lookup["Justice"], False),
+        (lookup["Six of Swords"], False),
+        (lookup["Ten of Pentacles"], False),
+    ]
+    narrative = _combine_three_cards(cards, "finding a steadier path")
+    assert "Justice" in narrative and "Six of Swords" in narrative and "Ten of Pentacles" in narrative
+    assert "concrete, sustainable step" in narrative
     assert "not a fixed forecast" in narrative
