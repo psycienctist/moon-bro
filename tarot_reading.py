@@ -157,7 +157,7 @@ def _combine_three_cards(cards: list[tuple[dict, bool]], intention: str = "") ->
 
 
 def render_tarot() -> None:
-    private_tab, tarot_tab = st.tabs(["Private Readings", "Tarot"])
+    tarot_tab, private_tab = st.tabs(["Tarot", "Community Requests"])
     with private_tab:
         reading_requests.render_reading_requests()
     with tarot_tab:
@@ -192,39 +192,57 @@ def render_tarot() -> None:
         st.caption(f"Cards selected: {len(selected_indices)} of 3")
         st.write("Tap any three face-down cards. Their identities stay hidden until you reveal your draw.")
 
-        # Six columns provide a compact grid while keeping each card a comfortable tap target.
-        for start in range(0, len(DECK), 6):
-            cols = st.columns(6)
-            for offset, col in enumerate(cols):
-                grid_index = start + offset
-                if grid_index >= len(DECK):
-                    continue
-                with col:
-                    is_selected = grid_index in selected_indices
-                    if st.session_state["tarot_grid_revealed"] and is_selected:
-                        card_name = st.session_state["tarot_grid_order"][grid_index]["name"]
-                        button_label = "✓"
-                        help_text = card_name
-                    else:
-                        button_label = "✦" if not is_selected else "✓"
-                        help_text = "Selected card" if is_selected else "Face-down tarot card"
-                    disabled = st.session_state["tarot_grid_revealed"] or (len(selected_indices) >= 3 and not is_selected)
-                    if st.button(button_label, key=f"tarot_grid_card_{grid_index}", help=help_text,
-                                 use_container_width=True, disabled=disabled):
-                        if is_selected:
-                            selected_indices.remove(grid_index)
-                        elif len(selected_indices) < 3:
-                            selected_indices.append(grid_index)
-                        st.session_state["tarot_grid_selected"] = selected_indices
-                        st.rerun()
+        # Six columns on desktop; CSS wraps into a larger three-column tap grid on phones.
+        with st.container(key="tarot_picker_grid"):
+            for start in range(0, len(DECK), 6):
+                cols = st.columns(6)
+                for offset, col in enumerate(cols):
+                    grid_index = start + offset
+                    if grid_index >= len(DECK):
+                        continue
+                    with col:
+                        is_selected = grid_index in selected_indices
+                        if st.session_state["tarot_grid_revealed"] and is_selected:
+                            card_name = st.session_state["tarot_grid_order"][grid_index]["name"]
+                            button_label = "✓"
+                            help_text = card_name
+                        else:
+                            button_label = "✦" if not is_selected else "✓"
+                            help_text = "Selected card" if is_selected else "Face-down tarot card"
+                        disabled = st.session_state["tarot_grid_revealed"] or (len(selected_indices) >= 3 and not is_selected)
+                        if st.button(button_label, key=f"tarot_grid_card_{grid_index}", help=help_text,
+                                     use_container_width=True, disabled=disabled):
+                            if is_selected:
+                                selected_indices.remove(grid_index)
+                            elif len(selected_indices) < 3:
+                                selected_indices.append(grid_index)
+                            st.session_state["tarot_grid_selected"] = selected_indices
+                            st.rerun()
 
+        selected_animation_css = "".join(
+            f".st-key-tarot_grid_card_{idx} button{{animation:tarotFlip .55s ease-out;}}"
+            for idx in selected_indices
+        )
         st.markdown(
-            "<style>div[data-testid=\"st-key-tarot_grid_card_0\"] button{min-height:48px;}"
-            "div[data-testid^=\"st-key-tarot_grid_card_\"] button{min-height:48px;font-size:1.1rem;"
-            "border:1px solid rgba(188,140,255,.55);border-radius:8px;background:rgba(35,22,65,.55);}"
+            "<style>"
+            "@keyframes tarotFlip{0%{transform:perspective(500px) rotateY(0deg) scale(1);}"
+            "45%{transform:perspective(500px) rotateY(90deg) scale(.94);}"
+            "100%{transform:perspective(500px) rotateY(0deg) scale(1);}}"
+            ".st-key-tarot_picker_grid [data-testid=\\"stHorizontalBlock\\"]{gap:.4rem!important;}"
+            ".st-key-tarot_picker_grid [data-testid=\\"column\\"]{min-width:0!important;}"
+            ".st-key-tarot_picker_grid button{min-height:58px!important;font-size:1.25rem!important;"
+            "border:1px solid rgba(188,140,255,.65)!important;border-radius:9px!important;"
+            "background:linear-gradient(145deg,rgba(49,31,84,.95),rgba(9,12,22,.98))!important;"
+            "box-shadow:inset 0 0 0 2px rgba(188,140,255,.08);transition:transform .2s ease,border-color .2s ease;}"
+            ".st-key-tarot_picker_grid button:hover{border-color:#d7b7ff!important;transform:translateY(-2px);}"
+            "@media(max-width:600px){"
+            ".st-key-tarot_picker_grid [data-testid=\\"stHorizontalBlock\\"]{flex-wrap:wrap!important;}"
+            ".st-key-tarot_picker_grid [data-testid=\\"column\\"]{flex:1 0 28%!important;width:28%!important;min-width:28%!important;}"
+            "}"
+            "@media(prefers-reduced-motion:reduce){.st-key-tarot_picker_grid button{animation:none!important;transition:none!important;}}"
+            + selected_animation_css +
             "</style>", unsafe_allow_html=True
         )
-
         if len(selected_indices) == 3 and not st.session_state["tarot_grid_revealed"]:
             if st.button("Reveal my three cards", type="primary", use_container_width=True, key="tarot_reveal_grid"):
                 st.session_state["tarot_grid_revealed"] = True
@@ -244,10 +262,13 @@ def render_tarot() -> None:
                 drawn = [(lookup[name], reversed_card) for name, reversed_card in reading["cards"]]
                 st.markdown("### Your revealed reading")
                 st.markdown(
-                    "<style>.st-key-tarot_reveal_row [data-testid=\"stHorizontalBlock\"]{flex-wrap:nowrap!important;gap:.35rem!important}"
-                    ".st-key-tarot_reveal_row [data-testid=\"column\"]{min-width:0!important;flex:1 1 0!important;width:33.333%!important}"
+                    "<style>.st-key-tarot_reveal_row [data-testid=\\"stHorizontalBlock\\"]{flex-wrap:nowrap!important;gap:.45rem!important}"
+                    ".st-key-tarot_reveal_row [data-testid=\\"stHorizontalBlock\\"]>div[data-testid=\\"column\\"]{min-width:0!important;flex:1 1 0!important;width:33.333%!important}"
                     ".st-key-tarot_reveal_row img{max-width:100%!important;height:auto!important}"
-                    ".st-key-tarot_reveal_row [data-testid=\"stMarkdownContainer\"]{overflow-wrap:anywhere;font-size:.88rem}"
+                    ".st-key-tarot_reveal_row [data-testid=\\"stMarkdownContainer\\"]{overflow-wrap:anywhere;font-size:.88rem}"
+                    "@media(max-width:600px){.st-key-tarot_reveal_row [data-testid=\\"stHorizontalBlock\\"]{flex-wrap:wrap!important}"
+                    ".st-key-tarot_reveal_row [data-testid=\\"stHorizontalBlock\\"]>div[data-testid=\\"column\\"]{flex:1 1 100%!important;width:100%!important;min-width:100%!important}}"
+                    "@media(prefers-reduced-motion:reduce){.st-key-tarot_reveal_row *{scroll-behavior:auto!important;}}"
                     "</style>", unsafe_allow_html=True
                 )
                 with st.container(key="tarot_reveal_row"):
