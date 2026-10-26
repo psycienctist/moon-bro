@@ -1288,6 +1288,27 @@ def render_upcoming_lunar_events_widget(now_utc: datetime) -> None:
             "practical": "Confirm dates and details, keep important notes, and reread messages before sending. Delays are ordinary possibilities, not proof that something bad is destined to happen.",
         },
         {
+            "planet": "Saturn", "start": "2026-07-26", "end": "2026-12-10", "icon": "♄",
+            "summary": "Review boundaries, responsibilities, and the structures that support you.",
+            "meaning": "Astrology associates Saturn with commitments, limits, patience, and long-term foundations. Its retrograde is traditionally framed as a chance to reassess whether rules and responsibilities remain useful and fair.",
+            "reflection": "Which responsibility genuinely matters, and where would a clearer boundary make it easier to follow through?",
+            "practical": "Break large obligations into manageable steps and revise routines that are not working. A review is an opportunity, not a verdict.",
+        },
+        {
+            "planet": "Uranus", "start": "2026-09-10", "end": "2027-02-08", "icon": "♅",
+            "summary": "Reconsider independence, change, and ideas that challenge the familiar.",
+            "meaning": "In astrology, Uranus symbolizes innovation, freedom, and disruption of old patterns. A retrograde is often interpreted as a period to consider which changes you actually want rather than reacting to change for its own sake.",
+            "reflection": "Where would a thoughtful experiment give you more freedom without sacrificing stability you value?",
+            "practical": "Test new approaches on a manageable scale and keep what proves useful. There is no need to force a sudden upheaval.",
+        },
+        {
+            "planet": "Neptune", "start": "2026-07-07", "end": "2026-12-12", "icon": "♆",
+            "summary": "Check the difference between hope, intuition, and verifiable information.",
+            "meaning": "Astrological traditions connect Neptune with imagination, ideals, compassion, and uncertainty. Its retrograde can serve as a prompt to look at a cherished belief with both kindness and discernment.",
+            "reflection": "What do you hope is true, and what information would help you see the situation more clearly?",
+            "practical": "Protect time for creativity and rest while checking important claims, expectations, and boundaries against reality.",
+        },
+        {
             "planet": "Jupiter", "start": "2026-12-13", "end": "2027-04-13", "icon": "♃",
             "summary": "Reconsider growth, confidence, and where you are investing effort.",
             "meaning": "Astrological traditions link Jupiter with learning, opportunity, belief, and expansion. Its retrograde is often interpreted as a chance to review an ambition or redefine what growth means to you.",
