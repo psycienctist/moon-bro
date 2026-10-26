@@ -8,6 +8,7 @@ from __future__ import annotations
 import random
 from urllib.parse import quote
 import streamlit as st
+import reading_requests
 
 TAROT_MODULE_VERSION = "lunatick_tarot_v1"
 
@@ -156,79 +157,83 @@ def _combine_three_cards(cards: list[tuple[dict, bool]], intention: str = "") ->
 
 
 def render_tarot() -> None:
-    st.markdown("## ✦ Tarot")
-    st.caption("A reflective reading for perspective—not a fixed prediction or a substitute for your own judgment.")
-    st.markdown(
-        "<div style='border:1px solid rgba(188,140,255,.4);border-radius:12px;padding:.8rem 1rem;margin:.4rem 0 1rem;background:linear-gradient(145deg,rgba(35,22,65,.55),rgba(5,7,10,.8));'>"
-        "<strong>Our reading promise</strong><br>Honest about challenges. Open to possibilities. No doom, fear tactics, or false certainty."
-        "</div>", unsafe_allow_html=True
-    )
-
-    _render_sample_reading()
-    st.markdown("---")
-    st.markdown("### Choose your own three cards")
-    st.write("Browse the deck and select one card for each position. Your cards are revealed together when you are ready.")
-    intention = st.text_input(
-        "Optional question or intention", max_chars=240,
-        placeholder="What would be useful to reflect on?", key="tarot_intention_picker"
-    )
-    st.caption("You can leave this blank. Avoid entering private information you would not want saved in the app session.")
-
-    names = [card["name"] for card in DECK]
-    # Compact, mobile-friendly selection controls keep the complete deck available without
-    # loading 78 large images at once; selected cards are shown with their artwork on reveal.
-    selected = []
-    picker_cols = st.columns(3)
-    labels = ["What shaped this", "What is present", "A helpful next step"]
-    for i, (col, label) in enumerate(zip(picker_cols, labels)):
-        with col:
-            st.markdown(f"**{i + 1}. {label}**")
-            chosen_name = st.selectbox(
-                "Choose a card", names, index=(i * 17 + 11) % len(names),
-                key=f"tarot_selected_card_{i}", label_visibility="collapsed"
-            )
-            selected.append(chosen_name)
-
-    if len(set(selected)) < 3:
-        st.warning("Choose three different cards to make your reading.")
-    if st.button(
-        "Reveal my three cards", type="primary", use_container_width=True,
-        key="tarot_reveal_selected"
-    ):
-        if len(set(selected)) == 3:
-            st.session_state["tarot_selected_reading"] = {
-                "cards": [(name, random.random() < 0.28) for name in selected],
-                "intention": intention.strip(),
-            }
-
-    reading = st.session_state.get("tarot_selected_reading")
-    if reading:
-        reading_names = [name for name, _ in reading["cards"]]
-        if reading_names == selected:
-            st.markdown(
-                "<style>@keyframes tarotReveal{0%{transform:rotateY(90deg);opacity:.15}100%{transform:rotateY(0);opacity:1}}"
-                ".tarot-reveal{animation:tarotReveal .65s ease-out both;transform-origin:center;}</style>",
-                unsafe_allow_html=True
-            )
-            st.markdown("### Your revealed reading")
-            lookup = {card["name"]: card for card in DECK}
-            drawn = [(lookup[name], reversed_card) for name, reversed_card in reading["cards"]]
-            reveal_cols = st.columns(3)
-            for col, ((card, reversed_card), position) in zip(reveal_cols, zip(drawn, labels)):
-                with col:
-                    st.markdown("<div class='tarot-reveal'>", unsafe_allow_html=True)
-                    _display_card(card, reversed_card, position)
-                    st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("### Bringing the reading together")
-            st.markdown(_combine_three_cards(drawn, reading.get("intention", "")))
-            st.info(
-                "Reflection, not fate: a difficult theme is not a sentence or a guarantee. "
-                "Use it as a prompt to prepare, seek support, set a boundary, or choose a different approach."
-            )
-        else:
-            st.caption("Your previous reveal is kept below only when it matches your current card choices. Reveal again to update it.")
-
-    with st.expander("Browse all 78 cards and their meanings"):
-        for card in DECK:
-            st.markdown(f"**{card['name']}** — {card['upright']}.")
-            st.caption("Reversed: " + card["reversed"] + ".")
+    private_tab, tarot_tab = st.tabs(["Private Readings", "Tarot"])
+    with private_tab:
+        reading_requests.render_reading_requests()
+    with tarot_tab:
+        st.markdown("## ✦ Tarot")
+        st.caption("A reflective reading for perspective—not a fixed prediction or a substitute for your own judgment.")
+        st.markdown(
+            "<div style='border:1px solid rgba(188,140,255,.4);border-radius:12px;padding:.8rem 1rem;margin:.4rem 0 1rem;background:linear-gradient(145deg,rgba(35,22,65,.55),rgba(5,7,10,.8));'>"
+            "<strong>Our reading promise</strong><br>Honest about challenges. Open to possibilities. No doom, fear tactics, or false certainty."
+            "</div>", unsafe_allow_html=True
+        )
+    
+        _render_sample_reading()
+        st.markdown("---")
+        st.markdown("### Choose your own three cards")
+        st.write("Browse the deck and select one card for each position. Your cards are revealed together when you are ready.")
+        intention = st.text_input(
+            "Optional question or intention", max_chars=240,
+            placeholder="What would be useful to reflect on?", key="tarot_intention_picker"
+        )
+        st.caption("You can leave this blank. Avoid entering private information you would not want saved in the app session.")
+    
+        names = [card["name"] for card in DECK]
+        # Compact, mobile-friendly selection controls keep the complete deck available without
+        # loading 78 large images at once; selected cards are shown with their artwork on reveal.
+        selected = []
+        picker_cols = st.columns(3)
+        labels = ["What shaped this", "What is present", "A helpful next step"]
+        for i, (col, label) in enumerate(zip(picker_cols, labels)):
+            with col:
+                st.markdown(f"**{i + 1}. {label}**")
+                chosen_name = st.selectbox(
+                    "Choose a card", names, index=(i * 17 + 11) % len(names),
+                    key=f"tarot_selected_card_{i}", label_visibility="collapsed"
+                )
+                selected.append(chosen_name)
+    
+        if len(set(selected)) < 3:
+            st.warning("Choose three different cards to make your reading.")
+        if st.button(
+            "Reveal my three cards", type="primary", use_container_width=True,
+            key="tarot_reveal_selected"
+        ):
+            if len(set(selected)) == 3:
+                st.session_state["tarot_selected_reading"] = {
+                    "cards": [(name, random.random() < 0.28) for name in selected],
+                    "intention": intention.strip(),
+                }
+    
+        reading = st.session_state.get("tarot_selected_reading")
+        if reading:
+            reading_names = [name for name, _ in reading["cards"]]
+            if reading_names == selected:
+                st.markdown(
+                    "<style>@keyframes tarotReveal{0%{transform:rotateY(90deg);opacity:.15}100%{transform:rotateY(0);opacity:1}}"
+                    ".tarot-reveal{animation:tarotReveal .65s ease-out both;transform-origin:center;}</style>",
+                    unsafe_allow_html=True
+                )
+                st.markdown("### Your revealed reading")
+                lookup = {card["name"]: card for card in DECK}
+                drawn = [(lookup[name], reversed_card) for name, reversed_card in reading["cards"]]
+                reveal_cols = st.columns(3)
+                for col, ((card, reversed_card), position) in zip(reveal_cols, zip(drawn, labels)):
+                    with col:
+                        st.markdown("<div class='tarot-reveal'>", unsafe_allow_html=True)
+                        _display_card(card, reversed_card, position)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("### Bringing the reading together")
+                st.markdown(_combine_three_cards(drawn, reading.get("intention", "")))
+                st.info(
+                    "Reflection, not fate: a difficult theme is not a sentence or a guarantee. "
+                    "Use it as a prompt to prepare, seek support, set a boundary, or choose a different approach."
+                )
+            else:
+                st.caption("Your previous reveal is kept below only when it matches your current card choices. Reveal again to update it.")
+    
+        with st.expander("Browse all 78 cards and their meanings"):
+            for card in DECK:
+                st.markdown(f"**{card['name']}** — {card['upright']}.")
+                st.caption("Reversed: " + card["reversed"] + ".")
