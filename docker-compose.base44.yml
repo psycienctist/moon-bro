@@ -1,0 +1,62 @@
+# Base44 development environment for LunaTicK.
+#
+# Run from the repository root:
+#   docker compose -f docker-compose.base44.yml up -d --build
+#
+# The web entry point is host port 3000 (the preview port). The application
+# source is bind-mounted from the checkout and Streamlit runs with
+# --server.runOnSave, so edits appear without rebuilding the image.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    image: base44-lunatick-dev
+    working_dir: /app
+    restart: on-failure
+    ports:
+      - "3000:8501"
+    volumes:
+      # Live source. The SQLite alpha database (lunatick.db, gitignored) is
+      # created in the working directory and therefore lands here as well.
+      - .:/app
+    environment:
+      # Sandbox passthrough: the entry point builds the OIDC redirect URI from
+      # BASE44_PUBLIC_HOST_SUFFIX; BASE44_PREVIEW_MODE only records that this is
+      # the sandbox run (values are read, never hardcoded).
+      - BASE44_PREVIEW_MODE
+      - BASE44_PUBLIC_HOST_SUFFIX
+      - BASE44_SANDBOX_HOST_DOMAIN
+    # External-service credentials delivered by the platform (empty when the
+    # user has not supplied any yet). Listed last so real values win over
+    # anything set elsewhere.
+    env_file:
+      - /run/base44/app.env
+    command:
+      - sh
+      - -ec
+      - >
+        sh docker/base44-entrypoint.sh
+        streamlit run streamlit_app.py
+        --server.port=8501
+        --server.address=0.0.0.0
+        --server.headless=true
+        --server.fileWatcherType=poll
+        --server.runOnSave=true
+        --browser.gatherUsageStats=false
+    healthcheck:
+      # Streamlit's own health endpoint; the app defines no health route.
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health',
+          timeout=5).read().strip() == b'ok' else 1)"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      base44.project: "LunaTicK"
+      base44.kind: "web"
+      base44.port: "3000"

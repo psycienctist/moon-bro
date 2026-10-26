@@ -1,0 +1,21 @@
+# Base44 development image for LunaTicK (Streamlit).
+#
+# This image intentionally contains ONLY the Python runtime and the project's
+# dependencies. The application source is bind-mounted at run time by
+# docker-compose.base44.yml, so editing app.py / any module is picked up by
+# Streamlit's file watcher without rebuilding the image.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Only the dependency manifest is baked in. Rebuild this image when
+# requirements.txt changes (docker compose -f docker-compose.base44.yml build).
+COPY requirements.txt ./
+RUN python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+EXPOSE 8501
