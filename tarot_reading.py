@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import random
 import hashlib
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from urllib.parse import quote
 import streamlit as st
 import reading_requests
@@ -183,7 +184,7 @@ def _combine_three_cards(cards: list[tuple[dict, bool]], intention: str = "", ch
 
 def _daily_draw(user_key: str, day: date | None = None) -> list[tuple[dict, bool]]:
     """Stable daily draw per account and date; anonymous visitors share a session-local key."""
-    day = day or date.today()
+    day = day or datetime.now(ZoneInfo("America/New_York")).date()
     seed = hashlib.sha256(f"lunatick-tarot:{user_key}:{day.isoformat()}".encode("utf-8")).hexdigest()
     rng = random.Random(seed)
     chosen = rng.sample(DECK, 3)
