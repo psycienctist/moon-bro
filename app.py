@@ -1228,31 +1228,170 @@ def get_upcoming_lunar_events(now_utc: datetime | None = None, count: int = 3):
 
 
 def render_upcoming_lunar_events_widget(now_utc: datetime) -> None:
-    """Render the compact, chronological lunar milestones on Home."""
-    events = get_upcoming_lunar_events(now_utc, count=3)
-    rows = []
-    for event in events:
-        badge = '<span class="lunar-event-badge">Eclipse</span>' if event["is_eclipse"] else ""
-        rows.append(
-            f"""
-            <div class="lunar-event-row">
-                <span aria-hidden="true">{event['emoji']}</span>
-                <span class="lunar-event-phase">{event['kind']}</span>
-                <span class="lunar-event-date">{event['display_date']}</span>
-                <span class="lunar-event-countdown">{event['days_away']}d</span>
-                {badge}
-            </div>
-            """
-        )
+    """Render clickable lunar milestones and notable planetary retrogrades on Home."""
+    eastern = ZoneInfo("America/New_York")
+    local_now = now_utc.astimezone(eastern)
+    today = local_now.date()
+    lunar_events = get_upcoming_lunar_events(now_utc, count=3)
 
-    st.html(
-        """
-        <section class="lunar-events-widget" aria-label="Upcoming lunar events">
-          <div class="lunar-events-title">UPCOMING LUNAR EVENTS</div>
-          {rows}
-        </section>
-        """.format(rows="".join(rows)),
+    lunar_guides = {
+        "New Moon": {
+            "meaning": "In lunar astronomy, this phase occurs near the point when the Moon is between Earth and the Sun, so the side facing us is mostly unlit. In astrology, it is commonly used as a symbol of beginnings and intention-setting.",
+            "reflection": "What would you like to begin, simplify, or give more attention to over the next few weeks?",
+        },
+        "First Quarter": {
+            "meaning": "The Moon appears half illuminated as it grows toward full. Astrological traditions associate this phase with decisions, effort, and adjusting a plan as it meets real life.",
+            "reflection": "What small, practical step would move an intention forward—and what needs adjusting?",
+        },
+        "Full Moon": {
+            "meaning": "The Moon's Earth-facing side is fully illuminated. In astrology, the full moon symbolizes culmination, heightened awareness, and seeing a situation from a wider perspective.",
+            "reflection": "What has become clearer lately, and what deserves appreciation before you move on?",
+        },
+        "Last Quarter": {
+            "meaning": "The Moon appears half illuminated as it wanes toward the next new moon. Astrological interpretations often connect this phase with integration, reassessment, and letting go of what no longer helps.",
+            "reflection": "What can you release, revise, or stop carrying into the next cycle?",
+        },
+    }
+
+    events = []
+    for event in lunar_events:
+        event_date = datetime.fromtimestamp(event["timestamp"], tz=timezone.utc).astimezone(eastern).date()
+        guide = lunar_guides.get(event["kind"], {})
+        events.append({
+            "sort_date": event_date,
+            "kind": event["kind"],
+            "icon": event["emoji"],
+            "date_label": event_date.strftime("%b %d").replace(" 0", " "),
+            "status": "Today" if event_date == today else f"In {event['days_away']} day{'s' if event['days_away'] != 1 else ''}",
+            "category": "Lunar phase",
+            "meaning": guide.get("meaning", ""),
+            "reflection": guide.get("reflection", ""),
+            "fact_note": "The phase and date are astronomical calculations; the reflective meaning is an astrological tradition, not a scientific prediction.",
+            "active": False,
+        })
+
+    # Dates are local Eastern calendar dates, based on published station calendars.
+    # Add new cycles here as they are verified; expired cycles are automatically hidden.
+    retrograde_cycles = [
+        {
+            "planet": "Venus", "start": "2026-10-03", "end": "2026-11-13", "icon": "♀",
+            "summary": "A review of relationships, values, self-worth, and spending.",
+            "meaning": "In astrology, Venus is associated with affection, connection, beauty, values, and money. A Venus retrograde is traditionally treated as a period for reviewing what feels reciprocal and meaningful—not as a prediction that a relationship or purchase will go wrong.",
+            "reflection": "Which relationships and commitments feel mutually supportive? Are your choices around time, money, and attention aligned with what matters to you?",
+            "practical": "Make room for honest conversations, review recurring expenses, and give important decisions the time they need. You do not have to reopen an old relationship or make a dramatic change.",
+        },
+        {
+            "planet": "Mercury", "start": "2026-10-24", "end": "2026-11-13", "icon": "☿",
+            "summary": "A useful prompt to review communication, plans, and assumptions.",
+            "meaning": "Astronomically, Mercury only appears to move backward against the background stars from Earth's viewpoint; it has not physically reversed its orbit. In astrology, this period is associated with revisiting messages, schedules, agreements, and unfinished conversations.",
+            "reflection": "What needs clarification? Is there an assumption you could check before reacting or making a decision?",
+            "practical": "Confirm dates and details, keep important notes, and reread messages before sending. Delays are ordinary possibilities, not proof that something bad is destined to happen.",
+        },
+        {
+            "planet": "Saturn", "start": "2026-07-26", "end": "2026-12-10", "icon": "♄",
+            "summary": "Review boundaries, responsibilities, and the structures that support you.",
+            "meaning": "Astrology associates Saturn with commitments, limits, patience, and long-term foundations. Its retrograde is traditionally framed as a chance to reassess whether rules and responsibilities remain useful and fair.",
+            "reflection": "Which responsibility genuinely matters, and where would a clearer boundary make it easier to follow through?",
+            "practical": "Break large obligations into manageable steps and revise routines that are not working. A review is an opportunity, not a verdict.",
+        },
+        {
+            "planet": "Uranus", "start": "2026-09-10", "end": "2027-02-08", "icon": "♅",
+            "summary": "Reconsider independence, change, and ideas that challenge the familiar.",
+            "meaning": "In astrology, Uranus symbolizes innovation, freedom, and disruption of old patterns. A retrograde is often interpreted as a period to consider which changes you actually want rather than reacting to change for its own sake.",
+            "reflection": "Where would a thoughtful experiment give you more freedom without sacrificing stability you value?",
+            "practical": "Test new approaches on a manageable scale and keep what proves useful. There is no need to force a sudden upheaval.",
+        },
+        {
+            "planet": "Neptune", "start": "2026-07-07", "end": "2026-12-12", "icon": "♆",
+            "summary": "Check the difference between hope, intuition, and verifiable information.",
+            "meaning": "Astrological traditions connect Neptune with imagination, ideals, compassion, and uncertainty. Its retrograde can serve as a prompt to look at a cherished belief with both kindness and discernment.",
+            "reflection": "What do you hope is true, and what information would help you see the situation more clearly?",
+            "practical": "Protect time for creativity and rest while checking important claims, expectations, and boundaries against reality.",
+        },
+        {
+            "planet": "Jupiter", "start": "2026-12-13", "end": "2027-04-13", "icon": "♃",
+            "summary": "Reconsider growth, confidence, and where you are investing effort.",
+            "meaning": "Astrological traditions link Jupiter with learning, opportunity, belief, and expansion. Its retrograde is often interpreted as a chance to review an ambition or redefine what growth means to you.",
+            "reflection": "Which goal still feels worthwhile when you examine it carefully, and what would sustainable progress look like?",
+            "practical": "Review the commitments you already have before adding more. A slower pace can help you build something more durable.",
+        },
+        {
+            "planet": "Mars", "start": "2027-01-10", "end": "2027-04-01", "icon": "♂",
+            "summary": "Reflect on motivation, frustration, and how you direct your energy.",
+            "meaning": "Astrology associates Mars with drive, assertion, and action. During its retrograde, the tradition encourages reviewing how effort is used and whether a strategy is effective.",
+            "reflection": "Where would a more deliberate approach serve you better than pushing harder?",
+            "practical": "Break a demanding goal into manageable steps, build in recovery time, and address conflict directly without assuming every disagreement will escalate.",
+        },
+        {
+            "planet": "Mercury", "start": "2027-02-09", "end": "2027-03-03", "icon": "☿",
+            "summary": "Review communication, plans, learning, and unfinished details.",
+            "meaning": "This is the next listed Mercury retrograde cycle after the late-2026 period. Astrological interpretations use it as a reminder to revisit information and make space for corrections.",
+            "reflection": "What would benefit from a second look, a clearer question, or a more careful explanation?",
+            "practical": "Check the details that matter and leave room to adapt. The dates do not determine individual outcomes.",
+        },
+        {
+            "planet": "Mercury", "start": "2027-06-10", "end": "2027-07-04", "icon": "☿",
+            "summary": "Revisit conversations, logistics, and the assumptions behind a plan.",
+            "meaning": "In astrology, Mercury retrograde is a symbolic review period for communication and coordination. It can be used as a prompt to notice where expectations and actual information differ.",
+            "reflection": "What expectation would be useful to verify rather than assume?",
+            "practical": "Confirm arrangements and ask follow-up questions when something is unclear; avoid treating normal complications as omens.",
+        },
+        {
+            "planet": "Mercury", "start": "2027-10-07", "end": "2027-10-28", "icon": "☿",
+            "summary": "Reassess communication and revisit details before moving ahead.",
+            "meaning": "This later-2027 cycle is another traditional invitation to review information, plans, and unfinished conversations—not a forecast of inevitable disruption.",
+            "reflection": "What deserves a thoughtful edit before you call it finished?",
+            "practical": "Use checklists for important details and be willing to correct course when new information arrives.",
+        },
+    ]
+
+    for cycle in retrograde_cycles:
+        start_date = datetime.strptime(cycle["start"], "%Y-%m-%d").date()
+        end_date = datetime.strptime(cycle["end"], "%Y-%m-%d").date()
+        if end_date < today:
+            continue
+        active = start_date <= today <= end_date
+        effective_date = today if active else start_date
+        if active:
+            status = "IN PROGRESS"
+        else:
+            days_until = (start_date - today).days
+            status = "Today" if days_until == 0 else f"In {days_until} days"
+        events.append({
+            "sort_date": effective_date,
+            "kind": f"{cycle['planet']} Retrograde",
+            "icon": cycle["icon"],
+            "date_label": f"{start_date.strftime('%b %d').replace(' 0', ' ')}–{end_date.strftime('%b %d').replace(' 0', ' ')}",
+            "status": status,
+            "category": "Planetary retrograde",
+            "meaning": cycle["meaning"],
+            "reflection": cycle["reflection"],
+            "practical": cycle["practical"],
+            "summary": cycle["summary"],
+            "fact_note": "Retrograde dates describe apparent motion from Earth. The personal meanings below come from astrology, a reflective tradition rather than a scientifically established way to predict events.",
+            "active": active,
+        })
+
+    events.sort(key=lambda item: (item["sort_date"], not item["active"], item["kind"]))
+
+    st.markdown(
+        '<div class="lunar-events-widget"><div class="lunar-events-title">UPCOMING LUNAR & PLANETARY EVENTS</div></div>',
+        unsafe_allow_html=True,
     )
+    st.caption("Select any event for its explanation and a practical reflection. Dates are shown in Eastern Time.")
+
+    for index, event in enumerate(events):
+        status_label = f" · {event['status']}" if event["status"] else ""
+        label = f"{event['icon']}  {event['kind']}  ·  {event['date_label']}{status_label}"
+        with st.expander(label, expanded=False):
+            st.caption(event["category"])
+            if event.get("summary"):
+                st.markdown(f"**At a glance:** {event['summary']}")
+            st.markdown(f"**What it means**\n\n{event['meaning']}")
+            st.markdown(f"**A question to reflect on**\n\n{event['reflection']}")
+            if event.get("practical"):
+                st.markdown(f"**Helpful approach**\n\n{event['practical']}")
+            st.caption(event["fact_note"])
 
 
 _LUNAR_EASTERN_ZONE = ZoneInfo("America/New_York")
