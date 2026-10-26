@@ -9,6 +9,8 @@ import random
 from urllib.parse import quote
 import streamlit as st
 
+from tarot_ai import generate_combined_reading
+
 TAROT_MODULE_VERSION = "lunatick_tarot_v1"
 
 MAJORS = [
@@ -270,7 +272,25 @@ def render_tarot() -> None:
                     _display_card(card, reversed_card, position)
                     st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("### Bringing the reading together")
-            st.markdown(_combine_three_cards(drawn, reading.get("intention", "")))
+            # Cache the interpretation for this exact reveal so Streamlit reruns
+            # do not trigger repeated paid API calls.
+            reading_key = (
+                tuple((card["name"], reversed_card) for card, reversed_card in drawn),
+                reading.get("intention", ""),
+            )
+            if st.session_state.get("tarot_ai_result_key") != reading_key:
+                interpretation, provider = generate_combined_reading(
+                    drawn, reading.get("intention", "")
+                )
+                if not interpretation:
+                    interpretation = _combine_three_cards(drawn, reading.get("intention", ""))
+                st.session_state["tarot_ai_result_key"] = reading_key
+                st.session_state["tarot_ai_result"] = interpretation
+                st.session_state["tarot_ai_provider"] = provider
+            st.markdown(st.session_state["tarot_ai_result"])
+            provider = st.session_state.get("tarot_ai_provider", "Local fallback")
+            if provider != "Local fallback":
+                st.caption(f"Personalized synthesis · {provider}")
             st.info(
                 "Reflection, not fate: a difficult theme is not a sentence or a guarantee. "
                 "Use it as a prompt to prepare, seek support, set a boundary, or choose a different approach."
