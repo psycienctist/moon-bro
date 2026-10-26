@@ -100,7 +100,7 @@ def _display_card(card: dict, reversed_card: bool, position: str) -> None:
         st.markdown(f"### {card['name']}" + (" · Reversed" if reversed_card else ""))
         url = _image_url(card)
         if url:
-            st.image(url, width=180)
+            st.image(url, width=110)
         meaning = card["reversed"] if reversed_card else card["upright"]
         st.caption("Reversed reading" if reversed_card else "Upright reading")
         st.write(meaning.capitalize() + ".")
@@ -243,10 +243,18 @@ def render_tarot() -> None:
                 lookup = {card["name"]: card for card in DECK}
                 drawn = [(lookup[name], reversed_card) for name, reversed_card in reading["cards"]]
                 st.markdown("### Your revealed reading")
-                reveal_cols = st.columns(3)
-                for col, ((card, reversed_card), position) in zip(reveal_cols, zip(drawn, labels)):
-                    with col:
-                        _display_card(card, reversed_card, position)
+                st.markdown(
+                    "<style>.st-key-tarot_reveal_row [data-testid=\"stHorizontalBlock\"]{flex-wrap:nowrap!important;gap:.35rem!important}"
+                    ".st-key-tarot_reveal_row [data-testid=\"column\"]{min-width:0!important;flex:1 1 0!important;width:33.333%!important}"
+                    ".st-key-tarot_reveal_row img{max-width:100%!important;height:auto!important}"
+                    ".st-key-tarot_reveal_row [data-testid=\"stMarkdownContainer\"]{overflow-wrap:anywhere;font-size:.88rem}"
+                    "</style>", unsafe_allow_html=True
+                )
+                with st.container(key="tarot_reveal_row"):
+                    reveal_cols = st.columns(3, gap="small")
+                    for col, ((card, reversed_card), position) in zip(reveal_cols, zip(drawn, labels)):
+                        with col:
+                            _display_card(card, reversed_card, position)
                 st.markdown("### Bringing the reading together")
                 st.markdown(_combine_three_cards(drawn, reading.get("intention", "")))
                 st.info(
