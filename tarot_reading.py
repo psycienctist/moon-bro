@@ -107,7 +107,7 @@ def _display_card(card: dict, reversed_card: bool, position: str) -> None:
         st.caption("Keywords: " + card["keywords"])
 
 def _render_sample_reading() -> None:
-    """Show three sample cards in one row; tap a card to reveal its interpretation."""
+    """Show three compact sample cards in one row, including on portrait phones."""
     st.markdown("### A sample reading")
     st.caption("Illustrative example only — these cards were chosen for the demo, not drawn for you.")
     sample = [
@@ -116,30 +116,51 @@ def _render_sample_reading() -> None:
         (DECK[[c["name"] for c in DECK].index("Ten of Pentacles")], False, "A helpful next step"),
     ]
 
-    # Keep all three cards visible side by side. Their explanations open below the row.
-    cols = st.columns(3, gap="small")
+    # Streamlit may stack columns at narrow viewport widths. Override that behavior
+    # only inside this sample-card row, so all three cards remain visible on phones.
+    st.markdown(
+        "<style>"
+        ".st-key-tarot_sample_cards [data-testid='stHorizontalBlock']{"
+        "flex-wrap:nowrap!important;gap:.35rem!important;align-items:flex-start!important;}"
+        ".st-key-tarot_sample_cards [data-testid='column']{"
+        "min-width:0!important;width:33.333%!important;flex:1 1 0!important;padding:0!important;}"
+        ".st-key-tarot_sample_cards [data-testid='stImage'] img{"
+        "width:100%!important;max-height:145px!important;object-fit:contain!important;}"
+        ".st-key-tarot_sample_cards [data-testid='stMarkdownContainer'] p{"
+        "font-size:.76rem!important;line-height:1.2!important;overflow-wrap:anywhere!important;}"
+        ".st-key-tarot_sample_cards .stButton button{"
+        "min-height:2rem!important;padding:.25rem .15rem!important;font-size:.7rem!important;}"
+        "</style>",
+        unsafe_allow_html=True,
+    )
+
     active_key = "tarot_sample_active_card"
     active = st.session_state.get(active_key, 0)
-    for index, (col, (card, reversed_card, position)) in enumerate(zip(cols, sample)):
-        with col:
-            st.markdown(
-                f"<div style='text-align:center;font-size:.8rem;font-weight:700;min-height:2.2rem;'>{position}</div>",
-                unsafe_allow_html=True,
-            )
-            url = _image_url(card)
-            if url:
-                st.image(url, use_container_width=True)
-            else:
-                st.markdown("🂠")
-            st.markdown(f"<div style='text-align:center;font-weight:700;font-size:.9rem;'>{card['name']}</div>", unsafe_allow_html=True)
-            if st.button(
-                "Show meaning" if active != index else "Meaning selected",
-                key=f"tarot_sample_card_{index}",
-                use_container_width=True,
-                type="primary" if active == index else "secondary",
-            ):
-                st.session_state[active_key] = index
-                active = index
+    with st.container(key="tarot_sample_cards"):
+        cols = st.columns(3, gap="small")
+        for index, (col, (card, reversed_card, position)) in enumerate(zip(cols, sample)):
+            with col:
+                st.markdown(
+                    f"<div style='text-align:center;font-size:.7rem;font-weight:700;min-height:2.5rem;line-height:1.2;'>{position}</div>",
+                    unsafe_allow_html=True,
+                )
+                url = _image_url(card)
+                if url:
+                    st.image(url, use_container_width=True)
+                else:
+                    st.markdown("🂠")
+                st.markdown(
+                    f"<div style='text-align:center;font-weight:700;font-size:.8rem;line-height:1.2;overflow-wrap:anywhere;'>{card['name']}</div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "Meaning" if active != index else "Selected",
+                    key=f"tarot_sample_card_{index}",
+                    use_container_width=True,
+                    type="primary" if active == index else "secondary",
+                ):
+                    st.session_state[active_key] = index
+                    active = index
 
     card, reversed_card, position = sample[active]
     meaning = card["reversed"] if reversed_card else card["upright"]
