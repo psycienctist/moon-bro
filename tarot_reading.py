@@ -107,7 +107,7 @@ def _display_card(card: dict, reversed_card: bool, position: str) -> None:
         st.caption("Keywords: " + card["keywords"])
 
 def _render_sample_reading() -> None:
-    """Show an illustrative reading immediately so first-time visitors understand the experience."""
+    """Show three sample cards in one row; tap a card to reveal its interpretation."""
     st.markdown("### A sample reading")
     st.caption("Illustrative example only — these cards were chosen for the demo, not drawn for you.")
     sample = [
@@ -115,10 +115,40 @@ def _render_sample_reading() -> None:
         (DECK[[c["name"] for c in DECK].index("Six of Swords")], False, "What is present"),
         (DECK[[c["name"] for c in DECK].index("Ten of Pentacles")], False, "A helpful next step"),
     ]
-    cols = st.columns(3)
-    for col, (card, reversed_card, position) in zip(cols, sample):
+
+    # Keep all three cards visible side by side. Their explanations open below the row.
+    cols = st.columns(3, gap="small")
+    active_key = "tarot_sample_active_card"
+    active = st.session_state.get(active_key, 0)
+    for index, (col, (card, reversed_card, position)) in enumerate(zip(cols, sample)):
         with col:
-            _display_card(card, reversed_card, position)
+            st.markdown(
+                f"<div style='text-align:center;font-size:.8rem;font-weight:700;min-height:2.2rem;'>{position}</div>",
+                unsafe_allow_html=True,
+            )
+            url = _image_url(card)
+            if url:
+                st.image(url, use_container_width=True)
+            else:
+                st.markdown("🂠")
+            st.markdown(f"<div style='text-align:center;font-weight:700;font-size:.9rem;'>{card['name']}</div>", unsafe_allow_html=True)
+            if st.button(
+                "Show meaning" if active != index else "Meaning selected",
+                key=f"tarot_sample_card_{index}",
+                use_container_width=True,
+                type="primary" if active == index else "secondary",
+            ):
+                st.session_state[active_key] = index
+                active = index
+
+    card, reversed_card, position = sample[active]
+    meaning = card["reversed"] if reversed_card else card["upright"]
+    st.markdown("---")
+    st.markdown(f"### {card['name']} — {position}")
+    st.write(meaning.capitalize() + ".")
+    st.write("**A constructive way forward:** " + card["advice"])
+    st.caption("Keywords: " + card["keywords"])
+
     st.markdown("**The story connecting these cards**")
     st.write(
         "Justice asks for a clear-eyed and fair look at what has happened. The Six of Swords "
@@ -129,7 +159,6 @@ def _render_sample_reading() -> None:
         "that serve your longer-term wellbeing. They do not guarantee an outcome; they offer "
         "a useful question: what fair, practical choice would make your future feel more secure?"
     )
-
 
 def _combine_three_cards(cards: list[tuple[dict, bool]], intention: str = "") -> str:
     """Create a position-aware narrative rather than repeating generic card definitions."""
